@@ -6,8 +6,9 @@ scipy
 scikit-learn
 tensorflow
 torchaudio
-torchtext
 torchvision
 pandas
 matplotlib
 hypothesis
+expecttest
+requests

@@ -31,7 +31,6 @@ IMPORT_WHITELIST = {
     "time",
     "torch",
     "torchaudio",
-    "torchtext",
     "torchvision",
     "types",
     "typing",
