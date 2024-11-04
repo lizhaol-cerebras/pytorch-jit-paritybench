@@ -170,7 +170,7 @@ test_yaml = _module
 test_yt8m_encoder = _module
 test_yt8m_feature_extractor = _module
 
-from _paritybench_helpers import _mock_config, patch_functional
+from paritybench._paritybench_helpers import _mock_config, patch_functional
 from unittest.mock import mock_open, MagicMock
 from torch.autograd import Function
 from torch.nn import Module

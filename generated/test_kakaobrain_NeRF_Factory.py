@@ -49,7 +49,7 @@ preprocess_shiny_blender = _module
 select_option = _module
 store_image = _module
 
-from _paritybench_helpers import _mock_config, patch_functional
+from paritybench._paritybench_helpers import _mock_config, patch_functional
 from unittest.mock import mock_open, MagicMock
 from torch.autograd import Function
 from torch.nn import Module

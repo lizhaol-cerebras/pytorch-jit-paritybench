@@ -18,7 +18,7 @@ eval_ckpt_main = _module
 eval_ckpt_main_tf1 = _module
 preprocessing = _module
 
-from _paritybench_helpers import _mock_config, patch_functional
+from paritybench._paritybench_helpers import _mock_config, patch_functional
 from unittest.mock import mock_open, MagicMock
 from torch.autograd import Function
 from torch.nn import Module
@@ -859,7 +859,7 @@ class MaxPool2dStaticSamePadding(nn.MaxPool2d):
 
 import torch
 from torch.nn import MSELoss, ReLU
-from _paritybench_helpers import _mock_config, _mock_layer, _paritybench_base, _fails_compile
+from paritybench._paritybench_helpers import _mock_config, _mock_layer, _paritybench_base, _fails_compile
 
 
 TESTCASES = [

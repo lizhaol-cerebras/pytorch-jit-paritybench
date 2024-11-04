@@ -8,7 +8,7 @@ train_variational_autoencoder_jax = _module
 train_variational_autoencoder_pytorch = _module
 train_variational_autoencoder_tensorflow = _module
 
-from _paritybench_helpers import _mock_config, patch_functional
+from paritybench._paritybench_helpers import _mock_config, patch_functional
 from unittest.mock import mock_open, MagicMock
 from torch.autograd import Function
 from torch.nn import Module
@@ -250,7 +250,7 @@ class VariationalFlow(nn.Module):
 
 import torch
 from torch.nn import MSELoss, ReLU
-from _paritybench_helpers import _mock_config, _mock_layer, _paritybench_base, _fails_compile
+from paritybench._paritybench_helpers import _mock_config, _mock_layer, _paritybench_base, _fails_compile
 
 
 TESTCASES = [

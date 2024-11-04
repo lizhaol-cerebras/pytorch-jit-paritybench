@@ -25,7 +25,7 @@ train = _module
 train_gpu_1 = _module
 train_gpu_2 = _module
 
-from _paritybench_helpers import _mock_config, patch_functional
+from paritybench._paritybench_helpers import _mock_config, patch_functional
 from unittest.mock import mock_open, MagicMock
 from torch.autograd import Function
 from torch.nn import Module

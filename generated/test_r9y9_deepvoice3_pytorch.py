@@ -46,7 +46,7 @@ extract_feats = _module
 prepare_htk_alignments_vctk = _module
 prepare_vctk_labels = _module
 
-from _paritybench_helpers import _mock_config, patch_functional
+from paritybench._paritybench_helpers import _mock_config, patch_functional
 from unittest.mock import mock_open, MagicMock
 from torch.autograd import Function
 from torch.nn import Module

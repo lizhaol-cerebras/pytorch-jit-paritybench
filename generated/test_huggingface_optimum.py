@@ -108,7 +108,7 @@ test_configuration_utils = _module
 test_modeling_base = _module
 test_dummpy_input_generators = _module
 
-from _paritybench_helpers import _mock_config, patch_functional
+from paritybench._paritybench_helpers import _mock_config, patch_functional
 from unittest.mock import mock_open, MagicMock
 from torch.autograd import Function
 from torch.nn import Module

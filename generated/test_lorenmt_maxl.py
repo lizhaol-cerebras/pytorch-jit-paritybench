@@ -7,7 +7,7 @@ model_vgg_maxl = _module
 model_vgg_maxl_firstorder = _module
 model_vgg_single = _module
 
-from _paritybench_helpers import _mock_config, patch_functional
+from paritybench._paritybench_helpers import _mock_config, patch_functional
 from unittest.mock import mock_open, MagicMock
 from torch.autograd import Function
 from torch.nn import Module

@@ -75,7 +75,7 @@ static_hetero_graph_temporal_signal = _module
 static_hetero_graph_temporal_signal_batch = _module
 train_test_split = _module
 
-from _paritybench_helpers import _mock_config, patch_functional
+from paritybench._paritybench_helpers import _mock_config, patch_functional
 from unittest.mock import mock_open, MagicMock
 from torch.autograd import Function
 from torch.nn import Module
@@ -3275,7 +3275,7 @@ class MPNNLSTM(nn.Module):
 
 import torch
 from torch.nn import MSELoss, ReLU
-from _paritybench_helpers import _mock_config, _mock_layer, _paritybench_base, _fails_compile
+from paritybench._paritybench_helpers import _mock_config, _mock_layer, _paritybench_base, _fails_compile
 
 
 TESTCASES = [

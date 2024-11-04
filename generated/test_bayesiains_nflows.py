@@ -74,7 +74,7 @@ svd_test = _module
 transform_test = _module
 torchutils_test = _module
 
-from _paritybench_helpers import _mock_config, patch_functional
+from paritybench._paritybench_helpers import _mock_config, patch_functional
 from unittest.mock import mock_open, MagicMock
 from torch.autograd import Function
 from torch.nn import Module
@@ -2466,7 +2466,7 @@ class SVDLinear(Linear):
 
 import torch
 from torch.nn import MSELoss, ReLU
-from _paritybench_helpers import _mock_config, _mock_layer, _paritybench_base, _fails_compile
+from paritybench._paritybench_helpers import _mock_config, _mock_layer, _paritybench_base, _fails_compile
 
 
 TESTCASES = [

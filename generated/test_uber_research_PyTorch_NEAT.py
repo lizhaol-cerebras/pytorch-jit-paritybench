@@ -26,7 +26,7 @@ test_strict_t_maze = _module
 test_t_maze = _module
 test_turning_t_maze = _module
 
-from _paritybench_helpers import _mock_config, patch_functional
+from paritybench._paritybench_helpers import _mock_config, patch_functional
 from unittest.mock import mock_open, MagicMock
 from torch.autograd import Function
 from torch.nn import Module

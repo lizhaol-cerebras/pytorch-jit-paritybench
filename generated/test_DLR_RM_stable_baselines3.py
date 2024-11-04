@@ -94,7 +94,7 @@ test_vec_extract_dict_obs = _module
 test_vec_monitor = _module
 test_vec_normalize = _module
 
-from _paritybench_helpers import _mock_config, patch_functional
+from paritybench._paritybench_helpers import _mock_config, patch_functional
 from unittest.mock import mock_open, MagicMock
 from torch.autograd import Function
 from torch.nn import Module
@@ -982,7 +982,7 @@ def get_actor_critic_arch(net_arch: Union[List[int], Dict[str, List[int]]]) ->Tu
 
 import torch
 from torch.nn import MSELoss, ReLU
-from _paritybench_helpers import _mock_config, _mock_layer, _paritybench_base, _fails_compile
+from paritybench._paritybench_helpers import _mock_config, _mock_layer, _paritybench_base, _fails_compile
 
 
 TESTCASES = [

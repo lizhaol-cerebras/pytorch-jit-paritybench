@@ -41,7 +41,7 @@ test_onnx_bert_rerank = _module
 test_pt_bert_model = _module
 test_pt_distilbert_qa_model = _module
 
-from _paritybench_helpers import _mock_config, patch_functional
+from paritybench._paritybench_helpers import _mock_config, patch_functional
 from unittest.mock import mock_open, MagicMock
 from torch.autograd import Function
 from torch.nn import Module
