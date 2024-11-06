@@ -4,7 +4,7 @@ pytest
 torch
 scipy
 scikit-learn
-tensorflow
+tensorflow-cpu==2.11.1
 torchaudio
 torchvision
 pandas
@@ -12,3 +12,4 @@ matplotlib
 hypothesis
 expecttest
 requests
+urllib3==1.26.15
