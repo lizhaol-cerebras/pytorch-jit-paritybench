@@ -4,7 +4,7 @@ crawled from popular GitHub projects.
 
 ###  Running ParityBench
 
-- [Install conda] with python>=3.8
+- [Install conda] with python>=3.9
 and create/activate a [conda environment]
 
 - Install requirements:
@@ -14,12 +14,6 @@ pip install -r requirements.txt
 conda install pytorch torchvision cpuonly -c pytorch-nightly
 ```
 
-- Run `python main.py`, you should see an output like:
-```
-TorchScript ParityBench:
-          total  passing  score
-projects   1172      346  29.5%
-tests      8292     4734  57.1%
 ```
 A file `errors.csv` is generated containing the top error messages and example
 `generated/*` files to reproduce those errors.
@@ -38,15 +32,13 @@ python main.py --generate-all
 ```
 
 ### Download, generate, evaluate 
-Python version >= 3.9 is highly recommended
-
 You can limit number of github projects to download for testing and running on a smaller set of github repos
 ```
-python main.py --download --download-dir <folder path> --limit 10
+python main.py --download [--download-dir <folder path>] [--limit 10]
 ```
-Generate tests from all downloaded projects
+Generate multiple tests from downloaded projects
 ```
-python main.py --generate-all --download-dir <folder path>
+python main.py --generate-all [--download-dir <folder path>] [--limit 10]
 ```
 You can generate tests for one project folder `-g`. This will extract nn modules from that project and generate a test script `--tests-dir`
 ```

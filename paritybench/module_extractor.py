@@ -97,12 +97,6 @@ class PyTorchModuleExtractor(object):
         except Exception as e:
             return self.errors.record("parse", e)
 
-        m = re.search(r"([a-z0-9_]+)/__init__.py$", filename, re.I)
-        if m:
-            self.output.add_module_alias(m.group(1), has_match)
-        else:
-            self.output.add_module_alias(os.path.splitext(os.path.basename(filename))[0], has_match)
-
         self.search_ast(tree, has_match)
 
     @staticmethod
@@ -277,11 +271,6 @@ class PyTorchModuleExtractor(object):
     def main(self, filename: str):
         basename = re.sub(r"[.]zip$", "", os.path.basename(filename))
 
-        self.output.writelines([
-            "import sys\n",
-            "_module = sys.modules[__name__]\n",
-            "del sys\n"])
-
         if os.path.isdir(filename):
             self.search_directory(filename) # find nn modules, imports, symbols
         else:
@@ -425,22 +414,3 @@ class IncrementalModule(object):
             code = compile(source, filename, "exec")
         exec(code, self.output_module.__dict__, self.output_module.__dict__)
         self.output_py.writelines(["\n", source, "\n"])
-
-    def add_module_alias(self, name: str, overwrite: bool):
-        """
-        We flatten everything we extract into a single module, this adds
-        a symbol to that unified module that points to the same module
-        so that internal a.b.c references work.
-
-        :param name: alternate name for self.output_module
-        :param overwrite: if true, replace an existing symbol
-        """
-        if name in {'global', 'try', 'except', 'if', 'in', 'else', 'for', 'import', 'pass',
-                    'return', 'def', 'int', 'super', 'torch', '__main__'}:
-            return
-        if not re.match(r"^[a-zA-Z_][a-zA-Z0-9_]*$", name):
-            return
-        if name in self.output_module.__dict__ and not overwrite:
-            return
-        self.output_module.__dict__[name] = self.output_module
-        self.output_py.write(f"{name} = _module\n")

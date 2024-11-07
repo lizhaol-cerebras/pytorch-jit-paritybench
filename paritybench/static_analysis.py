@@ -30,7 +30,7 @@ IMPORT_WHITELIST = {
     "tensorflow",
     "time",
     "torch",
-    "torchaudio",
+    # "torchaudio",
     "torchvision",
     "types",
     "typing",
