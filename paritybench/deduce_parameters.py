@@ -303,7 +303,7 @@ class DeduceParameter(object):
         val = str(self._guesses[-1])
         if val.startswith('<function _mock_layer'):
             # TODO: workaround, fix this better
-            return '_mock_layer'
+            return 'torch.nn.ReLU'
         return val
 
     __repr__ = __str__
@@ -370,7 +370,7 @@ class Guess(object):
     def __str__(self):
         val = repr(self.value)
         if '_mock_layer' in val:
-            return '_mock_layer'
+            return 'torch.nn.ReLU'
         return val
 
     __repr__ = __str__
@@ -1005,7 +1005,7 @@ class MockConfig(object):
         return self  # fake it so we can continue mutating result
 
     def __str__(self):
-        return "_mock_config({})".format(
+        return "SimpleNamespace({})".format(
             ", ".join(f"{key}={repr(value)}" for key, value in self._guesses.items())
         )
 

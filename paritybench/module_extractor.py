@@ -30,7 +30,6 @@ log = logging.getLogger(__name__)
 
 NN_MODULE_RE = re.compile(r"(\btorch\b)|(\bnn[.]Module\b)", re.MULTILINE)
 PREFIX = f'''
-from paritybench._paritybench_helpers import _mock_config, patch_functional
 from unittest.mock import mock_open, MagicMock
 from torch.autograd import Function
 from torch.nn import Module
@@ -40,14 +39,6 @@ from dataclasses import dataclass
 import numpy as np
 from torch import Tensor
 
-patch_functional()
-open = mock_open()
-yaml = logging = sys = argparse = MagicMock()
-ArgumentParser = argparse.ArgumentParser
-{" = ".join(sorted(CONFIG_NAMES))} = _mock_config()
-argparse.ArgumentParser.return_value.parse_args.return_value = _global_config
-yaml.load.return_value = _global_config
-sys.argv = _global_config
 __version__ = "1.0.0"
 xrange = range
 wraps = functools.wraps
@@ -55,7 +46,7 @@ wraps = functools.wraps
 SUFFIX = '''
 import torch
 from torch.nn import MSELoss, ReLU
-from paritybench._paritybench_helpers import _mock_config, _mock_layer, _paritybench_base, _fails_compile
+from types import SimpleNamespace
 
 '''
 
@@ -195,7 +186,6 @@ class PyTorchModuleExtractor(object):
 
     def construct_module(self):
         self.output.run_statement(self.ast_parse(PREFIX, "<string>"), source_required=True)
-        self.global_config = self.output.output_module.__dict__["_global_config"]
         self.name_to_ast = dict()
 
         for statement in self.imports.values():
@@ -248,17 +238,6 @@ class PyTorchModuleExtractor(object):
                     log.warning("Error adding requirement", exc_info=True)
             elif name in CONFIG_NAMES:
                 need_config = True
-
-        if need_config:
-            try:
-                for key in ExtractConfigUsage.run(statement):
-                    if key not in sorted(self.global_config):
-                        value = repr(DeduceParameter.initial_arg_init(key, None))
-                        self.output.run_statement(
-                            self.ast_parse(f"_global_config['{key}'] = {value}\n", "<string>"),
-                            source_required=True)
-            except Exception:
-                log.exception("global_config error")
 
     def test_modules(self):
         for name, value in list(sorted(self.output.items())):
@@ -319,18 +298,12 @@ class PyTorchModuleExtractor(object):
             return
         self.output.write(SUFFIX.format(basename=basename))
         self.output.write("\nTESTCASES = [\n")
-        self.output.write("    # (nn.Module, init_args, forward_args, jit_compiles)\n")
+        self.output.write("    # (nn.Module, init_args, forward_args)\n")
         for name, init_args, forward_args, compiles in self.testcases:
             self.output.write(f"    ({name},\n")
             self.output.write(f"     lambda: ({init_args[0]}, {init_args[1]}),\n")
-            self.output.write(f"     lambda: ({forward_args[0]}, {forward_args[1]}),\n")
-            self.output.write(f"     {repr(compiles)}),\n")
+            self.output.write(f"     lambda: ({forward_args[0]}, {forward_args[1]})),\n")
         self.output.write("]\n\n")
-
-        self.output.write(f"class Test_{basename}(_paritybench_base):\n")
-        for index in range(len(self.testcases)):
-            self.output.write(f"    def test_{index:03}(self):\n")
-            self.output.write(f"        self._check(*TESTCASES[{index}])\n\n")
 
 
 def extract_nn_module(name: str, nn_cls: type, checker, context):

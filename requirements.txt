@@ -12,4 +12,5 @@ matplotlib
 hypothesis
 expecttest
 requests
-urllib3==1.26.15
+urllib3==1.26.15 # For Python version <= 3.8
+astunparse # For Python version <= 3.8
