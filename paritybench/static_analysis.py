@@ -1,5 +1,4 @@
 import ast
-import astunparse # For Python version <= 3.8, otherwise ast has unparse
 import logging
 import re
 import torch
@@ -55,13 +54,13 @@ class ASTCleanup(ast.NodeTransformer):
     visit_ImportFrom = visit_Import
 
     def visit_AnnAssign(self, node: ast.AnnAssign):
-        node.annotation = ast.Constant(astunparse.unparse(node.annotation))
+        node.annotation = ast.Constant(ast.unparse(node.annotation))
         return node
 
     def visit_FunctionDef(self, node: ast.FunctionDef):
         for i, a in enumerate(node.args.args):
             if a.annotation is not None:
-                a.annotation = ast.Constant(astunparse.unparse(a.annotation))
+                a.annotation = ast.Constant(ast.unparse(a.annotation))
         return self.generic_visit(node)
 
     def visit_Call(self, node: ast.Call):

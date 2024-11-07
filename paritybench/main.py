@@ -71,7 +71,6 @@ def main(raw_args=None):
     if args.download:
         return CrawlGitHub(args.download_dir, max_count=args.limit).download()
 
-    write_helpers()
     # generate mode doesn't work well with `spawn`
     if not args.generate_one and not args.generate_all:
         torch.multiprocessing.set_start_method('spawn')

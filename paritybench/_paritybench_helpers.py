@@ -22,7 +22,7 @@ class DummyBlock(torch.nn.ReLU):
     expansion = 1
 
     def __str__(self):
-        return "_mock_layer()"
+        return "torch.nn.ReLU()"
 
     __repr__ = __str__
 

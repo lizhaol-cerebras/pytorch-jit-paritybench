@@ -38,9 +38,15 @@ python main.py --generate-all
 ```
 
 ### Download, generate, evaluate 
+Python version >= 3.9 is highly recommended
+
 You can limit number of github projects to download for testing and running on a smaller set of github repos
 ```
 python main.py --download --download-dir <folder path> --limit 10
+```
+Generate tests from all downloaded projects
+```
+python main.py --generate-all --download-dir <folder path>
 ```
 You can generate tests for one project folder `-g`. This will extract nn modules from that project and generate a test script `--tests-dir`
 ```
