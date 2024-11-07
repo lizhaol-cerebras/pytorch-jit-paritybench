@@ -15,21 +15,14 @@ parse_config = _module
 transforms = _module
 utils = _module
 
-from paritybench._paritybench_helpers import _mock_config, patch_functional
 from unittest.mock import mock_open, MagicMock
 from torch.autograd import Function
 from torch.nn import Module
 import abc, collections, copy, enum, functools, inspect, itertools, logging, math, matplotlib, numbers, numpy, pandas, queue, random, re, scipy, sklearn, string, tensorflow, time, torch, torchaudio, torchvision, types, typing, uuid, warnings
+import operator as op
+from dataclasses import dataclass
 import numpy as np
 from torch import Tensor
-patch_functional()
-open = mock_open()
-yaml = logging = sys = argparse = MagicMock()
-ArgumentParser = argparse.ArgumentParser
-_global_config = args = argv = cfg = config = params = _mock_config()
-argparse.ArgumentParser.return_value.parse_args.return_value = _global_config
-yaml.load.return_value = _global_config
-sys.argv = _global_config
 __version__ = '1.0.0'
 xrange = range
 wraps = functools.wraps
@@ -65,6 +58,12 @@ from matplotlib.ticker import NullLocator
 from itertools import chain
 
 
+from typing import List
+
+
+from typing import Tuple
+
+
 import torch.nn as nn
 
 
@@ -95,7 +94,7 @@ import torchvision
 class Upsample(nn.Module):
     """ nn.Upsample is deprecated """
 
-    def __init__(self, scale_factor, mode='nearest'):
+    def __init__(self, scale_factor, mode: 'str'='nearest'):
         super(Upsample, self).__init__()
         self.scale_factor = scale_factor
         self.mode = mode
@@ -105,23 +104,21 @@ class Upsample(nn.Module):
         return x
 
 
-class Mish(nn.Module):
-    """ The MISH activation function (https://github.com/digantamisra98/Mish) """
-
-    def __init__(self):
-        super(Mish, self).__init__()
-
-    def forward(self, x):
-        return x * torch.tanh(F.softplus(x))
-
-
 class YOLOLayer(nn.Module):
     """Detection layer"""
 
-    def __init__(self, anchors, num_classes):
+    def __init__(self, anchors: 'List[Tuple[int, int]]', num_classes: 'int', new_coords: 'bool'):
+        """
+        Create a YOLO layer
+
+        :param anchors: List of anchors
+        :param num_classes: Number of classes
+        :param new_coords: Whether to use the new coordinate format from YOLO V7
+        """
         super(YOLOLayer, self).__init__()
         self.num_anchors = len(anchors)
         self.num_classes = num_classes
+        self.new_coords = new_coords
         self.mse_loss = nn.MSELoss()
         self.bce_loss = nn.BCELoss()
         self.no = num_classes + 5
@@ -131,7 +128,13 @@ class YOLOLayer(nn.Module):
         self.register_buffer('anchor_grid', anchors.clone().view(1, -1, 1, 1, 2))
         self.stride = None
 
-    def forward(self, x, img_size):
+    def forward(self, x: 'torch.Tensor', img_size: 'int') ->torch.Tensor:
+        """
+        Forward pass of the YOLO layer
+
+        :param x: Input tensor
+        :param img_size: Size of the input image
+        """
         stride = img_size // x.size(2)
         self.stride = stride
         bs, _, ny, nx = x.shape
@@ -139,21 +142,34 @@ class YOLOLayer(nn.Module):
         if not self.training:
             if self.grid.shape[2:4] != x.shape[2:4]:
                 self.grid = self._make_grid(nx, ny)
-            x[..., 0:2] = (x[..., 0:2].sigmoid() + self.grid) * stride
-            x[..., 2:4] = torch.exp(x[..., 2:4]) * self.anchor_grid
-            x[..., 4:] = x[..., 4:].sigmoid()
+            if self.new_coords:
+                x[..., 0:2] = (x[..., 0:2] + self.grid) * stride
+                x[..., 2:4] = x[..., 2:4] ** 2 * (4 * self.anchor_grid)
+            else:
+                x[..., 0:2] = (x[..., 0:2].sigmoid() + self.grid) * stride
+                x[..., 2:4] = torch.exp(x[..., 2:4]) * self.anchor_grid
+                x[..., 4:] = x[..., 4:].sigmoid()
             x = x.view(bs, -1, self.no)
         return x
 
     @staticmethod
-    def _make_grid(nx=20, ny=20):
+    def _make_grid(nx: 'int'=20, ny: 'int'=20) ->torch.Tensor:
+        """
+        Create a grid of (x, y) coordinates
+
+        :param nx: Number of x coordinates
+        :param ny: Number of y coordinates
+        """
         yv, xv = torch.meshgrid([torch.arange(ny), torch.arange(nx)], indexing='ij')
         return torch.stack((xv, yv), 2).view((1, 1, ny, nx, 2)).float()
 
 
-def create_modules(module_defs):
+def create_modules(module_defs: 'List[dict]') ->Tuple[dict, nn.ModuleList]:
     """
     Constructs module list of layer blocks from module configuration in module_defs
+
+    :param module_defs: List of dictionaries with module definitions
+    :return: Hyperparameters and pytorch module list
     """
     hyperparams = module_defs.pop(0)
     hyperparams.update({'batch': int(hyperparams['batch']), 'subdivisions': int(hyperparams['subdivisions']), 'width': int(hyperparams['width']), 'height': int(hyperparams['height']), 'channels': int(hyperparams['channels']), 'optimizer': hyperparams.get('optimizer'), 'momentum': float(hyperparams['momentum']), 'decay': float(hyperparams['decay']), 'learning_rate': float(hyperparams['learning_rate']), 'burn_in': int(hyperparams['burn_in']), 'max_batches': int(hyperparams['max_batches']), 'policy': hyperparams['policy'], 'lr_steps': list(zip(map(int, hyperparams['steps'].split(',')), map(float, hyperparams['scales'].split(','))))})
@@ -172,8 +188,12 @@ def create_modules(module_defs):
                 modules.add_module(f'batch_norm_{module_i}', nn.BatchNorm2d(filters, momentum=0.1, eps=1e-05))
             if module_def['activation'] == 'leaky':
                 modules.add_module(f'leaky_{module_i}', nn.LeakyReLU(0.1))
-            if module_def['activation'] == 'mish':
-                modules.add_module(f'mish_{module_i}', Mish())
+            elif module_def['activation'] == 'mish':
+                modules.add_module(f'mish_{module_i}', nn.Mish())
+            elif module_def['activation'] == 'logistic':
+                modules.add_module(f'sigmoid_{module_i}', nn.Sigmoid())
+            elif module_def['activation'] == 'swish':
+                modules.add_module(f'swish_{module_i}', nn.SiLU())
         elif module_def['type'] == 'maxpool':
             kernel_size = int(module_def['size'])
             stride = int(module_def['stride'])
@@ -197,7 +217,8 @@ def create_modules(module_defs):
             anchors = [(anchors[i], anchors[i + 1]) for i in range(0, len(anchors), 2)]
             anchors = [anchors[i] for i in anchor_idxs]
             num_classes = int(module_def['classes'])
-            yolo_layer = YOLOLayer(anchors, num_classes)
+            new_coords = bool(module_def.get('new_coords', False))
+            yolo_layer = YOLOLayer(anchors, num_classes, new_coords)
             modules.add_module(f'yolo_{module_i}', yolo_layer)
         module_list.append(modules)
         output_filters.append(filters)
@@ -325,25 +346,13 @@ class Darknet(nn.Module):
 
 import torch
 from torch.nn import MSELoss, ReLU
-from paritybench._paritybench_helpers import _mock_config, _mock_layer, _paritybench_base, _fails_compile
+from types import SimpleNamespace
 
 
 TESTCASES = [
-    # (nn.Module, init_args, forward_args, jit_compiles)
-    (Mish,
-     lambda: ([], {}),
-     lambda: ([torch.rand([4, 4, 4, 4])], {}),
-     True),
+    # (nn.Module, init_args, forward_args)
     (Upsample,
      lambda: ([], {'scale_factor': 1.0}),
-     lambda: ([torch.rand([4, 4, 4, 4])], {}),
-     True),
+     lambda: ([torch.rand([4, 4, 4, 4])], {})),
 ]
-
-class Test_eriklindernoren_PyTorch_YOLOv3(_paritybench_base):
-    def test_000(self):
-        self._check(*TESTCASES[0])
-
-    def test_001(self):
-        self._check(*TESTCASES[1])
 

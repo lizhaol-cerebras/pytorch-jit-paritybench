@@ -1,7 +1,6 @@
 import sys
 _module = sys.modules[__name__]
 del sys
-app = _module
 basicsr = _module
 archs = _module
 arcface_arch = _module
@@ -13,6 +12,10 @@ vqgan_arch = _module
 data = _module
 data_sampler = _module
 data_util = _module
+ffhq_blind_dataset = _module
+ffhq_blind_joint_dataset = _module
+gaussian_kernels = _module
+paired_image_dataset = _module
 prefetch_dataloader = _module
 transforms = _module
 losses = _module
@@ -22,6 +25,13 @@ metrics = _module
 metric_util = _module
 psnr_ssim = _module
 models = _module
+base_model = _module
+codeformer_idx_model = _module
+codeformer_joint_model = _module
+codeformer_model = _module
+lr_scheduler = _module
+sr_model = _module
+vqgan_model = _module
 ops = _module
 dcn = _module
 deform_conv = _module
@@ -68,38 +78,27 @@ face_restoration_helper = _module
 face_utils = _module
 misc = _module
 inference_codeformer = _module
-predict = _module
+inference_colorization = _module
+inference_inpainting = _module
 crop_align_face = _module
 download_pretrained_models = _module
 download_pretrained_models_from_gdrive = _module
+generate_latent_gt = _module
+inference_vqgan = _module
+app = _module
+predict = _module
 
-from paritybench._paritybench_helpers import _mock_config, patch_functional
 from unittest.mock import mock_open, MagicMock
 from torch.autograd import Function
 from torch.nn import Module
 import abc, collections, copy, enum, functools, inspect, itertools, logging, math, matplotlib, numbers, numpy, pandas, queue, random, re, scipy, sklearn, string, tensorflow, time, torch, torchaudio, torchvision, types, typing, uuid, warnings
+import operator as op
+from dataclasses import dataclass
 import numpy as np
 from torch import Tensor
-patch_functional()
-open = mock_open()
-yaml = logging = sys = argparse = MagicMock()
-ArgumentParser = argparse.ArgumentParser
-_global_config = args = argv = cfg = config = params = _mock_config()
-argparse.ArgumentParser.return_value.parse_args.return_value = _global_config
-yaml.load.return_value = _global_config
-sys.argv = _global_config
 __version__ = '1.0.0'
 xrange = range
 wraps = functools.wraps
-
-
-import torch
-
-
-import torch.nn.functional as F
-
-
-from torchvision.transforms.functional import normalize
 
 
 import torch.nn as nn
@@ -109,6 +108,9 @@ import collections.abc
 
 
 import math
+
+
+import torch
 
 
 import torchvision
@@ -141,6 +143,9 @@ from torch import nn
 from torch import Tensor
 
 
+import torch.nn.functional as F
+
+
 from typing import Optional
 
 
@@ -171,6 +176,30 @@ from functools import partial
 from torch.utils.data.sampler import Sampler
 
 
+from scipy.io import loadmat
+
+
+import torch.utils.data as data
+
+
+from torchvision.transforms.functional import adjust_brightness
+
+
+from torchvision.transforms.functional import adjust_contrast
+
+
+from torchvision.transforms.functional import adjust_hue
+
+
+from torchvision.transforms.functional import adjust_saturation
+
+
+from torchvision.transforms.functional import normalize
+
+
+from torch.utils import data as data
+
+
 import queue as Queue
 
 
@@ -181,6 +210,21 @@ import functools
 
 
 from torch import autograd as autograd
+
+
+import logging
+
+
+from torch.nn.parallel import DataParallel
+
+
+from torch.nn.parallel import DistributedDataParallel
+
+
+from collections import Counter
+
+
+from torch.optim.lr_scheduler import _LRScheduler
 
 
 from torch.autograd import Function
@@ -207,9 +251,6 @@ from torch.utils.cpp_extension import CppExtension
 from torch.utils.cpp_extension import CUDAExtension
 
 
-import logging
-
-
 import torch.distributed as dist
 
 
@@ -223,6 +264,9 @@ from torch.hub import get_dir
 
 
 from torchvision.utils import make_grid
+
+
+import re
 
 
 import queue
@@ -363,79 +407,6 @@ class Bottleneck(nn.Module):
 
     def forward(self, x):
         return x + self.cv2(self.cv1(x)) if self.add else self.cv2(self.cv1(x))
-
-
-class Registry:
-    """
-    The registry that provides name -> object mapping, to support third-party
-    users' custom modules.
-
-    To create a registry (e.g. a backbone registry):
-
-    .. code-block:: python
-
-        BACKBONE_REGISTRY = Registry('BACKBONE')
-
-    To register an object:
-
-    .. code-block:: python
-
-        @BACKBONE_REGISTRY.register()
-        class MyBackbone():
-            ...
-
-    Or:
-
-    .. code-block:: python
-
-        BACKBONE_REGISTRY.register(MyBackbone)
-    """
-
-    def __init__(self, name):
-        """
-        Args:
-            name (str): the name of this registry
-        """
-        self._name = name
-        self._obj_map = {}
-
-    def _do_register(self, name, obj):
-        assert name not in self._obj_map, f"An object named '{name}' was already registered in '{self._name}' registry!"
-        self._obj_map[name] = obj
-
-    def register(self, obj=None):
-        """
-        Register the given object under the the name `obj.__name__`.
-        Can be used as either a decorator or not.
-        See docstring of this class for usage.
-        """
-        if obj is None:
-
-            def deco(func_or_class):
-                name = func_or_class.__name__
-                self._do_register(name, func_or_class)
-                return func_or_class
-            return deco
-        name = obj.__name__
-        self._do_register(name, obj)
-
-    def get(self, name):
-        ret = self._obj_map.get(name)
-        if ret is None:
-            raise KeyError(f"No object named '{name}' found in '{self._name}' registry!")
-        return ret
-
-    def __contains__(self, name):
-        return name in self._obj_map
-
-    def __iter__(self):
-        return iter(self._obj_map.items())
-
-    def keys(self):
-        return self._obj_map.keys()
-
-
-ARCH_REGISTRY = Registry('arch')
 
 
 class ResNetArcFace(nn.Module):
@@ -640,10 +611,10 @@ class TransformerSALayer(nn.Module):
         self.dropout2 = nn.Dropout(dropout)
         self.activation = _get_activation_fn(activation)
 
-    def with_pos_embed(self, tensor, pos: Optional[Tensor]):
+    def with_pos_embed(self, tensor, pos: 'Optional[Tensor]'):
         return tensor if pos is None else tensor + pos
 
-    def forward(self, tgt, tgt_mask: Optional[Tensor]=None, tgt_key_padding_mask: Optional[Tensor]=None, query_pos: Optional[Tensor]=None):
+    def forward(self, tgt, tgt_mask: 'Optional[Tensor]'=None, tgt_key_padding_mask: 'Optional[Tensor]'=None, query_pos: 'Optional[Tensor]'=None):
         tgt2 = self.norm1(tgt)
         q = k = self.with_pos_embed(tgt2, query_pos)
         tgt2 = self.self_attn(q, k, value=tgt2, attn_mask=tgt_mask, key_padding_mask=tgt_key_padding_mask)[0]
@@ -1253,9 +1224,6 @@ class VQGANDiscriminator(nn.Module):
 
     def forward(self, x):
         return self.main(x)
-
-
-LOSS_REGISTRY = Registry('loss')
 
 
 _reduction_modes = ['none', 'mean', 'sum']
@@ -2175,9 +2143,6 @@ def decode_landm(pre, priors, variances):
     tmp = priors[:, :2] + pre[:, :2] * variances[0] * priors[:, 2:], priors[:, :2] + pre[:, 2:4] * variances[0] * priors[:, 2:], priors[:, :2] + pre[:, 4:6] * variances[0] * priors[:, 2:], priors[:, :2] + pre[:, 6:8] * variances[0] * priors[:, 2:], priors[:, :2] + pre[:, 8:10] * variances[0] * priors[:, 2:]
     landms = torch.cat(tmp, dim=1)
     return landms
-
-
-device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
 
 def generate_config(network_name):
@@ -3697,319 +3662,142 @@ class ParseNet(nn.Module):
 
 import torch
 from torch.nn import MSELoss, ReLU
-from paritybench._paritybench_helpers import _mock_config, _mock_layer, _paritybench_base, _fails_compile
+from types import SimpleNamespace
 
 
 TESTCASES = [
-    # (nn.Module, init_args, forward_args, jit_compiles)
+    # (nn.Module, init_args, forward_args)
     (AttentionRefinementModule,
      lambda: ([], {'in_chan': 4, 'out_chan': 4}),
-     lambda: ([torch.rand([4, 4, 4, 4])], {}),
-     True),
+     lambda: ([torch.rand([4, 4, 4, 4])], {})),
     (BasicBlock,
      lambda: ([], {'in_chan': 4, 'out_chan': 4}),
-     lambda: ([torch.rand([4, 4, 4, 4])], {}),
-     True),
+     lambda: ([torch.rand([4, 4, 4, 4])], {})),
     (BboxHead,
      lambda: ([], {}),
-     lambda: ([torch.rand([4, 512, 64, 64])], {}),
-     True),
+     lambda: ([torch.rand([4, 512, 64, 64])], {})),
     (BiSeNet,
      lambda: ([], {'num_class': 4}),
-     lambda: ([torch.rand([4, 3, 64, 64])], {}),
-     False),
+     lambda: ([torch.rand([4, 3, 64, 64])], {})),
     (BiSeNetOutput,
      lambda: ([], {'in_chan': 4, 'mid_chan': 4, 'num_class': 4}),
-     lambda: ([torch.rand([4, 4, 4, 4])], {}),
-     True),
+     lambda: ([torch.rand([4, 4, 4, 4])], {})),
     (Bottleneck,
      lambda: ([], {'c1': 4, 'c2': 4}),
-     lambda: ([torch.rand([4, 4, 4, 4])], {}),
-     True),
+     lambda: ([torch.rand([4, 4, 4, 4])], {})),
     (BottleneckCSP,
      lambda: ([], {'c1': 4, 'c2': 4}),
-     lambda: ([torch.rand([4, 4, 4, 4])], {}),
-     True),
+     lambda: ([torch.rand([4, 4, 4, 4])], {})),
     (C3,
      lambda: ([], {'c1': 4, 'c2': 4}),
-     lambda: ([torch.rand([4, 4, 4, 4])], {}),
-     True),
+     lambda: ([torch.rand([4, 4, 4, 4])], {})),
     (CharbonnierLoss,
      lambda: ([], {}),
-     lambda: ([torch.rand([4, 4, 4, 4]), torch.rand([4, 4, 4, 4])], {}),
-     False),
+     lambda: ([torch.rand([4, 4, 4, 4]), torch.rand([4, 4, 4, 4])], {})),
     (ClassHead,
      lambda: ([], {}),
-     lambda: ([torch.rand([4, 512, 64, 64])], {}),
-     True),
+     lambda: ([torch.rand([4, 512, 64, 64])], {})),
     (ContextPath,
      lambda: ([], {}),
-     lambda: ([torch.rand([4, 3, 64, 64])], {}),
-     True),
+     lambda: ([torch.rand([4, 3, 64, 64])], {})),
     (Conv,
      lambda: ([], {'c1': 4, 'c2': 4}),
-     lambda: ([torch.rand([4, 4, 4, 4])], {}),
-     True),
+     lambda: ([torch.rand([4, 4, 4, 4])], {})),
     (ConvBNReLU,
      lambda: ([], {'in_chan': 4, 'out_chan': 4}),
-     lambda: ([torch.rand([4, 4, 4, 4])], {}),
-     True),
+     lambda: ([torch.rand([4, 4, 4, 4])], {})),
     (ConvLayer,
      lambda: ([], {'in_channels': 4, 'out_channels': 4}),
-     lambda: ([torch.rand([4, 4, 4, 4])], {}),
-     False),
+     lambda: ([torch.rand([4, 4, 4, 4])], {})),
     (CrossConv,
      lambda: ([], {'c1': 4, 'c2': 4}),
-     lambda: ([torch.rand([4, 4, 4, 4])], {}),
-     True),
+     lambda: ([torch.rand([4, 4, 4, 4])], {})),
     (Downsample,
      lambda: ([], {'in_channels': 4}),
-     lambda: ([torch.rand([4, 4, 4, 4])], {}),
-     False),
+     lambda: ([torch.rand([4, 4, 4, 4])], {})),
     (FeatureFusionModule,
      lambda: ([], {'in_chan': 4, 'out_chan': 4}),
-     lambda: ([torch.rand([4, 1, 4, 4]), torch.rand([4, 3, 4, 4])], {}),
-     True),
+     lambda: ([torch.rand([4, 1, 4, 4]), torch.rand([4, 3, 4, 4])], {})),
     (Focus,
      lambda: ([], {'c1': 4, 'c2': 4}),
-     lambda: ([torch.rand([4, 4, 4, 4])], {}),
-     True),
+     lambda: ([torch.rand([4, 4, 4, 4])], {})),
     (GumbelQuantizer,
      lambda: ([], {'codebook_size': 4, 'emb_dim': 4, 'num_hiddens': 4}),
-     lambda: ([torch.rand([4, 4, 4, 4])], {}),
-     True),
+     lambda: ([torch.rand([4, 4, 4, 4])], {})),
     (IRBlock,
      lambda: ([], {'inplanes': 4, 'planes': 4}),
-     lambda: ([torch.rand([4, 4, 4, 4])], {}),
-     True),
+     lambda: ([torch.rand([4, 4, 4, 4])], {})),
     (L1Loss,
      lambda: ([], {}),
-     lambda: ([torch.rand([4, 4, 4, 4]), torch.rand([4, 4, 4, 4])], {}),
-     False),
+     lambda: ([torch.rand([4, 4, 4, 4]), torch.rand([4, 4, 4, 4])], {})),
     (LandmarkHead,
      lambda: ([], {}),
-     lambda: ([torch.rand([4, 512, 64, 64])], {}),
-     True),
+     lambda: ([torch.rand([4, 512, 64, 64])], {})),
     (MSELoss,
      lambda: ([], {}),
-     lambda: ([torch.rand([4, 4, 4, 4]), torch.rand([4, 4, 4, 4])], {}),
-     False),
+     lambda: ([torch.rand([4, 4, 4, 4]), torch.rand([4, 4, 4, 4])], {})),
     (MixConv2d,
      lambda: ([], {'c1': 4, 'c2': 4}),
-     lambda: ([torch.rand([4, 4, 4, 4])], {}),
-     True),
+     lambda: ([torch.rand([4, 4, 4, 4])], {})),
     (MobileNetV1,
      lambda: ([], {}),
-     lambda: ([torch.rand([4, 3, 64, 64])], {}),
-     True),
+     lambda: ([torch.rand([4, 3, 64, 64])], {})),
     (NormLayer,
      lambda: ([], {'channels': 4}),
-     lambda: ([torch.rand([4, 4, 4, 4])], {}),
-     False),
+     lambda: ([torch.rand([4, 4, 4, 4])], {})),
     (ParseNet,
      lambda: ([], {}),
-     lambda: ([torch.rand([4, 3, 64, 64])], {}),
-     False),
+     lambda: ([torch.rand([4, 3, 64, 64])], {})),
     (PositionEmbeddingSine,
      lambda: ([], {}),
-     lambda: ([torch.rand([4, 4, 4, 4])], {}),
-     True),
+     lambda: ([torch.rand([4, 4, 4, 4])], {})),
     (RRDB,
      lambda: ([], {'num_feat': 4}),
-     lambda: ([torch.rand([4, 4, 4, 4])], {}),
-     True),
+     lambda: ([torch.rand([4, 4, 4, 4])], {})),
     (RRDBNet,
      lambda: ([], {'num_in_ch': 4, 'num_out_ch': 4}),
-     lambda: ([torch.rand([4, 4, 4, 4])], {}),
-     False),
+     lambda: ([torch.rand([4, 4, 4, 4])], {})),
     (ReluLayer,
      lambda: ([], {'channels': 4}),
-     lambda: ([torch.rand([4, 4, 4, 4])], {}),
-     True),
+     lambda: ([torch.rand([4, 4, 4, 4])], {})),
     (ResNet18,
      lambda: ([], {}),
-     lambda: ([torch.rand([4, 3, 64, 64])], {}),
-     True),
+     lambda: ([torch.rand([4, 3, 64, 64])], {})),
     (ResidualBlock,
      lambda: ([], {'c_in': 4, 'c_out': 4}),
-     lambda: ([torch.rand([4, 4, 4, 4])], {}),
-     False),
+     lambda: ([torch.rand([4, 4, 4, 4])], {})),
     (ResidualBlockNoBN,
      lambda: ([], {}),
-     lambda: ([torch.rand([4, 64, 64, 64])], {}),
-     True),
+     lambda: ([torch.rand([4, 64, 64, 64])], {})),
     (ResidualDenseBlock,
      lambda: ([], {}),
-     lambda: ([torch.rand([4, 64, 64, 64])], {}),
-     True),
+     lambda: ([torch.rand([4, 64, 64, 64])], {})),
     (RetinaFace,
      lambda: ([], {}),
-     lambda: ([torch.rand([4, 3, 64, 64])], {}),
-     False),
+     lambda: ([torch.rand([4, 3, 64, 64])], {})),
     (SEBlock,
      lambda: ([], {'channel': 4}),
-     lambda: ([torch.rand([4, 4, 4, 4])], {}),
-     True),
+     lambda: ([torch.rand([4, 4, 4, 4])], {})),
     (SPP,
      lambda: ([], {'c1': 4, 'c2': 4}),
-     lambda: ([torch.rand([4, 4, 4, 4])], {}),
-     True),
+     lambda: ([torch.rand([4, 4, 4, 4])], {})),
     (SSH,
      lambda: ([], {'in_channel': 4, 'out_channel': 4}),
-     lambda: ([torch.rand([4, 4, 4, 4])], {}),
-     True),
+     lambda: ([torch.rand([4, 4, 4, 4])], {})),
     (ShuffleV2Block,
      lambda: ([], {'inp': 4, 'oup': 4, 'stride': 1}),
-     lambda: ([torch.rand([4, 4, 4, 4])], {}),
-     False),
+     lambda: ([torch.rand([4, 4, 4, 4])], {})),
     (StemBlock,
      lambda: ([], {'c1': 4, 'c2': 4}),
-     lambda: ([torch.rand([4, 4, 4, 4])], {}),
-     True),
+     lambda: ([torch.rand([4, 4, 4, 4])], {})),
     (Upsample,
      lambda: ([], {'in_channels': 4}),
-     lambda: ([torch.rand([4, 4, 4, 4])], {}),
-     True),
+     lambda: ([torch.rand([4, 4, 4, 4])], {})),
     (VQGANDiscriminator,
      lambda: ([], {}),
-     lambda: ([torch.rand([4, 3, 64, 64])], {}),
-     True),
+     lambda: ([torch.rand([4, 3, 64, 64])], {})),
     (VectorQuantizer,
      lambda: ([], {'codebook_size': 4, 'emb_dim': 4, 'beta': 4}),
-     lambda: ([torch.rand([4, 4, 4, 4])], {}),
-     True),
+     lambda: ([torch.rand([4, 4, 4, 4])], {})),
 ]
-
-class Test_sczhou_CodeFormer(_paritybench_base):
-    def test_000(self):
-        self._check(*TESTCASES[0])
-
-    def test_001(self):
-        self._check(*TESTCASES[1])
-
-    def test_002(self):
-        self._check(*TESTCASES[2])
-
-    def test_003(self):
-        self._check(*TESTCASES[3])
-
-    def test_004(self):
-        self._check(*TESTCASES[4])
-
-    def test_005(self):
-        self._check(*TESTCASES[5])
-
-    def test_006(self):
-        self._check(*TESTCASES[6])
-
-    def test_007(self):
-        self._check(*TESTCASES[7])
-
-    def test_008(self):
-        self._check(*TESTCASES[8])
-
-    def test_009(self):
-        self._check(*TESTCASES[9])
-
-    def test_010(self):
-        self._check(*TESTCASES[10])
-
-    def test_011(self):
-        self._check(*TESTCASES[11])
-
-    def test_012(self):
-        self._check(*TESTCASES[12])
-
-    def test_013(self):
-        self._check(*TESTCASES[13])
-
-    def test_014(self):
-        self._check(*TESTCASES[14])
-
-    def test_015(self):
-        self._check(*TESTCASES[15])
-
-    def test_016(self):
-        self._check(*TESTCASES[16])
-
-    def test_017(self):
-        self._check(*TESTCASES[17])
-
-    def test_018(self):
-        self._check(*TESTCASES[18])
-
-    def test_019(self):
-        self._check(*TESTCASES[19])
-
-    def test_020(self):
-        self._check(*TESTCASES[20])
-
-    def test_021(self):
-        self._check(*TESTCASES[21])
-
-    def test_022(self):
-        self._check(*TESTCASES[22])
-
-    def test_023(self):
-        self._check(*TESTCASES[23])
-
-    def test_024(self):
-        self._check(*TESTCASES[24])
-
-    def test_025(self):
-        self._check(*TESTCASES[25])
-
-    def test_026(self):
-        self._check(*TESTCASES[26])
-
-    def test_027(self):
-        self._check(*TESTCASES[27])
-
-    def test_028(self):
-        self._check(*TESTCASES[28])
-
-    def test_029(self):
-        self._check(*TESTCASES[29])
-
-    def test_030(self):
-        self._check(*TESTCASES[30])
-
-    def test_031(self):
-        self._check(*TESTCASES[31])
-
-    def test_032(self):
-        self._check(*TESTCASES[32])
-
-    def test_033(self):
-        self._check(*TESTCASES[33])
-
-    def test_034(self):
-        self._check(*TESTCASES[34])
-
-    def test_035(self):
-        self._check(*TESTCASES[35])
-
-    def test_036(self):
-        self._check(*TESTCASES[36])
-
-    def test_037(self):
-        self._check(*TESTCASES[37])
-
-    def test_038(self):
-        self._check(*TESTCASES[38])
-
-    def test_039(self):
-        self._check(*TESTCASES[39])
-
-    def test_040(self):
-        self._check(*TESTCASES[40])
-
-    def test_041(self):
-        self._check(*TESTCASES[41])
-
-    def test_042(self):
-        self._check(*TESTCASES[42])
-
-    def test_043(self):
-        self._check(*TESTCASES[43])
 

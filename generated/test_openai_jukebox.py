@@ -194,21 +194,14 @@ test_utils = _module
 test_visdom = _module
 test_writer = _module
 
-from paritybench._paritybench_helpers import _mock_config, patch_functional
 from unittest.mock import mock_open, MagicMock
 from torch.autograd import Function
 from torch.nn import Module
 import abc, collections, copy, enum, functools, inspect, itertools, logging, math, matplotlib, numbers, numpy, pandas, queue, random, re, scipy, sklearn, string, tensorflow, time, torch, torchaudio, torchvision, types, typing, uuid, warnings
+import operator as op
+from dataclasses import dataclass
 import numpy as np
 from torch import Tensor
-patch_functional()
-open = mock_open()
-yaml = logging = sys = argparse = MagicMock()
-ArgumentParser = argparse.ArgumentParser
-_global_config = args = argv = cfg = config = params = _mock_config()
-argparse.ArgumentParser.return_value.parse_args.return_value = _global_config
-yaml.load.return_value = _global_config
-sys.argv = _global_config
 __version__ = '1.0.0'
 xrange = range
 wraps = functools.wraps
@@ -227,9 +220,6 @@ import torch.nn.functional as F
 
 
 import math
-
-
-from torch._six import string_classes
 
 
 import functools
@@ -3799,144 +3789,64 @@ class RNN(nn.Module):
 
 import torch
 from torch.nn import MSELoss, ReLU
-from paritybench._paritybench_helpers import _mock_config, _mock_layer, _paritybench_base, _fails_compile
+from types import SimpleNamespace
 
 
 TESTCASES = [
-    # (nn.Module, init_args, forward_args, jit_compiles)
+    # (nn.Module, init_args, forward_args)
     (BasicBlock,
      lambda: ([], {'inplanes': 4, 'planes': 4}),
-     lambda: ([torch.rand([4, 4, 4, 4])], {}),
-     True),
+     lambda: ([torch.rand([4, 4, 4, 4])], {})),
     (Bottleneck,
      lambda: ([], {'l_bins': 4, 'emb_width': 4, 'mu': 4, 'levels': 4}),
-     lambda: ([torch.rand([4, 4, 4, 4])], {}),
-     False),
+     lambda: ([torch.rand([4, 4, 4, 4])], {})),
     (Conv1D,
      lambda: ([], {'n_in': 4, 'n_out': 4}),
-     lambda: ([torch.rand([4, 4, 4, 4])], {}),
-     False),
+     lambda: ([torch.rand([4, 4, 4, 4])], {})),
     (DecoderConvBock,
      lambda: ([], {'input_emb_width': 4, 'output_emb_width': 4, 'down_t': 4, 'stride_t': 1, 'width': 4, 'depth': 1, 'm_conv': 4}),
-     lambda: ([torch.rand([4, 4])], {}),
-     False),
+     lambda: ([torch.rand([4, 4])], {})),
     (DummyNet,
      lambda: ([], {}),
-     lambda: ([torch.rand([4, 3, 64, 64])], {}),
-     True),
+     lambda: ([torch.rand([4, 3, 64, 64])], {})),
     (FactoredAttention,
      lambda: ([], {'n_in': 4, 'n_ctx': 4, 'n_state': 4, 'n_head': 4}),
-     lambda: ([torch.rand([4, 4, 4])], {}),
-     False),
+     lambda: ([torch.rand([4, 4, 4])], {})),
     (MLP,
      lambda: ([], {'n_in': 4, 'n_state': 4}),
-     lambda: ([torch.rand([4, 4, 4, 4])], {}),
-     False),
+     lambda: ([torch.rand([4, 4, 4, 4])], {})),
     (Mask,
      lambda: ([], {'n_ctx': 4}),
-     lambda: ([torch.rand([4, 4, 4, 4])], {}),
-     True),
-    (Model,
-     lambda: ([], {}),
-     lambda: ([torch.rand([4, 4, 4, 16777216])], {}),
-     True),
+     lambda: ([torch.rand([4, 4, 4, 4])], {})),
     (NoBottleneck,
      lambda: ([], {'levels': 4}),
-     lambda: ([torch.rand([4, 4, 4, 4])], {}),
-     True),
+     lambda: ([torch.rand([4, 4, 4, 4])], {})),
     (PositionEmbedding,
      lambda: ([], {'input_shape': 4, 'width': 4}),
-     lambda: ([], {}),
-     False),
+     lambda: ([], {})),
     (ResConv1DBlock,
      lambda: ([], {'n_in': 4, 'n_state': 4}),
-     lambda: ([torch.rand([4, 4])], {}),
-     True),
+     lambda: ([torch.rand([4, 4])], {})),
     (ResConvBlock,
      lambda: ([], {'n_in': 4, 'n_state': 4}),
-     lambda: ([torch.rand([4, 4, 4, 4])], {}),
-     True),
+     lambda: ([torch.rand([4, 4, 4, 4])], {})),
     (Resnet,
      lambda: ([], {'n_in': 4, 'n_depth': 1}),
-     lambda: ([torch.rand([4, 4, 4, 4])], {}),
-     True),
+     lambda: ([torch.rand([4, 4, 4, 4])], {})),
     (Resnet1D,
      lambda: ([], {'n_in': 4, 'n_depth': 1}),
-     lambda: ([torch.rand([4, 4])], {}),
-     False),
+     lambda: ([torch.rand([4, 4])], {})),
     (SimpleModel,
      lambda: ([], {}),
-     lambda: ([torch.rand([4, 4, 4, 4])], {}),
-     True),
+     lambda: ([torch.rand([4, 4, 4, 4])], {})),
     (SyncBatchNorm,
      lambda: ([], {'num_features': 4}),
-     lambda: ([torch.rand([4, 4, 4, 4])], {}),
-     False),
+     lambda: ([torch.rand([4, 4, 4, 4])], {})),
     (mLSTMRNNCell,
      lambda: ([], {'input_size': 4, 'hidden_size': 4}),
-     lambda: ([torch.rand([4, 4])], {}),
-     False),
+     lambda: ([torch.rand([4, 4])], {})),
     (tofp16,
      lambda: ([], {}),
-     lambda: ([torch.rand([4, 4, 4, 4])], {}),
-     True),
+     lambda: ([torch.rand([4, 4, 4, 4])], {})),
 ]
-
-class Test_openai_jukebox(_paritybench_base):
-    def test_000(self):
-        self._check(*TESTCASES[0])
-
-    def test_001(self):
-        self._check(*TESTCASES[1])
-
-    def test_002(self):
-        self._check(*TESTCASES[2])
-
-    def test_003(self):
-        self._check(*TESTCASES[3])
-
-    def test_004(self):
-        self._check(*TESTCASES[4])
-
-    def test_005(self):
-        self._check(*TESTCASES[5])
-
-    def test_006(self):
-        self._check(*TESTCASES[6])
-
-    def test_007(self):
-        self._check(*TESTCASES[7])
-
-    def test_008(self):
-        self._check(*TESTCASES[8])
-
-    def test_009(self):
-        self._check(*TESTCASES[9])
-
-    def test_010(self):
-        self._check(*TESTCASES[10])
-
-    def test_011(self):
-        self._check(*TESTCASES[11])
-
-    def test_012(self):
-        self._check(*TESTCASES[12])
-
-    def test_013(self):
-        self._check(*TESTCASES[13])
-
-    def test_014(self):
-        self._check(*TESTCASES[14])
-
-    def test_015(self):
-        self._check(*TESTCASES[15])
-
-    def test_016(self):
-        self._check(*TESTCASES[16])
-
-    def test_017(self):
-        self._check(*TESTCASES[17])
-
-    def test_018(self):
-        self._check(*TESTCASES[18])
 

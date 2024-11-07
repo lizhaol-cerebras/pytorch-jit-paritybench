@@ -20,11 +20,18 @@ extractor = _module
 learnable_memory_vit = _module
 levit = _module
 local_vit = _module
+look_vit = _module
 mae = _module
 max_vit = _module
+max_vit_with_registers = _module
 mobile_vit = _module
+mp3 = _module
 mpp = _module
+na_vit = _module
+na_vit_nested_tensor = _module
+na_vit_nested_tensor_3d = _module
 nest = _module
+normalized_vit = _module
 parallel_vit = _module
 pit = _module
 recorder = _module
@@ -33,10 +40,17 @@ rvt = _module
 scalable_vit = _module
 sep_vit = _module
 simmim = _module
+simple_flash_attn_vit = _module
+simple_flash_attn_vit_3d = _module
+simple_uvit = _module
 simple_vit = _module
 simple_vit_1d = _module
 simple_vit_3d = _module
+simple_vit_with_fft = _module
 simple_vit_with_patch_dropout = _module
+simple_vit_with_qk_norm = _module
+simple_vit_with_register_tokens = _module
+simple_vit_with_value_residual = _module
 t2t = _module
 twins_svt = _module
 vit = _module
@@ -46,22 +60,16 @@ vit_for_small_dataset = _module
 vit_with_patch_dropout = _module
 vit_with_patch_merger = _module
 vivit = _module
+xcit = _module
 
-from paritybench._paritybench_helpers import _mock_config, patch_functional
 from unittest.mock import mock_open, MagicMock
 from torch.autograd import Function
 from torch.nn import Module
 import abc, collections, copy, enum, functools, inspect, itertools, logging, math, matplotlib, numbers, numpy, pandas, queue, random, re, scipy, sklearn, string, tensorflow, time, torch, torchaudio, torchvision, types, typing, uuid, warnings
+import operator as op
+from dataclasses import dataclass
 import numpy as np
 from torch import Tensor
-patch_functional()
-open = mock_open()
-yaml = logging = sys = argparse = MagicMock()
-ArgumentParser = argparse.ArgumentParser
-_global_config = args = argv = cfg = config = params = _mock_config()
-argparse.ArgumentParser.return_value.parse_args.return_value = _global_config
-yaml.load.return_value = _global_config
-sys.argv = _global_config
 __version__ = '1.0.0'
 xrange = range
 wraps = functools.wraps
@@ -100,10 +108,19 @@ from functools import partial
 from torchvision import transforms as T
 
 
+from torch.nn import Module
+
+
 from math import ceil
 
 
 from math import sqrt
+
+
+from torch.nn import ModuleList
+
+
+from torch.nn import Sequential
 
 
 import torch.nn as nn
@@ -112,10 +129,34 @@ import torch.nn as nn
 import math
 
 
+from typing import List
+
+
+from torch import Tensor
+
+
+from torch.nn.utils.rnn import pad_sequence as orig_pad_sequence
+
+
+from torch.nested import nested_tensor
+
+
+import torch.nn.utils.parametrize as parametrize
+
+
 from math import pi
 
 
 from math import log
+
+
+from torch.amp import autocast
+
+
+from collections import namedtuple
+
+
+from torch.fft import fft2
 
 
 def sample_gumbel(shape, device, dtype, eps=1e-06):
@@ -153,68 +194,114 @@ class AdaptiveTokenSampling(nn.Module):
         return new_attn, new_mask, unique_sampled_token_ids
 
 
-class PreNorm(nn.Module):
-
-    def __init__(self, dim, fn):
-        super().__init__()
-        self.norm = nn.LayerNorm(dim)
-        self.fn = fn
-
-    def forward(self, x, **kwargs):
-        return self.fn(self.norm(x), **kwargs)
-
-
-class FeedForward(nn.Module):
+class FeedForward(Module):
 
     def __init__(self, dim, hidden_dim, dropout=0.0):
         super().__init__()
-        self.net = nn.Sequential(nn.Linear(dim, hidden_dim), nn.GELU(), nn.Dropout(dropout), nn.Linear(hidden_dim, dim), nn.Dropout(dropout))
+        self.net = nn.Sequential(nn.LayerNorm(dim), nn.Linear(dim, hidden_dim), nn.GELU(), nn.Dropout(dropout), nn.Linear(hidden_dim, dim), nn.Dropout(dropout))
 
     def forward(self, x):
         return self.net(x)
 
 
-class Attention(nn.Module):
+def exists(val):
+    return val is not None
+
+
+class Attention(Module):
 
     def __init__(self, dim, heads=8, dim_head=64, dropout=0.0):
         super().__init__()
         inner_dim = dim_head * heads
-        project_out = not (heads == 1 and dim_head == dim)
         self.heads = heads
         self.scale = dim_head ** -0.5
+        self.norm = nn.LayerNorm(dim)
+        self.to_q = nn.Linear(dim, inner_dim, bias=False)
+        self.to_kv = nn.Linear(dim, inner_dim * 2, bias=False)
         self.attend = nn.Softmax(dim=-1)
         self.dropout = nn.Dropout(dropout)
-        self.to_qkv = nn.Linear(dim, inner_dim * 3, bias=False)
-        self.to_out = nn.Sequential(nn.Linear(inner_dim, dim), nn.Dropout(dropout)) if project_out else nn.Identity()
+        self.to_out = nn.Sequential(nn.Linear(inner_dim, dim), nn.Dropout(dropout))
 
-    def forward(self, x):
-        qkv = self.to_qkv(x).chunk(3, dim=-1)
-        q, k, v = map(lambda t: rearrange(t, 'b n (h d) -> b h n d', h=self.heads), qkv)
-        dots = torch.matmul(q, k.transpose(-1, -2)) * self.scale
-        attn = self.attend(dots)
+    def forward(self, x, context=None):
+        h = self.heads
+        x = self.norm(x)
+        context = x if not exists(context) else torch.cat((x, context), dim=1)
+        qkv = self.to_q(x), *self.to_kv(context).chunk(2, dim=-1)
+        q, k, v = map(lambda t: rearrange(t, 'b n (h d) -> b h n d', h=h), qkv)
+        sim = einsum('b h i d, b h j d -> b h i j', q, k) * self.scale
+        attn = self.attend(sim)
         attn = self.dropout(attn)
-        out = torch.matmul(attn, v)
+        out = einsum('b h i j, b h j d -> b h i d', attn, v)
         out = rearrange(out, 'b h n d -> b n (h d)')
         return self.to_out(out)
 
 
-class Transformer(nn.Module):
+class LayerScale(Module):
 
-    def __init__(self, dim, depth, heads, dim_head, mlp_dim, dropout=0.0):
+    def __init__(self, dim, fn, depth):
         super().__init__()
-        self.layers = nn.ModuleList([])
-        for _ in range(depth):
-            self.layers.append(nn.ModuleList([PreNorm(dim, Attention(dim, heads=heads, dim_head=dim_head, dropout=dropout)), PreNorm(dim, FeedForward(dim, mlp_dim, dropout=dropout))]))
+        if depth <= 18:
+            init_eps = 0.1
+        elif 18 > depth <= 24:
+            init_eps = 1e-05
+        else:
+            init_eps = 1e-06
+        self.fn = fn
+        self.scale = nn.Parameter(torch.full((dim,), init_eps))
 
-    def forward(self, x):
-        for attn, ff in self.layers:
-            x = attn(x) + x
+    def forward(self, x, **kwargs):
+        return self.fn(x, **kwargs) * self.scale
+
+
+def dropout_layers(layers, dropout):
+    if dropout == 0:
+        return layers
+    num_layers = len(layers)
+    to_drop = torch.zeros(num_layers).uniform_(0.0, 1.0) < dropout
+    if all(to_drop):
+        rand_index = randrange(num_layers)
+        to_drop[rand_index] = False
+    layers = [layer for layer, drop in zip(layers, to_drop) if not drop]
+    return layers
+
+
+class Transformer(Module):
+
+    def __init__(self, dim, depth, heads, dim_head, mlp_dim, dropout=0.0, layer_dropout=0.0):
+        super().__init__()
+        self.layers = ModuleList([])
+        self.layer_dropout = layer_dropout
+        for ind in range(depth):
+            layer = ind + 1
+            self.layers.append(ModuleList([LayerScale(dim, Attention(dim, heads=heads, dim_head=dim_head, dropout=dropout), depth=layer), LayerScale(dim, FeedForward(dim, mlp_dim, dropout=dropout), depth=layer)]))
+
+    def forward(self, x, context=None):
+        layers = dropout_layers(self.layers, dropout=self.layer_dropout)
+        for attn, ff in layers:
+            x = attn(x, context=context) + x
             x = ff(x) + x
         return x
 
 
-def exists(val):
-    return val is not None
+class FactorizedTransformer(nn.Module):
+
+    def __init__(self, dim, depth, heads, dim_head, mlp_dim, dropout=0.0):
+        super().__init__()
+        self.norm = nn.LayerNorm(dim)
+        self.layers = nn.ModuleList([])
+        for _ in range(depth):
+            self.layers.append(nn.ModuleList([Attention(dim, heads=heads, dim_head=dim_head, dropout=dropout), Attention(dim, heads=heads, dim_head=dim_head, dropout=dropout), FeedForward(dim, mlp_dim, dropout=dropout)]))
+
+    def forward(self, x):
+        b, f, n, _ = x.shape
+        for spatial_attn, temporal_attn, ff in self.layers:
+            x = rearrange(x, 'b f n d -> (b f) n d')
+            x = spatial_attn(x) + x
+            x = rearrange(x, '(b f) n d -> (b n) f d', b=b, f=f)
+            x = temporal_attn(x) + x
+            x = ff(x) + x
+            x = rearrange(x, '(b n) f d -> b f n d', b=b, n=n)
+        return self.norm(x)
 
 
 def pair(t):
@@ -223,65 +310,57 @@ def pair(t):
 
 class ViT(nn.Module):
 
-    def __init__(self, *, image_size, image_patch_size, frames, frame_patch_size, num_classes, dim, spatial_depth, temporal_depth, heads, mlp_dim, pool='cls', channels=3, dim_head=64, dropout=0.0, emb_dropout=0.0):
+    def __init__(self, *, image_size, image_patch_size, frames, frame_patch_size, num_classes, dim, spatial_depth, temporal_depth, heads, mlp_dim, pool='cls', channels=3, dim_head=64, dropout=0.0, emb_dropout=0.0, variant='factorized_encoder'):
         super().__init__()
         image_height, image_width = pair(image_size)
         patch_height, patch_width = pair(image_patch_size)
         assert image_height % patch_height == 0 and image_width % patch_width == 0, 'Image dimensions must be divisible by the patch size.'
         assert frames % frame_patch_size == 0, 'Frames must be divisible by frame patch size'
+        assert variant in ('factorized_encoder', 'factorized_self_attention'), f'variant = {variant} is not implemented'
         num_image_patches = image_height // patch_height * (image_width // patch_width)
         num_frame_patches = frames // frame_patch_size
         patch_dim = channels * patch_height * patch_width * frame_patch_size
         assert pool in {'cls', 'mean'}, 'pool type must be either cls (cls token) or mean (mean pooling)'
         self.global_average_pool = pool == 'mean'
-        self.to_patch_embedding = nn.Sequential(Rearrange('b c (f pf) (h p1) (w p2) -> b f (h w) (p1 p2 pf c)', p1=patch_height, p2=patch_width, pf=frame_patch_size), nn.Linear(patch_dim, dim))
+        self.to_patch_embedding = nn.Sequential(Rearrange('b c (f pf) (h p1) (w p2) -> b f (h w) (p1 p2 pf c)', p1=patch_height, p2=patch_width, pf=frame_patch_size), nn.LayerNorm(patch_dim), nn.Linear(patch_dim, dim), nn.LayerNorm(dim))
         self.pos_embedding = nn.Parameter(torch.randn(1, num_frame_patches, num_image_patches, dim))
         self.dropout = nn.Dropout(emb_dropout)
         self.spatial_cls_token = nn.Parameter(torch.randn(1, 1, dim)) if not self.global_average_pool else None
-        self.temporal_cls_token = nn.Parameter(torch.randn(1, 1, dim)) if not self.global_average_pool else None
-        self.spatial_transformer = Transformer(dim, spatial_depth, heads, dim_head, mlp_dim, dropout)
-        self.temporal_transformer = Transformer(dim, temporal_depth, heads, dim_head, mlp_dim, dropout)
+        if variant == 'factorized_encoder':
+            self.temporal_cls_token = nn.Parameter(torch.randn(1, 1, dim)) if not self.global_average_pool else None
+            self.spatial_transformer = Transformer(dim, spatial_depth, heads, dim_head, mlp_dim, dropout)
+            self.temporal_transformer = Transformer(dim, temporal_depth, heads, dim_head, mlp_dim, dropout)
+        elif variant == 'factorized_self_attention':
+            assert spatial_depth == temporal_depth, 'Spatial and temporal depth must be the same for factorized self-attention'
+            self.factorized_transformer = FactorizedTransformer(dim, spatial_depth, heads, dim_head, mlp_dim, dropout)
         self.pool = pool
         self.to_latent = nn.Identity()
-        self.mlp_head = nn.Sequential(nn.LayerNorm(dim), nn.Linear(dim, num_classes))
+        self.mlp_head = nn.Linear(dim, num_classes)
+        self.variant = variant
 
     def forward(self, video):
         x = self.to_patch_embedding(video)
         b, f, n, _ = x.shape
-        x = x + self.pos_embedding
+        x = x + self.pos_embedding[:, :f, :n]
         if exists(self.spatial_cls_token):
             spatial_cls_tokens = repeat(self.spatial_cls_token, '1 1 d -> b f 1 d', b=b, f=f)
             x = torch.cat((spatial_cls_tokens, x), dim=2)
         x = self.dropout(x)
-        x = rearrange(x, 'b f n d -> (b f) n d')
-        x = self.spatial_transformer(x)
-        x = rearrange(x, '(b f) n d -> b f n d', b=b)
-        x = x[:, :, 0] if not self.global_average_pool else reduce(x, 'b f n d -> b f d', 'mean')
-        if exists(self.temporal_cls_token):
-            temporal_cls_tokens = repeat(self.temporal_cls_token, '1 1 d-> b 1 d', b=b)
-            x = torch.cat((temporal_cls_tokens, x), dim=1)
-        x = self.temporal_transformer(x)
-        x = x[:, 0] if not self.global_average_pool else reduce(x, 'b f d -> b d', 'mean')
+        if self.variant == 'factorized_encoder':
+            x = rearrange(x, 'b f n d -> (b f) n d')
+            x = self.spatial_transformer(x)
+            x = rearrange(x, '(b f) n d -> b f n d', b=b)
+            x = x[:, :, 0] if not self.global_average_pool else reduce(x, 'b f n d -> b f d', 'mean')
+            if exists(self.temporal_cls_token):
+                temporal_cls_tokens = repeat(self.temporal_cls_token, '1 1 d-> b 1 d', b=b)
+                x = torch.cat((temporal_cls_tokens, x), dim=1)
+            x = self.temporal_transformer(x)
+            x = x[:, 0] if not self.global_average_pool else reduce(x, 'b f d -> b d', 'mean')
+        elif self.variant == 'factorized_self_attention':
+            x = self.factorized_transformer(x)
+            x = x[:, 0, 0] if not self.global_average_pool else reduce(x, 'b f n d -> b d', 'mean')
         x = self.to_latent(x)
         return self.mlp_head(x)
-
-
-class LayerScale(nn.Module):
-
-    def __init__(self, dim, fn, depth):
-        super().__init__()
-        if depth <= 18:
-            init_eps = 0.1
-        elif depth > 18 and depth <= 24:
-            init_eps = 1e-05
-        else:
-            init_eps = 1e-06
-        scale = torch.zeros(1, 1, dim).fill_(init_eps)
-        self.scale = nn.Parameter(scale)
-        self.fn = fn
-
-    def forward(self, x, **kwargs):
-        return self.fn(x, **kwargs) * self.scale
 
 
 class CaiT(nn.Module):
@@ -291,7 +370,7 @@ class CaiT(nn.Module):
         assert image_size % patch_size == 0, 'Image dimensions must be divisible by the patch size.'
         num_patches = (image_size // patch_size) ** 2
         patch_dim = 3 * patch_size ** 2
-        self.to_patch_embedding = nn.Sequential(Rearrange('b c (h p1) (w p2) -> b (h w) (p1 p2 c)', p1=patch_size, p2=patch_size), nn.Linear(patch_dim, dim))
+        self.to_patch_embedding = nn.Sequential(Rearrange('b c (h p1) (w p2) -> b (h w) (p1 p2 c)', p1=patch_size, p2=patch_size), nn.LayerNorm(patch_dim), nn.Linear(patch_dim, dim), nn.LayerNorm(dim))
         self.pos_embedding = nn.Parameter(torch.randn(1, num_patches, dim))
         self.cls_token = nn.Parameter(torch.randn(1, 1, dim))
         self.dropout = nn.Dropout(emb_dropout)
@@ -477,7 +556,7 @@ class CrossTransformer(nn.Module):
         super().__init__()
         self.layers = nn.ModuleList([])
         for _ in range(depth):
-            self.layers.append(nn.ModuleList([ProjectInOut(sm_dim, lg_dim, PreNorm(lg_dim, Attention(lg_dim, heads=heads, dim_head=dim_head, dropout=dropout))), ProjectInOut(lg_dim, sm_dim, PreNorm(sm_dim, Attention(sm_dim, heads=heads, dim_head=dim_head, dropout=dropout)))]))
+            self.layers.append(nn.ModuleList([ProjectInOut(sm_dim, lg_dim, Attention(lg_dim, heads=heads, dim_head=dim_head, dropout=dropout)), ProjectInOut(lg_dim, sm_dim, Attention(sm_dim, heads=heads, dim_head=dim_head, dropout=dropout))]))
 
     def forward(self, sm_tokens, lg_tokens):
         (sm_cls, sm_patch_tokens), (lg_cls, lg_patch_tokens) = map(lambda t: (t[:, :1], t[:, 1:]), (sm_tokens, lg_tokens))
@@ -506,12 +585,12 @@ class MultiScaleEncoder(nn.Module):
 
 class ImageEmbedder(nn.Module):
 
-    def __init__(self, *, dim, image_size, patch_size, dropout=0.0):
+    def __init__(self, *, dim, image_size, patch_size, dropout=0.0, channels=3):
         super().__init__()
         assert image_size % patch_size == 0, 'Image dimensions must be divisible by the patch size.'
         num_patches = (image_size // patch_size) ** 2
-        patch_dim = 3 * patch_size ** 2
-        self.to_patch_embedding = nn.Sequential(Rearrange('b c (h p1) (w p2) -> b (h w) (p1 p2 c)', p1=patch_size, p2=patch_size), nn.Linear(patch_dim, dim))
+        patch_dim = channels * patch_size ** 2
+        self.to_patch_embedding = nn.Sequential(Rearrange('b c (h p1) (w p2) -> b (h w) (p1 p2 c)', p1=patch_size, p2=patch_size), nn.LayerNorm(patch_dim), nn.Linear(patch_dim, dim), nn.LayerNorm(dim))
         self.pos_embedding = nn.Parameter(torch.randn(1, num_patches + 1, dim))
         self.cls_token = nn.Parameter(torch.randn(1, 1, dim))
         self.dropout = nn.Dropout(dropout)
@@ -527,10 +606,10 @@ class ImageEmbedder(nn.Module):
 
 class CrossViT(nn.Module):
 
-    def __init__(self, *, image_size, num_classes, sm_dim, lg_dim, sm_patch_size=12, sm_enc_depth=1, sm_enc_heads=8, sm_enc_mlp_dim=2048, sm_enc_dim_head=64, lg_patch_size=16, lg_enc_depth=4, lg_enc_heads=8, lg_enc_mlp_dim=2048, lg_enc_dim_head=64, cross_attn_depth=2, cross_attn_heads=8, cross_attn_dim_head=64, depth=3, dropout=0.1, emb_dropout=0.1):
+    def __init__(self, *, image_size, num_classes, sm_dim, lg_dim, sm_patch_size=12, sm_enc_depth=1, sm_enc_heads=8, sm_enc_mlp_dim=2048, sm_enc_dim_head=64, lg_patch_size=16, lg_enc_depth=4, lg_enc_heads=8, lg_enc_mlp_dim=2048, lg_enc_dim_head=64, cross_attn_depth=2, cross_attn_heads=8, cross_attn_dim_head=64, depth=3, dropout=0.1, emb_dropout=0.1, channels=3):
         super().__init__()
-        self.sm_image_embedder = ImageEmbedder(dim=sm_dim, image_size=image_size, patch_size=sm_patch_size, dropout=emb_dropout)
-        self.lg_image_embedder = ImageEmbedder(dim=lg_dim, image_size=image_size, patch_size=lg_patch_size, dropout=emb_dropout)
+        self.sm_image_embedder = ImageEmbedder(dim=sm_dim, channels=channels, image_size=image_size, patch_size=sm_patch_size, dropout=emb_dropout)
+        self.lg_image_embedder = ImageEmbedder(dim=lg_dim, channels=channels, image_size=image_size, patch_size=lg_patch_size, dropout=emb_dropout)
         self.multi_scale_encoder = MultiScaleEncoder(depth=depth, sm_dim=sm_dim, lg_dim=lg_dim, cross_attn_heads=cross_attn_heads, cross_attn_dim_head=cross_attn_dim_head, cross_attn_depth=cross_attn_depth, sm_enc_params=dict(depth=sm_enc_depth, heads=sm_enc_heads, mlp_dim=sm_enc_mlp_dim, dim_head=sm_enc_dim_head), lg_enc_params=dict(depth=lg_enc_depth, heads=lg_enc_heads, mlp_dim=lg_enc_mlp_dim, dim_head=lg_enc_dim_head), dropout=dropout)
         self.sm_mlp_head = nn.Sequential(nn.LayerNorm(sm_dim), nn.Linear(sm_dim, num_classes))
         self.lg_mlp_head = nn.Sequential(nn.LayerNorm(lg_dim), nn.Linear(lg_dim, num_classes))
@@ -638,10 +717,10 @@ def group_by_key_prefix_and_remove_prefix(prefix, d):
 
 class CvT(nn.Module):
 
-    def __init__(self, *, num_classes, s1_emb_dim=64, s1_emb_kernel=7, s1_emb_stride=4, s1_proj_kernel=3, s1_kv_proj_stride=2, s1_heads=1, s1_depth=1, s1_mlp_mult=4, s2_emb_dim=192, s2_emb_kernel=3, s2_emb_stride=2, s2_proj_kernel=3, s2_kv_proj_stride=2, s2_heads=3, s2_depth=2, s2_mlp_mult=4, s3_emb_dim=384, s3_emb_kernel=3, s3_emb_stride=2, s3_proj_kernel=3, s3_kv_proj_stride=2, s3_heads=6, s3_depth=10, s3_mlp_mult=4, dropout=0.0):
+    def __init__(self, *, num_classes, s1_emb_dim=64, s1_emb_kernel=7, s1_emb_stride=4, s1_proj_kernel=3, s1_kv_proj_stride=2, s1_heads=1, s1_depth=1, s1_mlp_mult=4, s2_emb_dim=192, s2_emb_kernel=3, s2_emb_stride=2, s2_proj_kernel=3, s2_kv_proj_stride=2, s2_heads=3, s2_depth=2, s2_mlp_mult=4, s3_emb_dim=384, s3_emb_kernel=3, s3_emb_stride=2, s3_proj_kernel=3, s3_kv_proj_stride=2, s3_heads=6, s3_depth=10, s3_mlp_mult=4, dropout=0.0, channels=3):
         super().__init__()
         kwargs = dict(locals())
-        dim = 3
+        dim = channels
         layers = []
         for prefix in ('s1', 's2', 's3'):
             config, kwargs = group_by_key_prefix_and_remove_prefix(f'{prefix}_', kwargs)
@@ -655,16 +734,6 @@ class CvT(nn.Module):
         return self.to_logits(latents)
 
 
-class Residual(nn.Module):
-
-    def __init__(self, fn):
-        super().__init__()
-        self.fn = fn
-
-    def forward(self, x, **kwargs):
-        return self.fn(x, **kwargs) + x
-
-
 class DeepViT(nn.Module):
 
     def __init__(self, *, image_size, patch_size, num_classes, dim, depth, heads, mlp_dim, pool='cls', channels=3, dim_head=64, dropout=0.0, emb_dropout=0.0):
@@ -673,7 +742,7 @@ class DeepViT(nn.Module):
         num_patches = (image_size // patch_size) ** 2
         patch_dim = channels * patch_size ** 2
         assert pool in {'cls', 'mean'}, 'pool type must be either cls (cls token) or mean (mean pooling)'
-        self.to_patch_embedding = nn.Sequential(Rearrange('b c (h p1) (w p2) -> b (h w) (p1 p2 c)', p1=patch_size, p2=patch_size), nn.Linear(patch_dim, dim))
+        self.to_patch_embedding = nn.Sequential(Rearrange('b c (h p1) (w p2) -> b (h w) (p1 p2 c)', p1=patch_size, p2=patch_size), nn.LayerNorm(patch_dim), nn.Linear(patch_dim, dim), nn.LayerNorm(dim))
         self.pos_embedding = nn.Parameter(torch.randn(1, num_patches + 1, dim))
         self.cls_token = nn.Parameter(torch.randn(1, 1, dim))
         self.dropout = nn.Dropout(emb_dropout)
@@ -708,25 +777,23 @@ class RandomApply(nn.Module):
         return self.fn(x)
 
 
-class L2Norm(nn.Module):
-
-    def forward(self, x, eps=1e-06):
-        return F.normalize(x, dim=1, eps=eps)
+def l2norm(t):
+    return F.normalize(t, dim=-1, p=2)
 
 
-class MLP(nn.Module):
+class L2Norm(Module):
 
-    def __init__(self, dim, dim_out, num_layers, hidden_size=256):
+    def __init__(self, dim=-1):
         super().__init__()
-        layers = []
-        dims = dim, *((hidden_size,) * (num_layers - 1))
-        for ind, (layer_dim_in, layer_dim_out) in enumerate(zip(dims[:-1], dims[1:])):
-            is_last = ind == len(dims) - 1
-            layers.extend([nn.Linear(layer_dim_in, layer_dim_out), nn.GELU() if not is_last else nn.Identity()])
-        self.net = nn.Sequential(*layers, L2Norm(), nn.Linear(hidden_size, dim_out))
+        self.dim = dim
 
-    def forward(self, x):
-        return self.net(x)
+    def forward(self, t):
+        return l2norm(t, dim=self.dim)
+
+
+def MLP(dim, factor=4, dropout=0.0):
+    hidden_dim = int(dim * factor)
+    return nn.Sequential(LayerNorm(dim), nn.Linear(dim, hidden_dim), nn.GELU(), nn.Dropout(dropout), nn.Linear(hidden_dim, dim), nn.Dropout(dropout))
 
 
 def singleton(cache_key):
@@ -908,11 +975,11 @@ class DistillMixin:
         distilling = exists(distill_token)
         x = self.to_patch_embedding(img)
         b, n, _ = x.shape
-        cls_tokens = repeat(self.cls_token, '() n d -> b n d', b=b)
+        cls_tokens = repeat(self.cls_token, '1 n d -> b n d', b=b)
         x = torch.cat((cls_tokens, x), dim=1)
         x += self.pos_embedding[:, :n + 1]
         if distilling:
-            distill_tokens = repeat(distill_token, '() n d -> b n d', b=b)
+            distill_tokens = repeat(distill_token, '1 n d -> b n d', b=b)
             x = torch.cat((x, distill_tokens), dim=1)
         x = self._attend(x)
         if distilling:
@@ -981,7 +1048,7 @@ class T2TViT(nn.Module):
             self.transformer = transformer
         self.pool = pool
         self.to_latent = nn.Identity()
-        self.mlp_head = nn.Sequential(nn.LayerNorm(dim), nn.Linear(dim, num_classes))
+        self.mlp_head = nn.Linear(dim, num_classes)
 
     def forward(self, img):
         x = self.to_patch_embedding(img)
@@ -1016,9 +1083,9 @@ class DistillableT2TViT(DistillMixin, T2TViT):
         return x
 
 
-class DistillWrapper(nn.Module):
+class DistillWrapper(Module):
 
-    def __init__(self, *, teacher, student, temperature=1.0, alpha=0.5, hard=False):
+    def __init__(self, *, teacher, student, temperature=1.0, alpha=0.5, hard=False, mlp_layernorm=False):
         super().__init__()
         assert isinstance(student, (DistillableViT, DistillableT2TViT, DistillableEfficientViT)), 'student must be a vision transformer'
         self.teacher = teacher
@@ -1029,12 +1096,11 @@ class DistillWrapper(nn.Module):
         self.alpha = alpha
         self.hard = hard
         self.distillation_token = nn.Parameter(torch.randn(1, 1, dim))
-        self.distill_mlp = nn.Sequential(nn.LayerNorm(dim), nn.Linear(dim, num_classes))
+        self.distill_mlp = nn.Sequential(nn.LayerNorm(dim) if mlp_layernorm else nn.Identity(), nn.Linear(dim, num_classes))
 
     def forward(self, img, labels, temperature=None, alpha=None, **kwargs):
-        b, *_ = img.shape
-        alpha = alpha if exists(alpha) else self.alpha
-        T = temperature if exists(temperature) else self.temperature
+        alpha = default(alpha, self.alpha)
+        T = default(temperature, self.temperature)
         with torch.no_grad():
             teacher_logits = self.teacher(img)
         student_logits, distill_tokens = self.student(img, distill_token=self.distillation_token, **kwargs)
@@ -1239,7 +1305,7 @@ class Adapter(nn.Module):
 
 
 def always(val):
-    return lambda *args, **kwargs: val
+    return lambda *args: val
 
 
 class LeViT(nn.Module):
@@ -1276,6 +1342,16 @@ class LeViT(nn.Module):
         return out
 
 
+class Residual(nn.Module):
+
+    def __init__(self, fn):
+        super().__init__()
+        self.fn = fn
+
+    def forward(self, x, **kwargs):
+        return self.fn(x, **kwargs) + x
+
+
 class ExcludeCLS(nn.Module):
 
     def __init__(self, fn):
@@ -1295,7 +1371,7 @@ class LocalViT(nn.Module):
         assert image_size % patch_size == 0, 'Image dimensions must be divisible by the patch size.'
         num_patches = (image_size // patch_size) ** 2
         patch_dim = channels * patch_size ** 2
-        self.to_patch_embedding = nn.Sequential(Rearrange('b c (h p1) (w p2) -> b (h w) (p1 p2 c)', p1=patch_size, p2=patch_size), nn.Linear(patch_dim, dim))
+        self.to_patch_embedding = nn.Sequential(Rearrange('b c (h p1) (w p2) -> b (h w) (p1 p2 c)', p1=patch_size, p2=patch_size), nn.LayerNorm(patch_dim), nn.Linear(patch_dim, dim), nn.LayerNorm(dim))
         self.pos_embedding = nn.Parameter(torch.randn(1, num_patches + 1, dim))
         self.cls_token = nn.Parameter(torch.randn(1, 1, dim))
         self.dropout = nn.Dropout(emb_dropout)
@@ -1313,6 +1389,70 @@ class LocalViT(nn.Module):
         return self.mlp_head(x[:, 0])
 
 
+def divisible_by(num, den):
+    return num % den == 0
+
+
+def posemb_sincos_2d(h, w, dim, temperature: 'int'=10000, dtype=torch.float32):
+    y, x = torch.meshgrid(torch.arange(h), torch.arange(w), indexing='ij')
+    assert dim % 4 == 0, 'feature dimension must be multiple of 4 for sincos emb'
+    omega = torch.arange(dim // 4) / (dim // 4 - 1)
+    omega = 1.0 / temperature ** omega
+    y = y.flatten()[:, None] * omega[None, :]
+    x = x.flatten()[:, None] * omega[None, :]
+    pe = torch.cat((x.sin(), x.cos(), y.sin(), y.cos()), dim=1)
+    return pe.type(dtype)
+
+
+class LookViT(Module):
+
+    def __init__(self, *, dim, image_size, num_classes, depth=3, patch_size=16, heads=8, mlp_factor=4, dim_head=64, highres_patch_size=12, highres_mlp_factor=4, cross_attn_heads=8, cross_attn_dim_head=64, patch_conv_kernel_size=7, dropout=0.1, channels=3):
+        super().__init__()
+        assert divisible_by(image_size, highres_patch_size)
+        assert divisible_by(image_size, patch_size)
+        assert patch_size > highres_patch_size, 'patch size of the main vision transformer should be smaller than the highres patch sizes (that does the `lookup`)'
+        assert not divisible_by(patch_conv_kernel_size, 2)
+        self.dim = dim
+        self.image_size = image_size
+        self.patch_size = patch_size
+        kernel_size = patch_conv_kernel_size
+        patch_dim = highres_patch_size * highres_patch_size * channels
+        self.to_patches = nn.Sequential(Rearrange('b c (h p1) (w p2) -> b (p1 p2 c) h w', p1=highres_patch_size, p2=highres_patch_size), nn.Conv2d(patch_dim, dim, kernel_size, padding=kernel_size // 2), Rearrange('b c h w -> b h w c'), LayerNorm(dim))
+        num_patches = (image_size // highres_patch_size) ** 2
+        self.pos_embedding = nn.Parameter(torch.randn(num_patches, dim))
+        layers = ModuleList([])
+        for _ in range(depth):
+            layers.append(ModuleList([Attention(dim=dim, dim_head=dim_head, heads=heads, dropout=dropout), MLP(dim=dim, factor=mlp_factor, dropout=dropout), Attention(dim=dim, dim_head=cross_attn_dim_head, heads=cross_attn_heads, dropout=dropout, cross_attend=True), Attention(dim=dim, dim_head=cross_attn_dim_head, heads=cross_attn_heads, dropout=dropout, cross_attend=True, reuse_attention=True), LayerNorm(dim), MLP(dim=dim, factor=highres_mlp_factor, dropout=dropout)]))
+        self.layers = layers
+        self.norm = LayerNorm(dim)
+        self.highres_norm = LayerNorm(dim)
+        self.to_logits = nn.Linear(dim, num_classes, bias=False)
+
+    def forward(self, img):
+        assert img.shape[-2:] == (self.image_size, self.image_size)
+        highres_tokens = self.to_patches(img)
+        size = highres_tokens.shape[-2]
+        pos_emb = posemb_sincos_2d(highres_tokens)
+        highres_tokens = highres_tokens + rearrange(pos_emb, '(h w) d -> h w d', h=size)
+        tokens = F.interpolate(rearrange(highres_tokens, 'b h w d -> b d h w'), img.shape[-1] // self.patch_size, mode='bilinear')
+        tokens = rearrange(tokens, 'b c h w -> b (h w) c')
+        highres_tokens = rearrange(highres_tokens, 'b h w c -> b (h w) c')
+        for attn, mlp, lookup_cross_attn, highres_attn, highres_norm, highres_mlp in self.layers:
+            lookup_out, qk_sim = lookup_cross_attn(tokens, highres_tokens, return_qk_sim=True)
+            tokens = lookup_out + tokens
+            tokens = attn(tokens) + tokens
+            tokens = mlp(tokens) + tokens
+            qk_sim = rearrange(qk_sim, 'b h i j -> b h j i')
+            highres_tokens = highres_attn(highres_tokens, tokens, qk_sim=qk_sim) + highres_tokens
+            highres_tokens = highres_norm(highres_tokens)
+            highres_tokens = highres_mlp(highres_tokens) + highres_tokens
+        tokens = self.norm(tokens)
+        highres_tokens = self.highres_norm(highres_tokens)
+        tokens = reduce(tokens, 'b n d -> b d', 'mean')
+        highres_tokens = reduce(highres_tokens, 'b n d -> b d', 'mean')
+        return self.to_logits(tokens + highres_tokens)
+
+
 class MAE(nn.Module):
 
     def __init__(self, *, encoder, decoder_dim, masking_ratio=0.75, decoder_depth=1, decoder_heads=8, decoder_dim_head=64):
@@ -1321,8 +1461,9 @@ class MAE(nn.Module):
         self.masking_ratio = masking_ratio
         self.encoder = encoder
         num_patches, encoder_dim = encoder.pos_embedding.shape[-2:]
-        self.to_patch, self.patch_to_emb = encoder.to_patch_embedding[:2]
-        pixel_values_per_patch = self.patch_to_emb.weight.shape[-1]
+        self.to_patch = encoder.to_patch_embedding[0]
+        self.patch_to_emb = nn.Sequential(*encoder.to_patch_embedding[1:])
+        pixel_values_per_patch = encoder.to_patch_embedding[2].weight.shape[-1]
         self.decoder_dim = decoder_dim
         self.enc_to_dec = nn.Linear(encoder_dim, decoder_dim) if encoder_dim != decoder_dim else nn.Identity()
         self.mask_token = nn.Parameter(torch.randn(decoder_dim))
@@ -1335,7 +1476,10 @@ class MAE(nn.Module):
         patches = self.to_patch(img)
         batch, num_patches, *_ = patches.shape
         tokens = self.patch_to_emb(patches)
-        tokens = tokens + self.encoder.pos_embedding[:, 1:num_patches + 1]
+        if self.encoder.pool == 'cls':
+            tokens += self.encoder.pos_embedding[:, 1:num_patches + 1]
+        elif self.encoder.pool == 'mean':
+            tokens += self.encoder.pos_embedding
         num_masked = int(self.masking_ratio * num_patches)
         rand_indices = torch.rand(batch, num_patches, device=device).argsort(dim=-1)
         masked_indices, unmasked_indices = rand_indices[:, :num_masked], rand_indices[:, num_masked:]
@@ -1357,29 +1501,18 @@ class MAE(nn.Module):
         return recon_loss
 
 
-class PreNormResidual(nn.Module):
-
-    def __init__(self, dim, fn):
-        super().__init__()
-        self.norm = nn.LayerNorm(dim)
-        self.fn = fn
-
-    def forward(self, x):
-        return self.fn(self.norm(x)) + x
-
-
-class SqueezeExcitation(nn.Module):
+class SqueezeExcitation(Module):
 
     def __init__(self, dim, shrinkage_rate=0.25):
         super().__init__()
         hidden_dim = int(dim * shrinkage_rate)
-        self.gate = nn.Sequential(Reduce('b c h w -> b c', 'mean'), nn.Linear(dim, hidden_dim, bias=False), nn.SiLU(), nn.Linear(hidden_dim, dim, bias=False), nn.Sigmoid(), Rearrange('b c -> b c 1 1'))
+        self.gate = Sequential(Reduce('b c h w -> b c', 'mean'), nn.Linear(dim, hidden_dim, bias=False), nn.SiLU(), nn.Linear(hidden_dim, dim, bias=False), nn.Sigmoid(), Rearrange('b c -> b c 1 1'))
 
     def forward(self, x):
         return x * self.gate(x)
 
 
-class Dropsample(nn.Module):
+class Dropsample(Module):
 
     def __init__(self, prob=0):
         super().__init__()
@@ -1393,7 +1526,7 @@ class Dropsample(nn.Module):
         return x * keep_mask / (1 - self.prob)
 
 
-class MBConvResidual(nn.Module):
+class MBConvResidual(Module):
 
     def __init__(self, fn, dropout=0.0):
         super().__init__()
@@ -1409,37 +1542,80 @@ class MBConvResidual(nn.Module):
 def MBConv(dim_in, dim_out, *, downsample, expansion_rate=4, shrinkage_rate=0.25, dropout=0.0):
     hidden_dim = int(expansion_rate * dim_out)
     stride = 2 if downsample else 1
-    net = nn.Sequential(nn.Conv2d(dim_in, hidden_dim, 1), nn.BatchNorm2d(hidden_dim), nn.GELU(), nn.Conv2d(hidden_dim, hidden_dim, 3, stride=stride, padding=1, groups=hidden_dim), nn.BatchNorm2d(hidden_dim), nn.GELU(), SqueezeExcitation(hidden_dim, shrinkage_rate=shrinkage_rate), nn.Conv2d(hidden_dim, dim_out, 1), nn.BatchNorm2d(dim_out))
+    net = Sequential(nn.Conv2d(dim_in, hidden_dim, 1), nn.BatchNorm2d(hidden_dim), nn.GELU(), nn.Conv2d(hidden_dim, hidden_dim, 3, stride=stride, padding=1, groups=hidden_dim), nn.BatchNorm2d(hidden_dim), nn.GELU(), SqueezeExcitation(hidden_dim, shrinkage_rate=shrinkage_rate), nn.Conv2d(hidden_dim, dim_out, 1), nn.BatchNorm2d(dim_out))
     if dim_in == dim_out and not downsample:
         net = MBConvResidual(net, dropout=dropout)
     return net
 
 
-class MaxViT(nn.Module):
+def pack_one(t, pattern):
+    return pack([t], pattern)
 
-    def __init__(self, *, num_classes, dim, depth, dim_head=32, dim_conv_stem=None, window_size=7, mbconv_expansion_rate=4, mbconv_shrinkage_rate=0.25, dropout=0.1, channels=3):
+
+def unpack_one(t, ps, pattern):
+    return unpack(t, ps, pattern)[0]
+
+
+class MaxViT(Module):
+
+    def __init__(self, *, num_classes, dim, depth, dim_head=32, dim_conv_stem=None, window_size=7, mbconv_expansion_rate=4, mbconv_shrinkage_rate=0.25, dropout=0.1, channels=3, num_register_tokens=4):
         super().__init__()
         assert isinstance(depth, tuple), 'depth needs to be tuple if integers indicating number of transformer blocks at that stage'
+        assert num_register_tokens > 0
         dim_conv_stem = default(dim_conv_stem, dim)
-        self.conv_stem = nn.Sequential(nn.Conv2d(channels, dim_conv_stem, 3, stride=2, padding=1), nn.Conv2d(dim_conv_stem, dim_conv_stem, 3, padding=1))
+        self.conv_stem = Sequential(nn.Conv2d(channels, dim_conv_stem, 3, stride=2, padding=1), nn.Conv2d(dim_conv_stem, dim_conv_stem, 3, padding=1))
         num_stages = len(depth)
         dims = tuple(map(lambda i: 2 ** i * dim, range(num_stages)))
         dims = dim_conv_stem, *dims
         dim_pairs = tuple(zip(dims[:-1], dims[1:]))
         self.layers = nn.ModuleList([])
-        w = window_size
+        self.window_size = window_size
+        self.register_tokens = nn.ParameterList([])
         for ind, ((layer_dim_in, layer_dim), layer_depth) in enumerate(zip(dim_pairs, depth)):
             for stage_ind in range(layer_depth):
                 is_first = stage_ind == 0
                 stage_dim_in = layer_dim_in if is_first else layer_dim
-                block = nn.Sequential(MBConv(stage_dim_in, layer_dim, downsample=is_first, expansion_rate=mbconv_expansion_rate, shrinkage_rate=mbconv_shrinkage_rate), Rearrange('b d (x w1) (y w2) -> b x y w1 w2 d', w1=w, w2=w), PreNormResidual(layer_dim, Attention(dim=layer_dim, dim_head=dim_head, dropout=dropout, window_size=w)), PreNormResidual(layer_dim, FeedForward(dim=layer_dim, dropout=dropout)), Rearrange('b x y w1 w2 d -> b d (x w1) (y w2)'), Rearrange('b d (w1 x) (w2 y) -> b x y w1 w2 d', w1=w, w2=w), PreNormResidual(layer_dim, Attention(dim=layer_dim, dim_head=dim_head, dropout=dropout, window_size=w)), PreNormResidual(layer_dim, FeedForward(dim=layer_dim, dropout=dropout)), Rearrange('b x y w1 w2 d -> b d (w1 x) (w2 y)'))
-                self.layers.append(block)
+                conv = MBConv(stage_dim_in, layer_dim, downsample=is_first, expansion_rate=mbconv_expansion_rate, shrinkage_rate=mbconv_shrinkage_rate)
+                block_attn = Attention(dim=layer_dim, dim_head=dim_head, dropout=dropout, window_size=window_size, num_registers=num_register_tokens)
+                block_ff = FeedForward(dim=layer_dim, dropout=dropout)
+                grid_attn = Attention(dim=layer_dim, dim_head=dim_head, dropout=dropout, window_size=window_size, num_registers=num_register_tokens)
+                grid_ff = FeedForward(dim=layer_dim, dropout=dropout)
+                register_tokens = nn.Parameter(torch.randn(num_register_tokens, layer_dim))
+                self.layers.append(ModuleList([conv, ModuleList([block_attn, block_ff]), ModuleList([grid_attn, grid_ff])]))
+                self.register_tokens.append(register_tokens)
         self.mlp_head = nn.Sequential(Reduce('b d h w -> b d', 'mean'), nn.LayerNorm(dims[-1]), nn.Linear(dims[-1], num_classes))
 
     def forward(self, x):
+        b, w = x.shape[0], self.window_size
         x = self.conv_stem(x)
-        for stage in self.layers:
-            x = stage(x)
+        for (conv, (block_attn, block_ff), (grid_attn, grid_ff)), register_tokens in zip(self.layers, self.register_tokens):
+            x = conv(x)
+            x = rearrange(x, 'b d (x w1) (y w2) -> b x y w1 w2 d', w1=w, w2=w)
+            r = repeat(register_tokens, 'n d -> b x y n d', b=b, x=x.shape[1], y=x.shape[2])
+            r, register_batch_ps = pack_one(r, '* n d')
+            x, window_ps = pack_one(x, 'b x y * d')
+            x, batch_ps = pack_one(x, '* n d')
+            x, register_ps = pack([r, x], 'b * d')
+            x = block_attn(x) + x
+            x = block_ff(x) + x
+            r, x = unpack(x, register_ps, 'b * d')
+            x = unpack_one(x, batch_ps, '* n d')
+            x = unpack_one(x, window_ps, 'b x y * d')
+            x = rearrange(x, 'b x y w1 w2 d -> b d (x w1) (y w2)')
+            r = unpack_one(r, register_batch_ps, '* n d')
+            x = rearrange(x, 'b d (w1 x) (w2 y) -> b x y w1 w2 d', w1=w, w2=w)
+            r = reduce(r, 'b x y n d -> b n d', 'mean')
+            r = repeat(r, 'b n d -> b x y n d', x=x.shape[1], y=x.shape[2])
+            r, register_batch_ps = pack_one(r, '* n d')
+            x, window_ps = pack_one(x, 'b x y * d')
+            x, batch_ps = pack_one(x, '* n d')
+            x, register_ps = pack([r, x], 'b * d')
+            x = grid_attn(x) + x
+            r, x = unpack(x, register_ps, 'b * d')
+            x = grid_ff(x) + x
+            x = unpack_one(x, batch_ps, '* n d')
+            x = unpack_one(x, window_ps, 'b x y * d')
+            x = rearrange(x, 'b x y w1 w2 d -> b d (w1 x) (w2 y)')
         return self.mlp_head(x)
 
 
@@ -1536,6 +1712,33 @@ class MobileViT(nn.Module):
         return self.to_logits(x)
 
 
+class MP3(nn.Module):
+
+    def __init__(self, vit: 'ViT', masking_ratio):
+        super().__init__()
+        self.vit = vit
+        assert masking_ratio > 0 and masking_ratio < 1, 'masking ratio must be kept between 0 and 1'
+        self.masking_ratio = masking_ratio
+        dim = vit.dim
+        self.mlp_head = nn.Sequential(nn.LayerNorm(dim), nn.Linear(dim, vit.num_patches))
+
+    def forward(self, img):
+        device = img.device
+        tokens = self.vit.to_patch_embedding(img)
+        tokens = rearrange(tokens, 'b ... d -> b (...) d')
+        batch, num_patches, *_ = tokens.shape
+        num_masked = int(self.masking_ratio * num_patches)
+        rand_indices = torch.rand(batch, num_patches, device=device).argsort(dim=-1)
+        masked_indices, unmasked_indices = rand_indices[:, :num_masked], rand_indices[:, num_masked:]
+        batch_range = torch.arange(batch, device=device)[:, None]
+        tokens_unmasked = tokens[batch_range, unmasked_indices]
+        attended_tokens = self.vit.transformer(tokens, tokens_unmasked)
+        logits = rearrange(self.mlp_head(attended_tokens), 'b n d -> (b n) d')
+        labels = repeat(torch.arange(num_patches, device=device), 'n -> (b n)', b=batch)
+        loss = F.cross_entropy(logits, labels)
+        return loss
+
+
 class MPPLoss(nn.Module):
 
     def __init__(self, patch_size, channels, output_channel_bits, max_pixel_val, mean, std):
@@ -1584,6 +1787,7 @@ class MPP(nn.Module):
         super().__init__()
         self.transformer = transformer
         self.loss = MPPLoss(patch_size, channels, output_channel_bits, max_pixel_val, mean, std)
+        self.patch_to_emb = nn.Sequential(transformer.to_patch_embedding[1:])
         self.to_bits = nn.Linear(dim, 2 ** (output_channel_bits * channels))
         self.patch_size = patch_size
         self.mask_prob = mask_prob
@@ -1608,7 +1812,7 @@ class MPP(nn.Module):
         replace_prob = prob_mask_like(input, self.replace_prob)
         bool_mask_replace = mask * replace_prob == True
         masked_input[bool_mask_replace] = self.mask_token
-        masked_input = transformer.to_patch_embedding[-1](masked_input)
+        masked_input = self.patch_to_emb(masked_input)
         b, n, _ = masked_input.shape
         cls_tokens = repeat(transformer.cls_token, '() n d -> b n d', b=b)
         masked_input = torch.cat((cls_tokens, masked_input), dim=1)
@@ -1619,6 +1823,18 @@ class MPP(nn.Module):
         logits = cls_logits[:, 1:, :]
         mpp_loss = self.loss(logits, img, mask)
         return mpp_loss
+
+
+class RMSNorm(nn.Module):
+
+    def __init__(self, heads, dim):
+        super().__init__()
+        self.scale = dim ** 0.5
+        self.gamma = nn.Parameter(torch.ones(heads, 1, dim) / self.scale)
+
+    def forward(self, x):
+        normed = F.normalize(x, dim=-1)
+        return normed * self.scale * self.gamma
 
 
 def Aggregate(dim, dim_out):
@@ -1642,7 +1858,7 @@ class NesT(nn.Module):
         last_dim = layer_dims[-1]
         layer_dims = [*layer_dims, layer_dims[-1]]
         dim_pairs = zip(layer_dims[:-1], layer_dims[1:])
-        self.to_patch_embedding = nn.Sequential(Rearrange('b c (h p1) (w p2) -> b (p1 p2 c) h w', p1=patch_size, p2=patch_size), nn.Conv2d(patch_dim, layer_dims[0], 1))
+        self.to_patch_embedding = nn.Sequential(Rearrange('b c (h p1) (w p2) -> b (p1 p2 c) h w', p1=patch_size, p2=patch_size), LayerNorm(patch_dim), nn.Conv2d(patch_dim, layer_dims[0], 1), LayerNorm(layer_dims[0]))
         block_repeats = cast_tuple(block_repeats, num_hierarchies)
         self.layers = nn.ModuleList([])
         for level, heads, (dim_in, dim_out), block_repeat in zip(hierarchies, layer_heads, dim_pairs, block_repeats):
@@ -1662,6 +1878,72 @@ class NesT(nn.Module):
             x = rearrange(x, '(b b1 b2) c h w -> b c (b1 h) (b2 w)', b1=block_size, b2=block_size)
             x = aggregate(x)
         return self.mlp_head(x)
+
+
+class NormLinear(Module):
+
+    def __init__(self, dim, dim_out, norm_dim_in=True):
+        super().__init__()
+        self.linear = nn.Linear(dim, dim_out, bias=False)
+        parametrize.register_parametrization(self.linear, 'weight', L2Norm(dim=-1 if norm_dim_in else 0))
+
+    @property
+    def weight(self):
+        return self.linear.weight
+
+    def forward(self, x):
+        return self.linear(x)
+
+
+class nViT(Module):
+    """ https://arxiv.org/abs/2410.01131 """
+
+    def __init__(self, *, image_size, patch_size, num_classes, dim, depth, heads, mlp_dim, dropout=0.0, channels=3, dim_head=64, residual_lerp_scale_init=None):
+        super().__init__()
+        image_height, image_width = pair(image_size)
+        assert divisible_by(image_height, patch_size) and divisible_by(image_width, patch_size), 'Image dimensions must be divisible by the patch size.'
+        patch_height_dim, patch_width_dim = image_height // patch_size, image_width // patch_size
+        patch_dim = channels * patch_size ** 2
+        num_patches = patch_height_dim * patch_width_dim
+        self.channels = channels
+        self.patch_size = patch_size
+        self.to_patch_embedding = nn.Sequential(Rearrange('b c (h p1) (w p2) -> b (h w) (c p1 p2)', p1=patch_size, p2=patch_size), NormLinear(patch_dim, dim, norm_dim_in=False))
+        self.abs_pos_emb = NormLinear(dim, num_patches)
+        residual_lerp_scale_init = default(residual_lerp_scale_init, 1.0 / depth)
+        self.dim = dim
+        self.scale = dim ** 0.5
+        self.layers = ModuleList([])
+        self.residual_lerp_scales = nn.ParameterList([])
+        for _ in range(depth):
+            self.layers.append(ModuleList([Attention(dim, dim_head=dim_head, heads=heads, dropout=dropout), FeedForward(dim, dim_inner=mlp_dim, dropout=dropout)]))
+            self.residual_lerp_scales.append(nn.ParameterList([nn.Parameter(torch.ones(dim) * residual_lerp_scale_init / self.scale), nn.Parameter(torch.ones(dim) * residual_lerp_scale_init / self.scale)]))
+        self.logit_scale = nn.Parameter(torch.ones(num_classes))
+        self.to_pred = NormLinear(dim, num_classes)
+
+    @torch.no_grad()
+    def norm_weights_(self):
+        for module in self.modules():
+            if not isinstance(module, NormLinear):
+                continue
+            normed = module.weight
+            original = module.linear.parametrizations.weight.original
+            original.copy_(normed)
+
+    def forward(self, images):
+        device = images.device
+        tokens = self.to_patch_embedding(images)
+        seq_len = tokens.shape[-2]
+        pos_emb = self.abs_pos_emb.weight[torch.arange(seq_len, device=device)]
+        tokens = l2norm(tokens + pos_emb)
+        for (attn, ff), (attn_alpha, ff_alpha) in zip(self.layers, self.residual_lerp_scales):
+            attn_out = l2norm(attn(tokens))
+            tokens = l2norm(tokens.lerp(attn_out, attn_alpha * self.scale))
+            ff_out = l2norm(ff(tokens))
+            tokens = l2norm(tokens.lerp(ff_out, ff_alpha * self.scale))
+        pooled = reduce(tokens, 'b n d -> b d', 'mean')
+        logits = self.to_pred(pooled)
+        logits = logits * self.logit_scale * self.scale
+        return logits
 
 
 class Parallel(nn.Module):
@@ -1777,6 +2059,20 @@ class Recorder(nn.Module):
         return pred, attns
 
 
+class ChanLayerNorm(nn.Module):
+
+    def __init__(self, dim, eps=1e-05):
+        super().__init__()
+        self.eps = eps
+        self.g = nn.Parameter(torch.ones(1, dim, 1, 1))
+        self.b = nn.Parameter(torch.zeros(1, dim, 1, 1))
+
+    def forward(self, x):
+        var = torch.var(x, dim=1, unbiased=False, keepdim=True)
+        mean = torch.mean(x, dim=1, keepdim=True)
+        return (x - mean) / (var + self.eps).sqrt() * self.g + self.b
+
+
 class Downsample(nn.Module):
 
     def __init__(self, dim_in, dim_out):
@@ -1841,10 +2137,6 @@ class R2LTransformer(nn.Module):
         return local_tokens, region_tokens
 
 
-def divisible_by(val, d):
-    return val % d == 0
-
-
 class RegionViT(nn.Module):
 
     def __init__(self, *, dim=(64, 128, 256, 512), depth=(2, 2, 8, 2), window_size=7, num_classes=1000, tokenize_local_3_conv=False, local_patch_size=4, use_peg=False, attn_dropout=0.0, ff_dropout=0.0, channels=3):
@@ -1858,7 +2150,7 @@ class RegionViT(nn.Module):
         self.region_patch_size = local_patch_size * window_size
         init_dim, *_, last_dim = dim
         if tokenize_local_3_conv:
-            self.local_encoder = nn.Sequential(nn.Conv2d(3, init_dim, 3, 2, 1), nn.LayerNorm(init_dim), nn.GELU(), nn.Conv2d(init_dim, init_dim, 3, 2, 1), nn.LayerNorm(init_dim), nn.GELU(), nn.Conv2d(init_dim, init_dim, 3, 1, 1))
+            self.local_encoder = nn.Sequential(nn.Conv2d(3, init_dim, 3, 2, 1), ChanLayerNorm(init_dim), nn.GELU(), nn.Conv2d(init_dim, init_dim, 3, 2, 1), ChanLayerNorm(init_dim), nn.GELU(), nn.Conv2d(init_dim, init_dim, 3, 1, 1))
         else:
             self.local_encoder = nn.Conv2d(3, init_dim, 8, 4, 3)
         self.region_encoder = nn.Sequential(Rearrange('b c (h p1) (w p2) -> b (c p1 p2) h w', p1=region_patch_size, p2=region_patch_size), nn.Conv2d(region_patch_size ** 2 * channels, init_dim, 1))
@@ -1932,20 +2224,6 @@ class RvT(nn.Module):
         return self.mlp_head(x[:, 0])
 
 
-class ChanLayerNorm(nn.Module):
-
-    def __init__(self, dim, eps=1e-05):
-        super().__init__()
-        self.eps = eps
-        self.g = nn.Parameter(torch.ones(1, dim, 1, 1))
-        self.b = nn.Parameter(torch.zeros(1, dim, 1, 1))
-
-    def forward(self, x):
-        var = torch.var(x, dim=1, unbiased=False, keepdim=True)
-        mean = torch.mean(x, dim=1, keepdim=True)
-        return (x - mean) / (var + self.eps).sqrt() * self.g + self.b
-
-
 class ScalableSelfAttention(nn.Module):
 
     def __init__(self, dim, heads=8, dim_key=32, dim_value=32, dropout=0.0, reduction_factor=1):
@@ -1954,6 +2232,7 @@ class ScalableSelfAttention(nn.Module):
         self.scale = dim_key ** -0.5
         self.attend = nn.Softmax(dim=-1)
         self.dropout = nn.Dropout(dropout)
+        self.norm = ChanLayerNorm(dim)
         self.to_q = nn.Conv2d(dim, dim_key * heads, 1, bias=False)
         self.to_k = nn.Conv2d(dim, dim_key * heads, reduction_factor, stride=reduction_factor, bias=False)
         self.to_v = nn.Conv2d(dim, dim_value * heads, reduction_factor, stride=reduction_factor, bias=False)
@@ -1961,6 +2240,7 @@ class ScalableSelfAttention(nn.Module):
 
     def forward(self, x):
         height, width, heads = *x.shape[-2:], self.heads
+        x = self.norm(x)
         q, k, v = self.to_q(x), self.to_k(x), self.to_v(x)
         q, k, v = map(lambda t: rearrange(t, 'b (h d) ... -> b h (...) d', h=heads), (q, k, v))
         dots = torch.matmul(q, k.transpose(-1, -2)) * self.scale
@@ -1980,6 +2260,7 @@ class InteractiveWindowedSelfAttention(nn.Module):
         self.window_size = window_size
         self.attend = nn.Softmax(dim=-1)
         self.dropout = nn.Dropout(dropout)
+        self.norm = ChanLayerNorm(dim)
         self.local_interactive_module = nn.Conv2d(dim_value * heads, dim_value * heads, 3, padding=1)
         self.to_q = nn.Conv2d(dim, dim_key * heads, 1, bias=False)
         self.to_k = nn.Conv2d(dim, dim_key * heads, 1, bias=False)
@@ -1988,6 +2269,7 @@ class InteractiveWindowedSelfAttention(nn.Module):
 
     def forward(self, x):
         height, width, heads, wsz = *x.shape[-2:], self.heads, self.window_size
+        x = self.norm(x)
         wsz_h, wsz_w = default(wsz, height), default(wsz, width)
         assert height % wsz_h == 0 and width % wsz_w == 0, f'height ({height}) or width ({width}) of feature map is not divisible by the window size ({wsz_h}, {wsz_w})'
         q, k, v = self.to_q(x), self.to_k(x), self.to_v(x)
@@ -2048,6 +2330,7 @@ class DSSA(nn.Module):
         self.scale = dim_head ** -0.5
         self.window_size = window_size
         inner_dim = dim_head * heads
+        self.norm = ChanLayerNorm(dim)
         self.attend = nn.Sequential(nn.Softmax(dim=-1), nn.Dropout(dropout))
         self.to_qkv = nn.Conv1d(dim, inner_dim * 3, 1, bias=False)
         self.window_tokens = nn.Parameter(torch.randn(dim))
@@ -2072,6 +2355,7 @@ class DSSA(nn.Module):
         batch, height, width, heads, wsz = x.shape[0], *x.shape[-2:], self.heads, self.window_size
         assert height % wsz == 0 and width % wsz == 0, f'height {height} and width {width} must be divisible by window size {wsz}'
         num_windows = height // wsz * (width // wsz)
+        x = self.norm(x)
         x = rearrange(x, 'b c (h w1) (w w2) -> (b h w) c (w1 w2)', w1=wsz, w2=wsz)
         w = repeat(self.window_tokens, 'c -> b c 1', b=x.shape[0])
         x = torch.cat((w, x), dim=-1)
@@ -2131,8 +2415,9 @@ class SimMIM(nn.Module):
         self.masking_ratio = masking_ratio
         self.encoder = encoder
         num_patches, encoder_dim = encoder.pos_embedding.shape[-2:]
-        self.to_patch, self.patch_to_emb = encoder.to_patch_embedding[:2]
-        pixel_values_per_patch = self.patch_to_emb.weight.shape[-1]
+        self.to_patch = encoder.to_patch_embedding[0]
+        self.patch_to_emb = nn.Sequential(*encoder.to_patch_embedding[1:])
+        pixel_values_per_patch = encoder.to_patch_embedding[2].weight.shape[-1]
         self.mask_token = nn.Parameter(torch.randn(encoder_dim))
         self.to_pixels = nn.Linear(encoder_dim, pixel_values_per_patch)
 
@@ -2158,6 +2443,87 @@ class SimMIM(nn.Module):
         return recon_loss
 
 
+Config = namedtuple('FlashAttentionConfig', ['enable_flash', 'enable_math', 'enable_mem_efficient'])
+
+
+class Attend(Module):
+
+    def __init__(self, use_flash=False, config: 'Config'=Config(True, True, True)):
+        super().__init__()
+        self.config = config
+        self.use_flash = use_flash
+        assert not (use_flash and version.parse(torch.__version__) < version.parse('2.0.0')), 'in order to use flash attention, you must be using pytorch 2.0 or above'
+
+    def flash_attn(self, q, k, v):
+        with torch.backends.cuda.sdp_kernel(**self.config._asdict()):
+            out = F.scaled_dot_product_attention(q, k, v)
+        return out
+
+    def forward(self, q, k, v):
+        n, device, scale = q.shape[-2], q.device, q.shape[-1] ** -0.5
+        if self.use_flash:
+            return self.flash_attn(q, k, v)
+        sim = einsum('b h i d, b j d -> b h i j', q, k) * scale
+        attn = sim.softmax(dim=-1)
+        out = einsum('b h i j, b j d -> b h i d', attn, v)
+        return out
+
+
+class SimpleViT(Module):
+
+    def __init__(self, *, image_size, patch_size, num_classes, dim, depth, heads, mlp_dim, channels=3, dim_head=64):
+        super().__init__()
+        image_height, image_width = pair(image_size)
+        patch_height, patch_width = pair(patch_size)
+        assert image_height % patch_height == 0 and image_width % patch_width == 0, 'Image dimensions must be divisible by the patch size.'
+        patch_dim = channels * patch_height * patch_width
+        self.to_patch_embedding = nn.Sequential(Rearrange('b c (h p1) (w p2) -> b (h w) (p1 p2 c)', p1=patch_height, p2=patch_width), nn.LayerNorm(patch_dim), nn.Linear(patch_dim, dim), nn.LayerNorm(dim))
+        self.pos_embedding = posemb_sincos_2d(h=image_height // patch_height, w=image_width // patch_width, dim=dim)
+        self.transformer = Transformer(dim, depth, heads, dim_head, mlp_dim)
+        self.pool = 'mean'
+        self.to_latent = nn.Identity()
+        self.linear_head = nn.Linear(dim, num_classes)
+
+    def forward(self, img):
+        device = img.device
+        x = self.to_patch_embedding(img)
+        x += self.pos_embedding
+        x = self.transformer(x)
+        x = x.mean(dim=1)
+        x = self.to_latent(x)
+        return self.linear_head(x)
+
+
+class SimpleUViT(Module):
+
+    def __init__(self, *, image_size, patch_size, num_classes, dim, depth, heads, mlp_dim, num_register_tokens=4, channels=3, dim_head=64):
+        super().__init__()
+        image_height, image_width = pair(image_size)
+        patch_height, patch_width = pair(patch_size)
+        assert divisible_by(image_height, patch_height) and divisible_by(image_width, patch_width), 'Image dimensions must be divisible by the patch size.'
+        patch_dim = channels * patch_height * patch_width
+        self.to_patch_embedding = nn.Sequential(Rearrange('b c (h p1) (w p2) -> b (h w) (p1 p2 c)', p1=patch_height, p2=patch_width), nn.LayerNorm(patch_dim), nn.Linear(patch_dim, dim), nn.LayerNorm(dim))
+        pos_embedding = posemb_sincos_2d(h=image_height // patch_height, w=image_width // patch_width, dim=dim)
+        self.register_buffer('pos_embedding', pos_embedding, persistent=False)
+        self.register_tokens = nn.Parameter(torch.randn(num_register_tokens, dim))
+        self.transformer = Transformer(dim, depth, heads, dim_head, mlp_dim)
+        self.pool = 'mean'
+        self.to_latent = nn.Identity()
+        self.linear_head = nn.Linear(dim, num_classes)
+
+    def forward(self, img):
+        batch, device = img.shape[0], img.device
+        x = self.to_patch_embedding(img)
+        x = x + self.pos_embedding.type(x.dtype)
+        r = repeat(self.register_tokens, 'n d -> b n d', b=batch)
+        x, ps = pack([x, r], 'b * d')
+        x = self.transformer(x)
+        x, _ = unpack(x, ps, 'b * d')
+        x = x.mean(dim=1)
+        x = self.to_latent(x)
+        return self.linear_head(x)
+
+
 class PatchDropout(nn.Module):
 
     def __init__(self, prob):
@@ -2176,45 +2542,6 @@ class PatchDropout(nn.Module):
         return x[batch_indices, patch_indices_keep]
 
 
-def posemb_sincos_2d(patches, temperature=10000, dtype=torch.float32):
-    _, h, w, dim, device, dtype = *patches.shape, patches.device, patches.dtype
-    y, x = torch.meshgrid(torch.arange(h, device=device), torch.arange(w, device=device), indexing='ij')
-    assert dim % 4 == 0, 'feature dimension must be multiple of 4 for sincos emb'
-    omega = torch.arange(dim // 4, device=device) / (dim // 4 - 1)
-    omega = 1.0 / temperature ** omega
-    y = y.flatten()[:, None] * omega[None, :]
-    x = x.flatten()[:, None] * omega[None, :]
-    pe = torch.cat((x.sin(), x.cos(), y.sin(), y.cos()), dim=1)
-    return pe.type(dtype)
-
-
-class SimpleViT(nn.Module):
-
-    def __init__(self, *, image_size, patch_size, num_classes, dim, depth, heads, mlp_dim, channels=3, dim_head=64, patch_dropout=0.5):
-        super().__init__()
-        image_height, image_width = pair(image_size)
-        patch_height, patch_width = pair(patch_size)
-        assert image_height % patch_height == 0 and image_width % patch_width == 0, 'Image dimensions must be divisible by the patch size.'
-        num_patches = image_height // patch_height * (image_width // patch_width)
-        patch_dim = channels * patch_height * patch_width
-        self.to_patch_embedding = nn.Sequential(Rearrange('b c (h p1) (w p2) -> b h w (p1 p2 c)', p1=patch_height, p2=patch_width), nn.Linear(patch_dim, dim))
-        self.patch_dropout = PatchDropout(patch_dropout)
-        self.transformer = Transformer(dim, depth, heads, dim_head, mlp_dim)
-        self.to_latent = nn.Identity()
-        self.linear_head = nn.Sequential(nn.LayerNorm(dim), nn.Linear(dim, num_classes))
-
-    def forward(self, img):
-        *_, h, w, dtype = *img.shape, img.dtype
-        x = self.to_patch_embedding(img)
-        pe = posemb_sincos_2d(x)
-        x = rearrange(x, 'b ... d -> b (...) d') + pe
-        x = self.patch_dropout(x)
-        x = self.transformer(x)
-        x = x.mean(dim=1)
-        x = self.to_latent(x)
-        return self.linear_head(x)
-
-
 class PatchEmbedding(nn.Module):
 
     def __init__(self, *, dim, dim_out, patch_size):
@@ -2222,7 +2549,7 @@ class PatchEmbedding(nn.Module):
         self.dim = dim
         self.dim_out = dim_out
         self.patch_size = patch_size
-        self.proj = nn.Conv2d(patch_size ** 2 * dim, dim_out, 1)
+        self.proj = nn.Sequential(LayerNorm(patch_size ** 2 * dim), nn.Conv2d(patch_size ** 2 * dim, dim_out, 1), LayerNorm(dim_out))
 
     def forward(self, fmap):
         p = self.patch_size
@@ -2238,11 +2565,13 @@ class LocalAttention(nn.Module):
         self.patch_size = patch_size
         self.heads = heads
         self.scale = dim_head ** -0.5
+        self.norm = LayerNorm(dim)
         self.to_q = nn.Conv2d(dim, inner_dim, 1, bias=False)
         self.to_kv = nn.Conv2d(dim, inner_dim * 2, 1, bias=False)
         self.to_out = nn.Sequential(nn.Conv2d(inner_dim, dim, 1), nn.Dropout(dropout))
 
     def forward(self, fmap):
+        fmap = self.norm(fmap)
         shape, p = fmap.shape, self.patch_size
         b, n, x, y, h = *shape, self.heads
         x, y = map(lambda t: t // p, (x, y))
@@ -2263,12 +2592,14 @@ class GlobalAttention(nn.Module):
         inner_dim = dim_head * heads
         self.heads = heads
         self.scale = dim_head ** -0.5
+        self.norm = LayerNorm(dim)
         self.to_q = nn.Conv2d(dim, inner_dim, 1, bias=False)
         self.to_kv = nn.Conv2d(dim, inner_dim * 2, k, stride=k, bias=False)
         self.dropout = nn.Dropout(dropout)
         self.to_out = nn.Sequential(nn.Conv2d(inner_dim, dim, 1), nn.Dropout(dropout))
 
     def forward(self, x):
+        x = self.norm(x)
         shape = x.shape
         b, n, _, y, h = *shape, self.heads
         q, k, v = self.to_q(x), *self.to_kv(x).chunk(2, dim=1)
@@ -2307,12 +2638,14 @@ class LSA(nn.Module):
         inner_dim = dim_head * heads
         self.heads = heads
         self.temperature = nn.Parameter(torch.log(torch.tensor(dim_head ** -0.5)))
+        self.norm = nn.LayerNorm(dim)
         self.attend = nn.Softmax(dim=-1)
         self.dropout = nn.Dropout(dropout)
         self.to_qkv = nn.Linear(dim, inner_dim * 3, bias=False)
         self.to_out = nn.Sequential(nn.Linear(inner_dim, dim), nn.Dropout(dropout))
 
     def forward(self, x):
+        x = self.norm(x)
         qkv = self.to_qkv(x).chunk(3, dim=-1)
         q, k, v = map(lambda t: rearrange(t, 'b n (h d) -> b h n d', h=self.heads), qkv)
         dots = torch.matmul(q, k.transpose(-1, -2)) * self.temperature.exp()
@@ -2355,174 +2688,166 @@ class PatchMerger(nn.Module):
         return torch.matmul(attn, x)
 
 
+class XCAttention(Module):
+
+    def __init__(self, dim, heads=8, dim_head=64, dropout=0.0):
+        super().__init__()
+        inner_dim = dim_head * heads
+        self.heads = heads
+        self.norm = nn.LayerNorm(dim)
+        self.to_qkv = nn.Linear(dim, inner_dim * 3, bias=False)
+        self.temperature = nn.Parameter(torch.ones(heads, 1, 1))
+        self.attend = nn.Softmax(dim=-1)
+        self.dropout = nn.Dropout(dropout)
+        self.to_out = nn.Sequential(nn.Linear(inner_dim, dim), nn.Dropout(dropout))
+
+    def forward(self, x):
+        h = self.heads
+        x, ps = pack_one(x, 'b * d')
+        x = self.norm(x)
+        q, k, v = self.to_qkv(x).chunk(3, dim=-1)
+        q, k, v = map(lambda t: rearrange(t, 'b n (h d) -> b h d n', h=h), (q, k, v))
+        q, k = map(l2norm, (q, k))
+        sim = einsum('b h i n, b h j n -> b h i j', q, k) * self.temperature.exp()
+        attn = self.attend(sim)
+        attn = self.dropout(attn)
+        out = einsum('b h i j, b h j n -> b h i n', attn, v)
+        out = rearrange(out, 'b h d n -> b n (h d)')
+        out = unpack_one(out, ps, 'b * d')
+        return self.to_out(out)
+
+
+class LocalPatchInteraction(Module):
+
+    def __init__(self, dim, kernel_size=3):
+        super().__init__()
+        assert kernel_size % 2 == 1
+        padding = kernel_size // 2
+        self.net = nn.Sequential(nn.LayerNorm(dim), Rearrange('b h w c -> b c h w'), nn.Conv2d(dim, dim, kernel_size, padding=padding, groups=dim), nn.BatchNorm2d(dim), nn.GELU(), nn.Conv2d(dim, dim, kernel_size, padding=padding, groups=dim), Rearrange('b c h w -> b h w c'))
+
+    def forward(self, x):
+        return self.net(x)
+
+
+class XCATransformer(Module):
+
+    def __init__(self, dim, depth, heads, dim_head, mlp_dim, local_patch_kernel_size=3, dropout=0.0, layer_dropout=0.0):
+        super().__init__()
+        self.layers = ModuleList([])
+        self.layer_dropout = layer_dropout
+        for ind in range(depth):
+            layer = ind + 1
+            self.layers.append(ModuleList([LayerScale(dim, XCAttention(dim, heads=heads, dim_head=dim_head, dropout=dropout), depth=layer), LayerScale(dim, LocalPatchInteraction(dim, local_patch_kernel_size), depth=layer), LayerScale(dim, FeedForward(dim, mlp_dim, dropout=dropout), depth=layer)]))
+
+    def forward(self, x):
+        layers = dropout_layers(self.layers, dropout=self.layer_dropout)
+        for cross_covariance_attn, local_patch_interaction, ff in layers:
+            x = cross_covariance_attn(x) + x
+            x = local_patch_interaction(x) + x
+            x = ff(x) + x
+        return x
+
+
+class XCiT(Module):
+
+    def __init__(self, *, image_size, patch_size, num_classes, dim, depth, cls_depth, heads, mlp_dim, dim_head=64, dropout=0.0, emb_dropout=0.0, local_patch_kernel_size=3, layer_dropout=0.0):
+        super().__init__()
+        assert image_size % patch_size == 0, 'Image dimensions must be divisible by the patch size.'
+        num_patches = (image_size // patch_size) ** 2
+        patch_dim = 3 * patch_size ** 2
+        self.to_patch_embedding = nn.Sequential(Rearrange('b c (h p1) (w p2) -> b h w (p1 p2 c)', p1=patch_size, p2=patch_size), nn.LayerNorm(patch_dim), nn.Linear(patch_dim, dim), nn.LayerNorm(dim))
+        self.pos_embedding = nn.Parameter(torch.randn(1, num_patches, dim))
+        self.cls_token = nn.Parameter(torch.randn(dim))
+        self.dropout = nn.Dropout(emb_dropout)
+        self.xcit_transformer = XCATransformer(dim, depth, heads, dim_head, mlp_dim, local_patch_kernel_size, dropout, layer_dropout)
+        self.final_norm = nn.LayerNorm(dim)
+        self.cls_transformer = Transformer(dim, cls_depth, heads, dim_head, mlp_dim, dropout, layer_dropout)
+        self.mlp_head = nn.Sequential(nn.LayerNorm(dim), nn.Linear(dim, num_classes))
+
+    def forward(self, img):
+        x = self.to_patch_embedding(img)
+        x, ps = pack_one(x, 'b * d')
+        b, n, _ = x.shape
+        x += self.pos_embedding[:, :n]
+        x = unpack_one(x, ps, 'b * d')
+        x = self.dropout(x)
+        x = self.xcit_transformer(x)
+        x = self.final_norm(x)
+        cls_tokens = repeat(self.cls_token, 'd -> b 1 d', b=b)
+        x = rearrange(x, 'b ... d -> b (...) d')
+        cls_tokens = self.cls_transformer(cls_tokens, context=x)
+        return self.mlp_head(cls_tokens[:, 0])
+
+
 import torch
 from torch.nn import MSELoss, ReLU
-from paritybench._paritybench_helpers import _mock_config, _mock_layer, _paritybench_base, _fails_compile
+from types import SimpleNamespace
 
 
 TESTCASES = [
-    # (nn.Module, init_args, forward_args, jit_compiles)
+    # (nn.Module, init_args, forward_args)
     (ChanLayerNorm,
      lambda: ([], {'dim': 4}),
-     lambda: ([torch.rand([4, 4, 4, 4])], {}),
-     True),
+     lambda: ([torch.rand([4, 4, 4, 4])], {})),
     (CrossEmbedLayer,
      lambda: ([], {'dim_in': 4, 'dim_out': 4, 'kernel_sizes': [4, 4]}),
-     lambda: ([torch.rand([4, 4, 4, 4])], {}),
-     False),
+     lambda: ([torch.rand([4, 4, 4, 4])], {})),
     (DepthWiseConv2d,
      lambda: ([], {'dim_in': 4, 'dim_out': 4, 'kernel_size': 4, 'padding': 4}),
-     lambda: ([torch.rand([4, 4, 4, 4])], {}),
-     True),
+     lambda: ([torch.rand([4, 4, 4, 4])], {})),
     (Downsample,
      lambda: ([], {'dim_in': 4, 'dim_out': 4}),
-     lambda: ([torch.rand([4, 4, 4, 4])], {}),
-     True),
+     lambda: ([torch.rand([4, 4, 4, 4])], {})),
     (Dropsample,
      lambda: ([], {}),
-     lambda: ([torch.rand([4, 4, 4, 4])], {}),
-     True),
+     lambda: ([torch.rand([4, 4, 4, 4])], {})),
     (ExcludeCLS,
-     lambda: ([], {'fn': _mock_layer()}),
-     lambda: ([torch.rand([4, 4, 4, 4])], {}),
-     False),
+     lambda: ([], {'fn': torch.nn.ReLU()}),
+     lambda: ([torch.rand([4, 4, 4, 4])], {})),
     (FeedForward,
      lambda: ([], {'dim': 4, 'hidden_dim': 4}),
-     lambda: ([torch.rand([4, 4, 4, 4])], {}),
-     True),
+     lambda: ([torch.rand([4, 4, 4, 4])], {})),
     (GEGLU,
      lambda: ([], {}),
-     lambda: ([torch.rand([4, 4, 4, 4])], {}),
-     True),
-    (L2Norm,
-     lambda: ([], {}),
-     lambda: ([torch.rand([4, 4, 4, 4])], {}),
-     False),
+     lambda: ([torch.rand([4, 4, 4, 4])], {})),
     (LayerNorm,
      lambda: ([], {'dim': 4}),
-     lambda: ([torch.rand([4, 4, 4, 4])], {}),
-     True),
+     lambda: ([torch.rand([4, 4, 4, 4])], {})),
     (LayerScale,
-     lambda: ([], {'dim': 4, 'fn': _mock_layer(), 'depth': 1}),
-     lambda: ([torch.rand([4, 4, 4, 4])], {}),
-     False),
+     lambda: ([], {'dim': 4, 'fn': torch.nn.ReLU(), 'depth': 1}),
+     lambda: ([torch.rand([4, 4, 4, 4])], {})),
     (MBConvResidual,
-     lambda: ([], {'fn': _mock_layer()}),
-     lambda: ([torch.rand([4, 4, 4, 4])], {}),
-     True),
+     lambda: ([], {'fn': torch.nn.ReLU()}),
+     lambda: ([torch.rand([4, 4, 4, 4])], {})),
     (MV2Block,
      lambda: ([], {'inp': 4, 'oup': 4}),
-     lambda: ([torch.rand([4, 4, 4, 4])], {}),
-     True),
+     lambda: ([torch.rand([4, 4, 4, 4])], {})),
     (OverlappingPatchEmbed,
      lambda: ([], {'dim_in': 4, 'dim_out': 4}),
-     lambda: ([torch.rand([4, 4, 4, 4])], {}),
-     True),
+     lambda: ([torch.rand([4, 4, 4, 4])], {})),
     (PEG,
      lambda: ([], {'dim': 4}),
-     lambda: ([torch.rand([4, 4, 4, 4])], {}),
-     False),
+     lambda: ([torch.rand([4, 4, 4, 4])], {})),
     (Parallel,
      lambda: ([], {}),
-     lambda: ([torch.rand([4, 4, 4, 4])], {}),
-     False),
+     lambda: ([torch.rand([4, 4, 4, 4])], {})),
     (PatchDropout,
      lambda: ([], {'prob': 0}),
-     lambda: ([torch.rand([4, 4, 4, 4])], {}),
-     False),
+     lambda: ([torch.rand([4, 4, 4, 4])], {})),
     (PatchMerger,
      lambda: ([], {'dim': 4, 'num_tokens_out': 4}),
-     lambda: ([torch.rand([4, 4, 4, 4])], {}),
-     True),
-    (PreNorm,
-     lambda: ([], {'dim': 4, 'fn': _mock_layer()}),
-     lambda: ([torch.rand([4, 4, 4, 4])], {}),
-     False),
-    (PreNormResidual,
-     lambda: ([], {'dim': 4, 'fn': _mock_layer()}),
-     lambda: ([torch.rand([4, 4, 4, 4])], {}),
-     True),
+     lambda: ([torch.rand([4, 4, 4, 4])], {})),
     (ProjectInOut,
-     lambda: ([], {'dim_in': 4, 'dim_out': 4, 'fn': _mock_layer()}),
-     lambda: ([torch.rand([4, 4, 4, 4])], {}),
-     False),
+     lambda: ([], {'dim_in': 4, 'dim_out': 4, 'fn': torch.nn.ReLU()}),
+     lambda: ([torch.rand([4, 4, 4, 4])], {})),
+    (RMSNorm,
+     lambda: ([], {'heads': 4, 'dim': 4}),
+     lambda: ([torch.rand([4, 4, 4, 4])], {})),
     (RandomApply,
-     lambda: ([], {'fn': _mock_layer(), 'p': 4}),
-     lambda: ([torch.rand([4, 4, 4, 4])], {}),
-     False),
+     lambda: ([], {'fn': torch.nn.ReLU(), 'p': 4}),
+     lambda: ([torch.rand([4, 4, 4, 4])], {})),
     (Residual,
-     lambda: ([], {'fn': _mock_layer()}),
-     lambda: ([torch.rand([4, 4, 4, 4])], {}),
-     False),
+     lambda: ([], {'fn': torch.nn.ReLU()}),
+     lambda: ([torch.rand([4, 4, 4, 4])], {})),
 ]
-
-class Test_lucidrains_vit_pytorch(_paritybench_base):
-    def test_000(self):
-        self._check(*TESTCASES[0])
-
-    def test_001(self):
-        self._check(*TESTCASES[1])
-
-    def test_002(self):
-        self._check(*TESTCASES[2])
-
-    def test_003(self):
-        self._check(*TESTCASES[3])
-
-    def test_004(self):
-        self._check(*TESTCASES[4])
-
-    def test_005(self):
-        self._check(*TESTCASES[5])
-
-    def test_006(self):
-        self._check(*TESTCASES[6])
-
-    def test_007(self):
-        self._check(*TESTCASES[7])
-
-    def test_008(self):
-        self._check(*TESTCASES[8])
-
-    def test_009(self):
-        self._check(*TESTCASES[9])
-
-    def test_010(self):
-        self._check(*TESTCASES[10])
-
-    def test_011(self):
-        self._check(*TESTCASES[11])
-
-    def test_012(self):
-        self._check(*TESTCASES[12])
-
-    def test_013(self):
-        self._check(*TESTCASES[13])
-
-    def test_014(self):
-        self._check(*TESTCASES[14])
-
-    def test_015(self):
-        self._check(*TESTCASES[15])
-
-    def test_016(self):
-        self._check(*TESTCASES[16])
-
-    def test_017(self):
-        self._check(*TESTCASES[17])
-
-    def test_018(self):
-        self._check(*TESTCASES[18])
-
-    def test_019(self):
-        self._check(*TESTCASES[19])
-
-    def test_020(self):
-        self._check(*TESTCASES[20])
-
-    def test_021(self):
-        self._check(*TESTCASES[21])
-
-    def test_022(self):
-        self._check(*TESTCASES[22])
 

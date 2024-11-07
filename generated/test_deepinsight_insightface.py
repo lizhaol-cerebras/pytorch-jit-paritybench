@@ -52,12 +52,32 @@ gen_video_feature = _module
 dataset_mask = _module
 mxnet_to_ort = _module
 onnx_helper = _module
+inspireface = _module
+modules = _module
+core = _module
+native = _module
+inspire_face = _module
+param = _module
+sample_face_detection = _module
+sample_face_recognition = _module
+sample_face_track_from_video = _module
+sample_system_resource_statistics = _module
+integration = _module
+performance = _module
+test_lfw_precision = _module
+test_settings = _module
+test_utilis = _module
+unit = _module
+test_base_module = _module
+test_recognition_module = _module
+test_tracker_module = _module
+archive_packing = _module
+output_error_table = _module
 test_blazeface = _module
 PY_OP = _module
 cascade_refine = _module
 rpn_fpn_ohem3 = _module
 rcnn = _module
-core = _module
 callback = _module
 loader = _module
 module = _module
@@ -512,6 +532,7 @@ vit = _module
 ms1mv2_mbf = _module
 ms1mv2_r100 = _module
 ms1mv2_r50 = _module
+ms1mv3_r50_onegpu = _module
 wf12m_conflict_r50 = _module
 wf12m_conflict_r50_pfc03_filter04 = _module
 wf12m_flip_pfc01_filter04_r50 = _module
@@ -529,6 +550,7 @@ wf42m_pfc02_8gpus_r50_bs4k = _module
 wf42m_pfc02_r100 = _module
 wf42m_pfc02_r100_16gpus = _module
 wf42m_pfc02_r100_32gpus = _module
+wf42m_pfc02_vit_h = _module
 wf42m_pfc03_32gpu_r100 = _module
 wf42m_pfc03_32gpu_r18 = _module
 wf42m_pfc03_32gpu_r200 = _module
@@ -550,14 +572,25 @@ inference = _module
 losses = _module
 lr_scheduler = _module
 onnx_ijbc = _module
-partial_fc = _module
 partial_fc_v2 = _module
+shuffle_rec = _module
 torch2onnx = _module
-train = _module
 train_v2 = _module
 plot = _module
 utils_callbacks = _module
 utils_distributed_sampler = _module
+dataset_mix = _module
+evaluate = _module
+eval_buaa_112 = _module
+eval_casia_112 = _module
+eval_lamp_112 = _module
+eval_ops = _module
+eval_oulu_112 = _module
+losses = _module
+network = _module
+lightcnn112 = _module
+train = _module
+utils = _module
 callbacks = _module
 default = _module
 align_ijb = _module
@@ -602,6 +635,10 @@ train = _module
 general = _module
 plots = _module
 rend_util = _module
+dataset_gaze = _module
+models = _module
+test_gaze = _module
+trainer_gaze = _module
 iresnet = _module
 network = _module
 resnet = _module
@@ -683,21 +720,14 @@ _operators = _module
 _transformers = _module
 _weightloader = _module
 
-from paritybench._paritybench_helpers import _mock_config, patch_functional
 from unittest.mock import mock_open, MagicMock
 from torch.autograd import Function
 from torch.nn import Module
 import abc, collections, copy, enum, functools, inspect, itertools, logging, math, matplotlib, numbers, numpy, pandas, queue, random, re, scipy, sklearn, string, tensorflow, time, torch, torchaudio, torchvision, types, typing, uuid, warnings
+import operator as op
+from dataclasses import dataclass
 import numpy as np
 from torch import Tensor
-patch_functional()
-open = mock_open()
-yaml = logging = sys = argparse = MagicMock()
-ArgumentParser = argparse.ArgumentParser
-_global_config = args = argv = cfg = config = params = _mock_config()
-argparse.ArgumentParser.return_value.parse_args.return_value = _global_config
-yaml.load.return_value = _global_config
-sys.argv = _global_config
 __version__ = '1.0.0'
 xrange = range
 wraps = functools.wraps
@@ -988,7 +1018,7 @@ from sklearn.model_selection import KFold
 import matplotlib
 
 
-import collections
+from torch.optim import SGD
 
 
 from torch.nn.functional import linear
@@ -998,6 +1028,18 @@ from torch.nn.functional import normalize
 
 
 from torch.utils.tensorboard import SummaryWriter
+
+
+from torch.distributed.algorithms.ddp_comm_hooks.default_hooks import fp16_compress_hook
+
+
+import torch.utils.data as data
+
+
+from torch.utils.data.sampler import Sampler
+
+
+from torch.nn import Parameter
 
 
 import torch.utils.data.distributed
@@ -1028,9 +1070,6 @@ import torch.utils.model_zoo as modelzoo
 
 
 import torch.utils.model_zoo as model_zoo
-
-
-from torch.nn import Parameter
 
 
 import scipy.sparse as sp
@@ -2809,7 +2848,7 @@ class ResNet(nn.Module):
             x = self.layer4(x)
         return x
 
-    def forward_head(self, x, pre_logits: bool=False):
+    def forward_head(self, x, pre_logits: 'bool'=False):
         x = self.global_pool(x)
         if self.drop_rate:
             x = F.dropout(x, p=float(self.drop_rate), training=self.training)
@@ -4450,48 +4489,18 @@ def bbox2result(bboxes, labels, num_classes):
         return [bboxes[labels == i, :] for i in range(num_classes)]
 
 
-def accuracy(pred, target, topk=1, thresh=None):
-    """Calculate accuracy according to the prediction and target.
-
-    Args:
-        pred (torch.Tensor): The model prediction, shape (N, num_class)
-        target (torch.Tensor): The target of each prediction, shape (N, )
-        topk (int | tuple[int], optional): If the predictions in ``topk``
-            matches the target, the predictions will be regarded as
-            correct ones. Defaults to 1.
-        thresh (float, optional): If not None, predictions with scores under
-            this threshold are considered incorrect. Default to None.
-
-    Returns:
-        float | tuple[float]: If the input ``topk`` is a single integer,
-            the function will return a single float as accuracy. If
-            ``topk`` is a tuple containing multiple integers, the
-            function will return a tuple containing accuracies of
-            each ``topk`` number.
-    """
-    assert isinstance(topk, (int, tuple))
-    if isinstance(topk, int):
-        topk = topk,
-        return_single = True
-    else:
-        return_single = False
+def accuracy(output, target, topk=(1,)):
+    """Computes the precision@k for the specified values of k"""
     maxk = max(topk)
-    if pred.size(0) == 0:
-        accu = [pred.new_tensor(0.0) for i in range(len(topk))]
-        return accu[0] if return_single else accu
-    assert pred.ndim == 2 and target.ndim == 1
-    assert pred.size(0) == target.size(0)
-    assert maxk <= pred.size(1), f'maxk {maxk} exceeds pred dimension {pred.size(1)}'
-    pred_value, pred_label = pred.topk(maxk, dim=1)
-    pred_label = pred_label.t()
-    correct = pred_label.eq(target.view(1, -1).expand_as(pred_label))
-    if thresh is not None:
-        correct = correct & (pred_value > thresh).t()
+    batch_size = target.size(0)
+    _, pred = output.topk(maxk, 1, True, True)
+    pred = pred.t()
+    correct = pred.eq(target.unsqueeze(0).expand_as(pred))
     res = []
     for k in topk:
-        correct_k = correct[:k].reshape(-1).float().sum(0, keepdim=True)
-        res.append(correct_k.mul_(100.0 / pred.size(0)))
-    return res[0] if return_single else res
+        correct_k = correct[:k].contiguous().view(-1).float().sum(0, keepdim=True)
+        res.append(correct_k.mul_(100.0 / batch_size))
+    return res
 
 
 class Accuracy(nn.Module):
@@ -8657,7 +8666,7 @@ class ArcFace(nn.Module):
         self.s = s
         self.m = m
 
-    def forward(self, cosine: torch.Tensor, label):
+    def forward(self, cosine: 'torch.Tensor', label):
         index = torch.where(label != -1)[0]
         m_hot = torch.zeros(index.size()[0], cosine.size()[1], device=cosine.device)
         m_hot.scatter_(1, label[index, None], self.m)
@@ -8665,6 +8674,41 @@ class ArcFace(nn.Module):
         cosine[index] += m_hot
         cosine.cos_().mul_(self.s)
         return cosine
+
+
+class OFRecordDataLoader(nn.Module):
+
+    def __init__(self, ofrecord_root: 'str'='./ofrecord', mode: 'str'='train', dataset_size: 'int'=9469, batch_size: 'int'=1, total_batch_size: 'int'=1, data_part_num: 'int'=8, placement: 'flow.placement'=None, sbp: 'Union[flow.sbp.sbp, List[flow.sbp.sbp]]'=None):
+        super().__init__()
+        channel_last = False
+        output_layout = 'NHWC' if channel_last else 'NCHW'
+        assert (ofrecord_root, mode)
+        self.train_record_reader = flow.nn.OfrecordReader(os.path.join(ofrecord_root, mode), batch_size=batch_size, data_part_num=data_part_num, part_name_suffix_length=5, random_shuffle=True if mode == 'train' else False, shuffle_after_epoch=True if mode == 'train' else False, placement=placement, sbp=sbp)
+        self.record_label_decoder = flow.nn.OfrecordRawDecoder('label', shape=(), dtype=flow.int32)
+        color_space = 'RGB'
+        height = 112
+        width = 112
+        self.record_image_decoder = flow.nn.OFRecordImageDecoder('encoded', color_space=color_space)
+        self.resize = flow.nn.image.Resize(target_size=[height, width]) if mode == 'train' else flow.nn.image.Resize(resize_side='shorter', keep_aspect_ratio=True, target_size=112)
+        self.flip = flow.nn.CoinFlip(batch_size=batch_size, placement=placement, sbp=sbp) if mode == 'train' else None
+        rgb_mean = [127.5, 127.5, 127.5]
+        rgb_std = [127.5, 127.5, 127.5]
+        self.crop_mirror_norm = flow.nn.CropMirrorNormalize(color_space=color_space, output_layout=output_layout, mean=rgb_mean, std=rgb_std, output_dtype=flow.float) if mode == 'train' else flow.nn.CropMirrorNormalize(color_space=color_space, output_layout=output_layout, crop_h=0, crop_w=0, crop_pos_y=0.5, crop_pos_x=0.5, mean=rgb_mean, std=rgb_std, output_dtype=flow.float)
+        self.batch_size = batch_size
+        self.total_batch_size = total_batch_size
+        self.dataset_size = dataset_size
+
+    def __len__(self):
+        return self.dataset_size // self.total_batch_size
+
+    def forward(self):
+        train_record = self.train_record_reader()
+        label = self.record_label_decoder(train_record)
+        image_raw_buffer = self.record_image_decoder(train_record)
+        image = self.resize(image_raw_buffer)[0]
+        rng = self.flip() if self.flip != None else None
+        image = self.crop_mirror_norm(image, rng)
+        return image, label
 
 
 class Flatten(Module):
@@ -8808,7 +8852,7 @@ class VITBatchNorm(nn.Module):
 
 class Attention(nn.Module):
 
-    def __init__(self, dim: int, num_heads: int=8, qkv_bias: bool=False, qk_scale: Optional[None]=None, attn_drop: float=0.0, proj_drop: float=0.0):
+    def __init__(self, dim: 'int', num_heads: 'int'=8, qkv_bias: 'bool'=False, qk_scale: 'Optional[None]'=None, attn_drop: 'float'=0.0, proj_drop: 'float'=0.0):
         super().__init__()
         self.num_heads = num_heads
         head_dim = dim // num_heads
@@ -8929,7 +8973,7 @@ class VisionTransformer(nn.Module):
     """ Vision Transformer with support for patch or hybrid CNN input stage
     """
 
-    def __init__(self, img_size: int=112, patch_size: int=16, in_channels: int=3, num_classes: int=1000, embed_dim: int=768, depth: int=12, num_heads: int=12, mlp_ratio: float=4.0, qkv_bias: bool=False, qk_scale: Optional[None]=None, drop_rate: float=0.0, attn_drop_rate: float=0.0, drop_path_rate: float=0.0, hybrid_backbone: Optional[None]=None, norm_layer: str='ln', mask_ratio=0.1, using_checkpoint=False):
+    def __init__(self, img_size: 'int'=112, patch_size: 'int'=16, in_channels: 'int'=3, num_classes: 'int'=1000, embed_dim: 'int'=768, depth: 'int'=12, num_heads: 'int'=12, mlp_ratio: 'float'=4.0, qkv_bias: 'bool'=False, qk_scale: 'Optional[None]'=None, drop_rate: 'float'=0.0, attn_drop_rate: 'float'=0.0, drop_path_rate: 'float'=0.0, hybrid_backbone: 'Optional[None]'=None, norm_layer: 'str'='ln', mask_ratio=0.1, using_checkpoint=False):
         super().__init__()
         self.num_classes = num_classes
         self.num_features = self.embed_dim = embed_dim
@@ -9095,7 +9139,7 @@ class DistCrossEntropyFunc(torch.autograd.Function):
     """
 
     @staticmethod
-    def forward(ctx, logits: torch.Tensor, label: torch.Tensor):
+    def forward(ctx, logits: 'torch.Tensor', label: 'torch.Tensor'):
         """ """
         batch_size = logits.size(0)
         max_logits, _ = torch.max(logits, dim=1, keepdim=True)
@@ -9139,338 +9183,6 @@ class DistCrossEntropy(torch.nn.Module):
         return DistCrossEntropyFunc.apply(logit_part, label_part)
 
 
-class PartialFC(torch.nn.Module):
-    """
-    https://arxiv.org/abs/2203.15565
-    A distributed sparsely updating variant of the FC layer, named Partial FC (PFC).
-
-    When sample rate less than 1, in each iteration, positive class centers and a random subset of
-    negative class centers are selected to compute the margin-based softmax loss, all class
-    centers are still maintained throughout the whole training process, but only a subset is
-    selected and updated in each iteration.
-
-    .. note::
-        When sample rate equal to 1, Partial FC is equal to model parallelism(default sample rate is 1).
-
-    Example:
-    --------
-    >>> module_pfc = PartialFC(embedding_size=512, num_classes=8000000, sample_rate=0.2)
-    >>> for img, labels in data_loader:
-    >>>     embeddings = net(img)
-    >>>     loss = module_pfc(embeddings, labels, optimizer)
-    >>>     loss.backward()
-    >>>     optimizer.step()
-    """
-    _version = 1
-
-    def __init__(self, margin_loss: Callable, embedding_size: int, num_classes: int, sample_rate: float=1.0, fp16: bool=False):
-        """
-        Paramenters:
-        -----------
-        embedding_size: int
-            The dimension of embedding, required
-        num_classes: int
-            Total number of classes, required
-        sample_rate: float
-            The rate of negative centers participating in the calculation, default is 1.0.
-        """
-        super(PartialFC, self).__init__()
-        assert distributed.is_initialized(), 'must initialize distributed before create this'
-        self.rank = distributed.get_rank()
-        self.world_size = distributed.get_world_size()
-        self.dist_cross_entropy = DistCrossEntropy()
-        self.embedding_size = embedding_size
-        self.sample_rate: float = sample_rate
-        self.fp16 = fp16
-        self.num_local: int = num_classes // self.world_size + int(self.rank < num_classes % self.world_size)
-        self.class_start: int = num_classes // self.world_size * self.rank + min(self.rank, num_classes % self.world_size)
-        self.num_sample: int = int(self.sample_rate * self.num_local)
-        self.last_batch_size: int = 0
-        self.weight: torch.Tensor
-        self.weight_mom: torch.Tensor
-        self.weight_activated: torch.nn.Parameter
-        self.weight_activated_mom: torch.Tensor
-        self.is_updated: bool = True
-        self.init_weight_update: bool = True
-        if self.sample_rate < 1:
-            self.register_buffer('weight', tensor=torch.normal(0, 0.01, (self.num_local, embedding_size)))
-            self.register_buffer('weight_mom', tensor=torch.zeros_like(self.weight))
-            self.register_parameter('weight_activated', param=torch.nn.Parameter(torch.empty(0, 0)))
-            self.register_buffer('weight_activated_mom', tensor=torch.empty(0, 0))
-            self.register_buffer('weight_index', tensor=torch.empty(0, 0))
-        else:
-            self.weight_activated = torch.nn.Parameter(torch.normal(0, 0.01, (self.num_local, embedding_size)))
-        if isinstance(margin_loss, Callable):
-            self.margin_softmax = margin_loss
-        else:
-            raise
-
-    @torch.no_grad()
-    def sample(self, labels: torch.Tensor, index_positive: torch.Tensor, optimizer: torch.optim.Optimizer):
-        """
-        This functions will change the value of labels
-
-        Parameters:
-        -----------
-        labels: torch.Tensor
-            pass
-        index_positive: torch.Tensor
-            pass
-        optimizer: torch.optim.Optimizer
-            pass
-        """
-        positive = torch.unique(labels[index_positive], sorted=True)
-        if self.num_sample - positive.size(0) >= 0:
-            perm = torch.rand(size=[self.num_local])
-            perm[positive] = 2.0
-            index = torch.topk(perm, k=self.num_sample)[1]
-            index = index.sort()[0]
-        else:
-            index = positive
-        self.weight_index = index
-        labels[index_positive] = torch.searchsorted(index, labels[index_positive])
-        self.weight_activated = torch.nn.Parameter(self.weight[self.weight_index])
-        self.weight_activated_mom = self.weight_mom[self.weight_index]
-        if isinstance(optimizer, torch.optim.SGD):
-            optimizer.state.pop(optimizer.param_groups[-1]['params'][0], None)
-            optimizer.param_groups[-1]['params'][0] = self.weight_activated
-            optimizer.state[self.weight_activated]['momentum_buffer'] = self.weight_activated_mom
-        else:
-            raise
-
-    @torch.no_grad()
-    def update(self):
-        """ partial weight to global
-        """
-        if self.init_weight_update:
-            self.init_weight_update = False
-            return
-        if self.sample_rate < 1:
-            self.weight[self.weight_index] = self.weight_activated
-            self.weight_mom[self.weight_index] = self.weight_activated_mom
-
-    def forward(self, local_embeddings: torch.Tensor, local_labels: torch.Tensor, optimizer: torch.optim.Optimizer):
-        """
-        Parameters:
-        ----------
-        local_embeddings: torch.Tensor
-            feature embeddings on each GPU(Rank).
-        local_labels: torch.Tensor
-            labels on each GPU(Rank).
-
-        Returns:
-        -------
-        loss: torch.Tensor
-            pass
-        """
-        local_labels.squeeze_()
-        local_labels = local_labels.long()
-        self.update()
-        batch_size = local_embeddings.size(0)
-        if self.last_batch_size == 0:
-            self.last_batch_size = batch_size
-        assert self.last_batch_size == batch_size, 'last batch size do not equal current batch size: {} vs {}'.format(self.last_batch_size, batch_size)
-        _gather_embeddings = [torch.zeros((batch_size, self.embedding_size)) for _ in range(self.world_size)]
-        _gather_labels = [torch.zeros(batch_size).long() for _ in range(self.world_size)]
-        _list_embeddings = AllGather(local_embeddings, *_gather_embeddings)
-        distributed.all_gather(_gather_labels, local_labels)
-        embeddings = torch.cat(_list_embeddings)
-        labels = torch.cat(_gather_labels)
-        labels = labels.view(-1, 1)
-        index_positive = (self.class_start <= labels) & (labels < self.class_start + self.num_local)
-        labels[~index_positive] = -1
-        labels[index_positive] -= self.class_start
-        if self.sample_rate < 1:
-            self.sample(labels, index_positive, optimizer)
-        with torch.amp.autocast(self.fp16):
-            norm_embeddings = normalize(embeddings)
-            norm_weight_activated = normalize(self.weight_activated)
-            logits = linear(norm_embeddings, norm_weight_activated)
-        if self.fp16:
-            logits = logits.float()
-        logits = logits.clamp(-1, 1)
-        logits = self.margin_softmax(logits, labels)
-        loss = self.dist_cross_entropy(logits, labels)
-        return loss
-
-    def state_dict(self, destination=None, prefix='', keep_vars=False):
-        if destination is None:
-            destination = collections.OrderedDict()
-            destination._metadata = collections.OrderedDict()
-        for name, module in self._modules.items():
-            if module is not None:
-                module.state_dict(destination, prefix + name + '.', keep_vars=keep_vars)
-        if self.sample_rate < 1:
-            destination['weight'] = self.weight.detach()
-        else:
-            destination['weight'] = self.weight_activated.data.detach()
-        return destination
-
-    def load_state_dict(self, state_dict, strict: bool=True):
-        if self.sample_rate < 1:
-            self.weight = state_dict['weight']
-            self.weight_mom.zero_()
-            self.weight_activated.data.zero_()
-            self.weight_activated_mom.zero_()
-            self.weight_index.zero_()
-        else:
-            self.weight_activated.data = state_dict['weight']
-
-
-class PartialFCAdamW(torch.nn.Module):
-
-    def __init__(self, margin_loss: Callable, embedding_size: int, num_classes: int, sample_rate: float=1.0, fp16: bool=False):
-        """
-        Paramenters:
-        -----------
-        embedding_size: int
-            The dimension of embedding, required
-        num_classes: int
-            Total number of classes, required
-        sample_rate: float
-            The rate of negative centers participating in the calculation, default is 1.0.
-        """
-        super(PartialFCAdamW, self).__init__()
-        assert distributed.is_initialized(), 'must initialize distributed before create this'
-        self.rank = distributed.get_rank()
-        self.world_size = distributed.get_world_size()
-        self.dist_cross_entropy = DistCrossEntropy()
-        self.embedding_size = embedding_size
-        self.sample_rate: float = sample_rate
-        self.fp16 = fp16
-        self.num_local: int = num_classes // self.world_size + int(self.rank < num_classes % self.world_size)
-        self.class_start: int = num_classes // self.world_size * self.rank + min(self.rank, num_classes % self.world_size)
-        self.num_sample: int = int(self.sample_rate * self.num_local)
-        self.last_batch_size: int = 0
-        self.weight: torch.Tensor
-        self.weight_exp_avg: torch.Tensor
-        self.weight_exp_avg_sq: torch.Tensor
-        self.weight_activated: torch.nn.Parameter
-        self.weight_activated_exp_avg: torch.Tensor
-        self.weight_activated_exp_avg_sq: torch.Tensor
-        self.is_updated: bool = True
-        self.init_weight_update: bool = True
-        if self.sample_rate < 1:
-            self.register_buffer('weight', tensor=torch.normal(0, 0.01, (self.num_local, embedding_size)))
-            self.register_buffer('weight_exp_avg', tensor=torch.zeros_like(self.weight))
-            self.register_buffer('weight_exp_avg_sq', tensor=torch.zeros_like(self.weight))
-            self.register_parameter('weight_activated', param=torch.nn.Parameter(torch.empty(0, 0)))
-            self.register_buffer('weight_activated_exp_avg', tensor=torch.empty(0, 0))
-            self.register_buffer('weight_activated_exp_avg_sq', tensor=torch.empty(0, 0))
-        else:
-            self.weight_activated = torch.nn.Parameter(torch.normal(0, 0.01, (self.num_local, embedding_size)))
-        self.step = 0
-        if isinstance(margin_loss, Callable):
-            self.margin_softmax = margin_loss
-        else:
-            raise
-
-    @torch.no_grad()
-    def sample(self, labels, index_positive, optimizer):
-        self.step += 1
-        positive = torch.unique(labels[index_positive], sorted=True)
-        if self.num_sample - positive.size(0) >= 0:
-            perm = torch.rand(size=[self.num_local])
-            perm[positive] = 2.0
-            index = torch.topk(perm, k=self.num_sample)[1]
-            index = index.sort()[0]
-        else:
-            index = positive
-        self.weight_index = index
-        labels[index_positive] = torch.searchsorted(index, labels[index_positive])
-        self.weight_activated = torch.nn.Parameter(self.weight[self.weight_index])
-        self.weight_activated_exp_avg = self.weight_exp_avg[self.weight_index]
-        self.weight_activated_exp_avg_sq = self.weight_exp_avg_sq[self.weight_index]
-        if isinstance(optimizer, (torch.optim.Adam, torch.optim.AdamW)):
-            optimizer.state.pop(optimizer.param_groups[-1]['params'][0], None)
-            optimizer.param_groups[-1]['params'][0] = self.weight_activated
-            optimizer.state[self.weight_activated]['exp_avg'] = self.weight_activated_exp_avg
-            optimizer.state[self.weight_activated]['exp_avg_sq'] = self.weight_activated_exp_avg_sq
-            optimizer.state[self.weight_activated]['step'] = self.step
-        else:
-            raise
-
-    @torch.no_grad()
-    def update(self):
-        """ partial weight to global
-        """
-        if self.init_weight_update:
-            self.init_weight_update = False
-            return
-        if self.sample_rate < 1:
-            self.weight[self.weight_index] = self.weight_activated
-            self.weight_exp_avg[self.weight_index] = self.weight_activated_exp_avg
-            self.weight_exp_avg_sq[self.weight_index] = self.weight_activated_exp_avg_sq
-
-    def forward(self, local_embeddings: torch.Tensor, local_labels: torch.Tensor, optimizer: torch.optim.Optimizer):
-        """
-        Parameters:
-        ----------
-        local_embeddings: torch.Tensor
-            feature embeddings on each GPU(Rank).
-        local_labels: torch.Tensor
-            labels on each GPU(Rank).
-
-        Returns:
-        -------
-        loss: torch.Tensor
-            pass
-        """
-        local_labels.squeeze_()
-        local_labels = local_labels.long()
-        self.update()
-        batch_size = local_embeddings.size(0)
-        if self.last_batch_size == 0:
-            self.last_batch_size = batch_size
-        assert self.last_batch_size == batch_size, 'last batch size do not equal current batch size: {} vs {}'.format(self.last_batch_size, batch_size)
-        _gather_embeddings = [torch.zeros((batch_size, self.embedding_size)) for _ in range(self.world_size)]
-        _gather_labels = [torch.zeros(batch_size).long() for _ in range(self.world_size)]
-        _list_embeddings = AllGather(local_embeddings, *_gather_embeddings)
-        distributed.all_gather(_gather_labels, local_labels)
-        embeddings = torch.cat(_list_embeddings)
-        labels = torch.cat(_gather_labels)
-        labels = labels.view(-1, 1)
-        index_positive = (self.class_start <= labels) & (labels < self.class_start + self.num_local)
-        labels[~index_positive] = -1
-        labels[index_positive] -= self.class_start
-        if self.sample_rate < 1:
-            self.sample(labels, index_positive, optimizer)
-        with torch.amp.autocast(self.fp16):
-            norm_embeddings = normalize(embeddings)
-            norm_weight_activated = normalize(self.weight_activated)
-            logits = linear(norm_embeddings, norm_weight_activated)
-        if self.fp16:
-            logits = logits.float()
-        logits = logits.clamp(-1, 1)
-        logits = self.margin_softmax(logits, labels)
-        loss = self.dist_cross_entropy(logits, labels)
-        return loss
-
-    def state_dict(self, destination=None, prefix='', keep_vars=False):
-        if destination is None:
-            destination = collections.OrderedDict()
-            destination._metadata = collections.OrderedDict()
-        for name, module in self._modules.items():
-            if module is not None:
-                module.state_dict(destination, prefix + name + '.', keep_vars=keep_vars)
-        if self.sample_rate < 1:
-            destination['weight'] = self.weight.detach()
-        else:
-            destination['weight'] = self.weight_activated.data.detach()
-        return destination
-
-    def load_state_dict(self, state_dict, strict: bool=True):
-        if self.sample_rate < 1:
-            self.weight = state_dict['weight']
-            self.weight_exp_avg.zero_()
-            self.weight_exp_avg_sq.zero_()
-            self.weight_activated.data.zero_()
-            self.weight_activated_exp_avg.zero_()
-            self.weight_activated_exp_avg_sq.zero_()
-        else:
-            self.weight_activated.data = state_dict['weight']
-
-
 class PartialFC_V2(torch.nn.Module):
     """
     https://arxiv.org/abs/2203.15565
@@ -9492,7 +9204,7 @@ class PartialFC_V2(torch.nn.Module):
     """
     _version = 2
 
-    def __init__(self, margin_loss: Callable, embedding_size: int, num_classes: int, sample_rate: float=1.0, fp16: bool=False):
+    def __init__(self, margin_loss: 'Callable', embedding_size: 'int', num_classes: 'int', sample_rate: 'float'=1.0, fp16: 'bool'=False):
         """
         Paramenters:
         -----------
@@ -9509,14 +9221,14 @@ class PartialFC_V2(torch.nn.Module):
         self.world_size = distributed.get_world_size()
         self.dist_cross_entropy = DistCrossEntropy()
         self.embedding_size = embedding_size
-        self.sample_rate: float = sample_rate
+        self.sample_rate: 'float' = sample_rate
         self.fp16 = fp16
-        self.num_local: int = num_classes // self.world_size + int(self.rank < num_classes % self.world_size)
-        self.class_start: int = num_classes // self.world_size * self.rank + min(self.rank, num_classes % self.world_size)
-        self.num_sample: int = int(self.sample_rate * self.num_local)
-        self.last_batch_size: int = 0
-        self.is_updated: bool = True
-        self.init_weight_update: bool = True
+        self.num_local: 'int' = num_classes // self.world_size + int(self.rank < num_classes % self.world_size)
+        self.class_start: 'int' = num_classes // self.world_size * self.rank + min(self.rank, num_classes % self.world_size)
+        self.num_sample: 'int' = int(self.sample_rate * self.num_local)
+        self.last_batch_size: 'int' = 0
+        self.is_updated: 'bool' = True
+        self.init_weight_update: 'bool' = True
         self.weight = torch.nn.Parameter(torch.normal(0, 0.01, (self.num_local, embedding_size)))
         if isinstance(margin_loss, Callable):
             self.margin_softmax = margin_loss
@@ -9548,7 +9260,7 @@ class PartialFC_V2(torch.nn.Module):
             labels[index_positive] = torch.searchsorted(index, labels[index_positive])
         return self.weight[self.weight_index]
 
-    def forward(self, local_embeddings: torch.Tensor, local_labels: torch.Tensor):
+    def forward(self, local_embeddings: 'torch.Tensor', local_labels: 'torch.Tensor'):
         """
         Parameters:
         ----------
@@ -9593,6 +9305,221 @@ class PartialFC_V2(torch.nn.Module):
         return loss
 
 
+class IDMMD(nn.Module):
+
+    def __init__(self, kernel_type='rbf', kernel_mul=2.0, kernel_num=5):
+        super(IDMMD, self).__init__()
+        self.kernel_num = kernel_num
+        self.kernel_mul = kernel_mul
+        self.fix_sigma = None
+        self.kernel_type = kernel_type
+
+    def get_centers_by_id(self, x_rgb, x_ir, targets):
+        centers_rgb = []
+        centers_ir = []
+        batch_y_set = set(targets.data.cpu().numpy())
+        for _, l in enumerate(batch_y_set):
+            feat1 = x_rgb[targets == l]
+            feat2 = x_ir[targets == l]
+            centers_rgb.append(feat1.mean(dim=0).unsqueeze(0))
+            centers_ir.append(feat2.mean(dim=0).unsqueeze(0))
+        centers_rgb = torch.cat(centers_rgb, 0)
+        centers_ir = torch.cat(centers_ir, 0)
+        return centers_rgb, centers_ir
+
+    def forward(self, x_rgb, x_ir, targets):
+        centers_rgb, centers_ir = self.get_centers_by_id(x_rgb, x_ir, targets)
+        if self.kernel_type == 'linear':
+            loss = self.linear_mmd(centers_rgb, centers_ir)
+        elif self.kernel_type == 'rbf':
+            B = centers_rgb.size(0)
+            kernels = self.guassian_kernel(centers_rgb, centers_ir)
+            XX = kernels[:B, :B]
+            YY = kernels[B:, B:]
+            XY = kernels[:B, B:]
+            YX = kernels[B:, :B]
+            loss = (XX + YY - XY - YX).mean()
+        return loss
+
+    def linear_mmd(self, center_rgb, center_ir):
+
+        def compute_dist_(x_rgb, x_ir):
+            n = x_rgb.size(0)
+            dist1 = torch.pow(x_rgb, 2).sum(dim=1, keepdim=True).expand(n, n)
+            dist2 = torch.pow(x_ir, 2).sum(dim=1, keepdim=True).expand(n, n)
+            dist = dist1 + dist2.t()
+            dist.addmm_(mat1=x_rgb, mat2=x_ir.t(), beta=1, alpha=-2)
+            dist = dist.clamp(min=1e-12)
+            return dist
+        matrix = compute_dist_(center_rgb, center_ir)
+        loss = matrix.diag()
+        return loss.mean()
+
+    def guassian_kernel(self, x_rgb, x_ir):
+        total = torch.cat([x_rgb, x_ir], dim=0)
+        N = total.size(0)
+        total0 = total.unsqueeze(0).expand(int(total.size(0)), int(total.size(0)), int(total.size(1)))
+        total1 = total.unsqueeze(1).expand(int(total.size(0)), int(total.size(0)), int(total.size(1)))
+        dists = ((total0 - total1) ** 2).sum(2)
+        if self.fix_sigma:
+            bandwidth = self.fix_sigma
+        else:
+            bandwidth = torch.sum(dists.data) / (N ** 2 - N)
+        bandwidth /= self.kernel_mul ** (self.kernel_num // 2)
+        bandwidth_list = [(bandwidth * self.kernel_mul ** i) for i in range(self.kernel_num)]
+        kernel_val = [torch.exp(-dists / bandwidth_temp) for bandwidth_temp in bandwidth_list]
+        return sum(kernel_val)
+
+
+class mfm(nn.Module):
+
+    def __init__(self, in_channels, out_channels, kernel_size=3, stride=1, padding=1, type=1):
+        super(mfm, self).__init__()
+        self.out_channels = out_channels
+        if type == 1:
+            self.filter = nn.Conv2d(in_channels, 2 * out_channels, kernel_size=kernel_size, stride=stride, padding=padding)
+        else:
+            self.filter = nn.Linear(in_channels, 2 * out_channels)
+
+    def forward(self, x):
+        x = self.filter(x)
+        out = torch.split(x, self.out_channels, 1)
+        return torch.max(out[0], out[1])
+
+
+class group(nn.Module):
+
+    def __init__(self, in_channels, out_channels, kernel_size, stride, padding):
+        super(group, self).__init__()
+        self.conv_a = mfm(in_channels, in_channels, 1, 1, 0)
+        self.conv = mfm(in_channels, out_channels, kernel_size, stride, padding)
+
+    def forward(self, x):
+        x = self.conv_a(x)
+        x = self.conv(x)
+        return x
+
+
+class resblock(nn.Module):
+
+    def __init__(self, in_channels, out_channels):
+        super(resblock, self).__init__()
+        self.conv1 = mfm(in_channels, out_channels, kernel_size=3, stride=1, padding=1)
+        self.conv2 = mfm(out_channels, out_channels, kernel_size=3, stride=1, padding=1)
+
+    def forward(self, x):
+        res = x
+        out = self.conv1(x)
+        out = self.conv2(out)
+        out = out + res
+        return out
+
+
+class network_29layers(nn.Module):
+
+    def __init__(self, block, layers, num_classes=79077):
+        super(network_29layers, self).__init__()
+        self.conv1 = mfm(1, 48, 5, 1, 2)
+        self.pool1 = nn.MaxPool2d(kernel_size=2, stride=2, ceil_mode=True)
+        self.block1 = self._make_layer(block, layers[0], 48, 48)
+        self.group1 = group(48, 96, 3, 1, 1)
+        self.pool2 = nn.MaxPool2d(kernel_size=2, stride=2, ceil_mode=True)
+        self.block2 = self._make_layer(block, layers[1], 96, 96)
+        self.group2 = group(96, 192, 3, 1, 1)
+        self.pool3 = nn.MaxPool2d(kernel_size=2, stride=2, ceil_mode=True)
+        self.block3 = self._make_layer(block, layers[2], 192, 192)
+        self.group3 = group(192, 128, 3, 1, 1)
+        self.block4 = self._make_layer(block, layers[3], 128, 128)
+        self.group4 = group(128, 128, 3, 1, 1)
+        self.pool4 = nn.MaxPool2d(kernel_size=2, stride=2, ceil_mode=True)
+        self.fc = mfm(7 * 7 * 128, 256, type=0)
+        self.fc2 = nn.Linear(256, num_classes)
+
+    def _make_layer(self, block, num_blocks, in_channels, out_channels):
+        layers = []
+        for i in range(0, num_blocks):
+            layers.append(block(in_channels, out_channels))
+        return nn.Sequential(*layers)
+
+    def forward(self, x):
+        x = self.conv1(x)
+        x = self.pool1(x)
+        x = self.block1(x)
+        x = self.group1(x)
+        x = self.pool2(x)
+        x = self.block2(x)
+        x = self.group2(x)
+        x = self.pool3(x)
+        x = self.block3(x)
+        x = self.group3(x)
+        x = self.block4(x)
+        x = self.group4(x)
+        x = self.pool4(x)
+        x = x.view(x.size(0), -1)
+        fc = self.fc(x)
+        if self.training:
+            x = F.dropout(fc, training=self.training)
+            out = self.fc2(x)
+            return out, F.normalize(fc, p=2, dim=1)
+        return F.normalize(fc, p=2, dim=1)
+
+
+class network_29layers_cosface(nn.Module):
+
+    def __init__(self, block, layers, num_classes=79077):
+        super(network_29layers_cosface, self).__init__()
+        self.conv1 = mfm(1, 48, 5, 1, 2)
+        self.pool1 = nn.MaxPool2d(kernel_size=2, stride=2, ceil_mode=True)
+        self.block1 = self._make_layer(block, layers[0], 48, 48)
+        self.group1 = group(48, 96, 3, 1, 1)
+        self.pool2 = nn.MaxPool2d(kernel_size=2, stride=2, ceil_mode=True)
+        self.block2 = self._make_layer(block, layers[1], 96, 96)
+        self.group2 = group(96, 192, 3, 1, 1)
+        self.pool3 = nn.MaxPool2d(kernel_size=2, stride=2, ceil_mode=True)
+        self.block3 = self._make_layer(block, layers[2], 192, 192)
+        self.group3 = group(192, 128, 3, 1, 1)
+        self.block4 = self._make_layer(block, layers[3], 128, 128)
+        self.group4 = group(128, 128, 3, 1, 1)
+        self.pool4 = nn.MaxPool2d(kernel_size=2, stride=2, ceil_mode=True)
+        self.fc = mfm(7 * 7 * 128, 256, type=0)
+        self.weight = Parameter(torch.Tensor(num_classes, 256))
+        nn.init.xavier_uniform_(self.weight)
+
+    def _make_layer(self, block, num_blocks, in_channels, out_channels):
+        layers = []
+        for i in range(0, num_blocks):
+            layers.append(block(in_channels, out_channels))
+        return nn.Sequential(*layers)
+
+    def cosine_sim(self, x1, x2, dim=1, eps=1e-08):
+        ip = torch.mm(x1, x2.t())
+        w1 = torch.norm(x1, 2, dim)
+        w2 = torch.norm(x2, 2, dim)
+        return ip / torch.ger(w1, w2).clamp(min=eps)
+
+    def forward(self, x):
+        x = self.conv1(x)
+        x = self.pool1(x)
+        x = self.block1(x)
+        x = self.group1(x)
+        x = self.pool2(x)
+        x = self.block2(x)
+        x = self.group2(x)
+        x = self.pool3(x)
+        x = self.block3(x)
+        x = self.group3(x)
+        x = self.block4(x)
+        x = self.group4(x)
+        x = self.pool4(x)
+        x = x.view(x.size(0), -1)
+        fc = self.fc(x)
+        if self.training:
+            x = F.dropout(fc, training=self.training)
+            out = self.cosine_sim(x, self.weight)
+            return out, F.normalize(fc, p=2, dim=1)
+        return F.normalize(fc, p=2, dim=1)
+
+
 class VPL(Module):
     """
     Modified from Partial-FC
@@ -9603,26 +9530,26 @@ class VPL(Module):
         super(VPL, self).__init__()
         assert sample_rate == 1.0
         assert not resume
-        self.num_classes: int = num_classes
-        self.rank: int = rank
-        self.local_rank: int = local_rank
-        self.device: torch.device = torch.device('cuda:{}'.format(self.local_rank))
-        self.world_size: int = world_size
-        self.batch_size: int = batch_size
-        self.margin_softmax: callable = margin_softmax
-        self.sample_rate: float = sample_rate
-        self.embedding_size: int = embedding_size
-        self.prefix: str = prefix
-        self.num_local: int = num_classes // world_size + int(rank < num_classes % world_size)
-        self.class_start: int = num_classes // world_size * rank + min(rank, num_classes % world_size)
-        self.num_sample: int = int(self.sample_rate * self.num_local)
+        self.num_classes: 'int' = num_classes
+        self.rank: 'int' = rank
+        self.local_rank: 'int' = local_rank
+        self.device: 'torch.device' = torch.device('cuda:{}'.format(self.local_rank))
+        self.world_size: 'int' = world_size
+        self.batch_size: 'int' = batch_size
+        self.margin_softmax: 'callable' = margin_softmax
+        self.sample_rate: 'float' = sample_rate
+        self.embedding_size: 'int' = embedding_size
+        self.prefix: 'str' = prefix
+        self.num_local: 'int' = num_classes // world_size + int(rank < num_classes % world_size)
+        self.class_start: 'int' = num_classes // world_size * rank + min(rank, num_classes % world_size)
+        self.num_sample: 'int' = int(self.sample_rate * self.num_local)
         self.weight_name = os.path.join(self.prefix, 'rank_{}_softmax_weight.pt'.format(self.rank))
         self.weight_mom_name = os.path.join(self.prefix, 'rank_{}_softmax_weight_mom.pt'.format(self.rank))
         self.weight = torch.normal(0, 0.01, (self.num_local, self.embedding_size), device=self.device)
-        self.weight_mom: torch.Tensor = torch.zeros_like(self.weight)
+        self.weight_mom: 'torch.Tensor' = torch.zeros_like(self.weight)
         logging.info('softmax weight init successfully!')
         logging.info('softmax weight mom init successfully!')
-        self.stream: torch.Stream = torch.Stream(local_rank)
+        self.stream: 'torch.cuda.Stream' = torch.cuda.Stream(local_rank)
         self.index = None
         self.update = lambda : 0
         self.sub_weight = Parameter(self.weight)
@@ -9726,7 +9653,7 @@ class VPL(Module):
         logits.backward(grad)
         if total_features.grad is not None:
             total_features.grad.detach_()
-        x_grad: torch.Tensor = torch.zeros_like(features, requires_grad=True)
+        x_grad: 'torch.Tensor' = torch.zeros_like(features, requires_grad=True)
         dist.reduce_scatter(x_grad, list(total_features.grad.chunk(self.world_size, dim=0)))
         x_grad = x_grad * self.world_size
         if self.vpl_mode >= 0:
@@ -10446,6 +10373,11 @@ class ResnetBlock_Adain(nn.Module):
         return out
 
 
+def resnet_jmlr(pretrained=False, **kwargs):
+    model_args = dict(block=BasicBlock, layers=[5, 3, 4, 2], stem_width=32, stem_type='deep', avg_down=True, channels=[64, 160, 272, 512], **kwargs)
+    return ResNet(**model_args)
+
+
 class OneNetwork(nn.Module):
 
     def __init__(self, cfg):
@@ -10538,6 +10470,46 @@ class OneNetwork(nn.Module):
                 feat = torch.cat((pred, feate), 1)
                 pred = self.fc(feat)
         return pred
+
+
+class EyeDataset:
+
+    def __init__(self, root, load_data=True):
+        eyes_info = mio.import_pickle(osp.join(root, 'eyes3d.pkl'))
+        idxs481 = eyes_info['mask481']['idxs']
+        tri481 = eyes_info['mask481']['trilist']
+        self.iris_idx_481 = eyes_info['mask481']['idxs_iris']
+        eyel_template = eyes_info['left_points'][idxs481]
+        eyer_template = eyes_info['right_points'][idxs481]
+        eyel_template_homo = np.append(eyel_template, np.ones((eyel_template.shape[0], 1)), axis=1)
+        eyer_template_homo = np.append(eyer_template, np.ones((eyer_template.shape[0], 1)), axis=1)
+        points = mio.import_pickle(osp.join(root, 'eyespoints.pkl'))
+        self.homol = eyel_template_homo.T
+        self.homor = eyer_template_homo.T
+        if load_data:
+            self.worldl = {}
+            self.worldr = {}
+            for k in points:
+                p = k.find('/')
+                newk = k[p + 1:]
+                value = points[k]
+                self.worldl[newk] = value['left']
+                self.worldr[newk] = value['right']
+
+    def get(self, key, to_homo=False):
+        if key not in self.worldl:
+            return None, None
+        left = self.worldl[key]
+        right = self.worldr[key]
+        if to_homo:
+            left = (left @ self.homol).T
+            right = (right @ self.homor).T
+        return left, right
+
+    def to_homo(self, eyel, eyer):
+        eyel = (eyel @ self.homol).T
+        eyer = (eyer @ self.homor).T
+        return eyel, eyer
 
 
 def get_network(cfg):
@@ -10708,7 +10680,7 @@ class JMLRInference(nn.Module):
         return R, t
 
 
-def eye_like(x: torch.Tensor, n: int) ->torch.Tensor:
+def eye_like(x: 'torch.Tensor', n: 'int') ->torch.Tensor:
     return torch.eye(n, n, dtype=x.dtype, device=x.device).unsqueeze(0).repeat(x.shape[0], 1, 1)
 
 
@@ -12062,431 +12034,205 @@ class Graph_trans(nn.Module):
 
 import torch
 from torch.nn import MSELoss, ReLU
-from paritybench._paritybench_helpers import _mock_config, _mock_layer, _paritybench_base, _fails_compile
+from types import SimpleNamespace
 
 
 TESTCASES = [
-    # (nn.Module, init_args, forward_args, jit_compiles)
+    # (nn.Module, init_args, forward_args)
     (ASPP_module,
      lambda: ([], {'inplanes': 4, 'planes': 4, 'rate': 4}),
-     lambda: ([torch.rand([4, 4, 4, 4])], {}),
-     True),
+     lambda: ([torch.rand([4, 4, 4, 4])], {})),
     (ASPP_module_rate0,
      lambda: ([], {'inplanes': 4, 'planes': 4}),
-     lambda: ([torch.rand([4, 4, 4, 4])], {}),
-     True),
+     lambda: ([torch.rand([4, 4, 4, 4])], {})),
     (ApplyStyle,
      lambda: ([], {'latent_size': 4, 'channels': 4}),
-     lambda: ([torch.rand([4, 4]), torch.rand([4, 4])], {}),
-     True),
+     lambda: ([torch.rand([4, 4]), torch.rand([4, 4])], {})),
     (ArcFace,
      lambda: ([], {}),
-     lambda: ([torch.rand([4, 4, 4, 4]), torch.ones([4], dtype=torch.int64)], {}),
-     True),
+     lambda: ([torch.rand([4, 4, 4, 4]), torch.ones([4], dtype=torch.int64)], {})),
     (AttentionRefinementModule,
      lambda: ([], {'in_chan': 4, 'out_chan': 4}),
-     lambda: ([torch.rand([4, 4, 4, 4])], {}),
-     True),
+     lambda: ([torch.rand([4, 4, 4, 4])], {})),
     (BalancedL1Loss,
      lambda: ([], {}),
-     lambda: ([torch.rand([4, 4, 4, 4]), torch.rand([4, 4, 4, 4])], {}),
-     False),
+     lambda: ([torch.rand([4, 4, 4, 4]), torch.rand([4, 4, 4, 4])], {})),
     (BasicBlock,
      lambda: ([], {'in_chan': 4, 'out_chan': 4}),
-     lambda: ([torch.rand([4, 4, 4, 4])], {}),
-     True),
+     lambda: ([torch.rand([4, 4, 4, 4])], {})),
     (BiSeNet,
      lambda: ([], {'n_classes': 4}),
-     lambda: ([torch.rand([4, 3, 64, 64])], {}),
-     True),
+     lambda: ([torch.rand([4, 3, 64, 64])], {})),
     (BiSeNetOutput,
      lambda: ([], {'in_chan': 4, 'mid_chan': 4, 'n_classes': 4}),
-     lambda: ([torch.rand([4, 4, 4, 4])], {}),
-     True),
+     lambda: ([torch.rand([4, 4, 4, 4])], {})),
     (Block,
      lambda: ([], {'inplanes': 4, 'planes': 4, 'reps': 4}),
-     lambda: ([torch.rand([4, 4, 4, 4])], {}),
-     False),
+     lambda: ([torch.rand([4, 4, 4, 4])], {})),
     (BoundedIoULoss,
      lambda: ([], {}),
-     lambda: ([torch.rand([4, 4, 4, 4]), torch.rand([4, 4, 4, 4])], {}),
-     False),
+     lambda: ([torch.rand([4, 4, 4, 4]), torch.rand([4, 4, 4, 4])], {})),
     (Branch,
      lambda: ([], {'in_channels': 4, 'res_channels': 4, 'out_channels': 4}),
-     lambda: ([torch.rand([4, 4, 4]), torch.rand([4, 4, 4])], {}),
-     True),
+     lambda: ([torch.rand([4, 4, 4]), torch.rand([4, 4, 4])], {})),
     (CIoULoss,
      lambda: ([], {}),
-     lambda: ([torch.rand([4, 4, 4, 4]), torch.rand([4, 4, 4, 4])], {}),
-     False),
+     lambda: ([torch.rand([4, 4, 4, 4]), torch.rand([4, 4, 4, 4])], {})),
     (ContextPath,
      lambda: ([], {}),
-     lambda: ([torch.rand([4, 3, 64, 64])], {}),
-     True),
+     lambda: ([torch.rand([4, 3, 64, 64])], {})),
     (ConvBNReLU,
      lambda: ([], {'in_chan': 4, 'out_chan': 4}),
-     lambda: ([torch.rand([4, 4, 4, 4])], {}),
-     True),
+     lambda: ([torch.rand([4, 4, 4, 4])], {})),
     (ConvBlock,
      lambda: ([], {'in_c': 4, 'out_c': 4}),
-     lambda: ([torch.rand([4, 4, 4, 4])], {}),
-     True),
+     lambda: ([torch.rand([4, 4, 4, 4])], {})),
     (CosFace,
      lambda: ([], {}),
-     lambda: ([torch.rand([4, 4, 4, 4]), torch.ones([4], dtype=torch.int64)], {}),
-     True),
+     lambda: ([torch.rand([4, 4, 4, 4]), torch.ones([4], dtype=torch.int64)], {})),
     (CrossEntropyLoss,
      lambda: ([], {}),
-     lambda: ([torch.rand([4, 4, 4, 4]), torch.rand([4, 4, 4, 4])], {}),
-     False),
+     lambda: ([torch.rand([4, 4, 4, 4]), torch.rand([4, 4, 4, 4])], {})),
     (CustomMappingNetwork,
      lambda: ([], {'z_dim': 4, 'map_hidden_dim': 4, 'map_output_dim': 4}),
-     lambda: ([torch.rand([4, 4, 4, 4])], {}),
-     True),
+     lambda: ([torch.rand([4, 4, 4, 4])], {})),
     (DIoULoss,
      lambda: ([], {}),
-     lambda: ([torch.rand([4, 4, 4, 4]), torch.rand([4, 4, 4, 4])], {}),
-     False),
+     lambda: ([torch.rand([4, 4, 4, 4]), torch.rand([4, 4, 4, 4])], {})),
+    (DataParallelCriterion,
+     lambda: ([], {'module': torch.nn.ReLU()}),
+     lambda: ([torch.rand([4, 4, 4, 4])], {})),
+    (DataParallelModel,
+     lambda: ([], {'module': torch.nn.ReLU()}),
+     lambda: ([], {'input': torch.rand([4, 4])})),
     (Decoder_module,
      lambda: ([], {'inplanes': 4, 'planes': 4}),
-     lambda: ([torch.rand([4, 4, 4, 4])], {}),
-     True),
+     lambda: ([torch.rand([4, 4, 4, 4])], {})),
     (DeepLabv3_plus,
      lambda: ([], {}),
-     lambda: ([torch.rand([4, 3, 64, 64])], {}),
-     False),
+     lambda: ([torch.rand([4, 3, 64, 64])], {})),
     (DepthWise,
      lambda: ([], {'in_c': 4, 'out_c': 4}),
-     lambda: ([torch.rand([4, 4, 4, 4])], {}),
-     False),
+     lambda: ([torch.rand([4, 4, 4, 4])], {})),
     (FeatureFusionModule,
      lambda: ([], {'in_chan': 4, 'out_chan': 4}),
-     lambda: ([torch.rand([4, 1, 4, 4]), torch.rand([4, 3, 4, 4])], {}),
-     True),
+     lambda: ([torch.rand([4, 1, 4, 4]), torch.rand([4, 3, 4, 4])], {})),
     (Featuremaps_to_Graph,
      lambda: ([], {'input_channels': 4, 'hidden_layers': 1}),
-     lambda: ([torch.rand([4, 4, 4, 4])], {}),
-     True),
+     lambda: ([torch.rand([4, 4, 4, 4])], {})),
     (FiLMLayer,
      lambda: ([], {'input_dim': 4, 'hidden_dim': 4}),
-     lambda: ([torch.rand([4, 4, 4, 4]), torch.rand([4, 4, 4, 4]), torch.rand([4, 4, 4, 4])], {}),
-     True),
+     lambda: ([torch.rand([4, 4, 4, 4]), torch.rand([4, 4, 4, 4]), torch.rand([4, 4, 4, 4])], {})),
     (Flatten,
      lambda: ([], {}),
-     lambda: ([torch.rand([4, 4, 4, 4])], {}),
-     True),
+     lambda: ([torch.rand([4, 4, 4, 4])], {})),
     (GHMC,
      lambda: ([], {}),
-     lambda: ([torch.rand([4, 4, 4, 4]), torch.rand([4, 4, 4, 4]), torch.rand([4, 4, 4, 4])], {}),
-     False),
+     lambda: ([torch.rand([4, 4, 4, 4]), torch.rand([4, 4, 4, 4]), torch.rand([4, 4, 4, 4])], {})),
     (GHMR,
      lambda: ([], {}),
-     lambda: ([torch.rand([4, 4, 4, 4]), torch.rand([4, 4, 4, 4]), torch.rand([4, 4, 4, 4])], {}),
-     False),
+     lambda: ([torch.rand([4, 4, 4, 4]), torch.rand([4, 4, 4, 4]), torch.rand([4, 4, 4, 4])], {})),
     (GaussianFocalLoss,
      lambda: ([], {}),
-     lambda: ([torch.rand([4, 4, 4, 4]), torch.rand([4, 4, 4, 4])], {}),
-     False),
+     lambda: ([torch.rand([4, 4, 4, 4]), torch.rand([4, 4, 4, 4])], {})),
     (GraphConvolution,
      lambda: ([], {'in_features': 4, 'out_features': 4}),
-     lambda: ([torch.rand([4, 4, 4, 4])], {}),
-     False),
+     lambda: ([torch.rand([4, 4, 4, 4])], {})),
     (IBasicBlock,
      lambda: ([], {'inplanes': 4, 'planes': 4}),
-     lambda: ([torch.rand([4, 4, 4, 4])], {}),
-     True),
+     lambda: ([torch.rand([4, 4, 4, 4])], {})),
     (InstanceNorm,
      lambda: ([], {}),
-     lambda: ([torch.rand([4, 4, 4, 4])], {}),
-     True),
+     lambda: ([torch.rand([4, 4, 4, 4])], {})),
     (Integral,
      lambda: ([], {}),
-     lambda: ([torch.rand([4, 17])], {}),
-     True),
+     lambda: ([torch.rand([4, 17])], {})),
     (L1Loss,
      lambda: ([], {}),
-     lambda: ([torch.rand([4, 4, 4, 4]), torch.rand([4, 4, 4, 4])], {}),
-     False),
+     lambda: ([torch.rand([4, 4, 4, 4]), torch.rand([4, 4, 4, 4])], {})),
     (L2Norm,
      lambda: ([], {'n_dims': 4}),
-     lambda: ([torch.rand([4, 4, 4, 4])], {}),
-     True),
+     lambda: ([torch.rand([4, 4, 4, 4])], {})),
     (Linear,
      lambda: ([], {'linear_size': 4}),
-     lambda: ([torch.rand([4, 4, 4])], {}),
-     True),
+     lambda: ([torch.rand([4, 4, 4])], {})),
     (LinearBlock,
      lambda: ([], {'in_c': 4, 'out_c': 4}),
-     lambda: ([torch.rand([4, 4, 4, 4])], {}),
-     True),
+     lambda: ([torch.rand([4, 4, 4, 4])], {})),
     (LovaszSoftmax,
      lambda: ([], {}),
-     lambda: ([torch.rand([4, 4, 4, 4]), torch.rand([4, 4])], {}),
-     False),
+     lambda: ([torch.rand([4, 4, 4, 4]), torch.rand([4, 4])], {})),
     (MSELoss,
      lambda: ([], {}),
-     lambda: ([torch.rand([4, 4, 4, 4]), torch.rand([4, 4, 4, 4])], {}),
-     False),
+     lambda: ([torch.rand([4, 4, 4, 4]), torch.rand([4, 4, 4, 4])], {})),
     (Mlp,
      lambda: ([], {'in_features': 4}),
-     lambda: ([torch.rand([4, 4, 4, 4])], {}),
-     True),
+     lambda: ([torch.rand([4, 4, 4, 4])], {})),
     (MobileNetV1,
      lambda: ([], {}),
-     lambda: ([torch.rand([4, 3, 64, 64])], {}),
-     False),
+     lambda: ([torch.rand([4, 3, 64, 64])], {})),
     (MultiheadAttention,
      lambda: ([], {'embed_dims': 4, 'num_heads': 4}),
-     lambda: ([torch.rand([4, 4])], {}),
-     True),
+     lambda: ([torch.rand([4, 4])], {})),
     (RSoftmax,
      lambda: ([], {'radix': 4, 'groups': 1}),
-     lambda: ([torch.rand([4, 4, 4, 4])], {}),
-     True),
+     lambda: ([torch.rand([4, 4, 4, 4])], {})),
     (Residual,
      lambda: ([], {'c': 4, 'num_block': 4, 'groups': 1}),
-     lambda: ([torch.rand([4, 4, 4, 4])], {}),
-     False),
+     lambda: ([torch.rand([4, 4, 4, 4])], {})),
     (Resnet18,
      lambda: ([], {}),
-     lambda: ([torch.rand([4, 3, 64, 64])], {}),
-     True),
+     lambda: ([torch.rand([4, 3, 64, 64])], {})),
     (SeparableConv2d,
      lambda: ([], {'inplanes': 4, 'planes': 4}),
-     lambda: ([torch.rand([4, 4, 4, 4])], {}),
-     True),
+     lambda: ([torch.rand([4, 4, 4, 4])], {})),
     (SeparableConv2d_aspp,
      lambda: ([], {'inplanes': 4, 'planes': 4}),
-     lambda: ([torch.rand([4, 4, 4, 4])], {}),
-     True),
+     lambda: ([torch.rand([4, 4, 4, 4])], {})),
     (SeparableConv2d_same,
      lambda: ([], {'inplanes': 4, 'planes': 4}),
-     lambda: ([torch.rand([4, 4, 4, 4])], {}),
-     False),
+     lambda: ([torch.rand([4, 4, 4, 4])], {})),
     (SingleGPU,
-     lambda: ([], {'module': _mock_layer()}),
-     lambda: ([torch.rand([4, 4, 4, 4])], {}),
-     True),
+     lambda: ([], {'module': torch.nn.ReLU()}),
+     lambda: ([torch.rand([4, 4, 4, 4])], {})),
     (SmoothL1Loss,
      lambda: ([], {}),
-     lambda: ([torch.rand([4, 4, 4, 4]), torch.rand([4, 4, 4, 4])], {}),
-     False),
+     lambda: ([torch.rand([4, 4, 4, 4]), torch.rand([4, 4, 4, 4])], {})),
     (SpatialPath,
      lambda: ([], {}),
-     lambda: ([torch.rand([4, 3, 64, 64])], {}),
-     True),
+     lambda: ([torch.rand([4, 3, 64, 64])], {})),
     (StableBCELoss,
      lambda: ([], {}),
-     lambda: ([torch.rand([4, 4, 4, 4]), torch.rand([4, 4, 4, 4])], {}),
-     True),
+     lambda: ([torch.rand([4, 4, 4, 4]), torch.rand([4, 4, 4, 4])], {})),
     (VITBatchNorm,
      lambda: ([], {'num_features': 4}),
-     lambda: ([torch.rand([4, 4, 4])], {}),
-     True),
+     lambda: ([torch.rand([4, 4, 4])], {})),
     (VarifocalLoss,
      lambda: ([], {}),
-     lambda: ([torch.rand([4, 4, 4, 4]), torch.rand([4, 4, 4, 4])], {}),
-     False),
+     lambda: ([torch.rand([4, 4, 4, 4]), torch.rand([4, 4, 4, 4])], {})),
     (Xception,
      lambda: ([], {}),
-     lambda: ([torch.rand([4, 3, 64, 64])], {}),
-     False),
+     lambda: ([torch.rand([4, 3, 64, 64])], {})),
     (deeplab_xception_transfer_basemodel,
      lambda: ([], {}),
-     lambda: ([torch.rand([4, 3, 64, 64])], {}),
-     False),
+     lambda: ([torch.rand([4, 3, 64, 64])], {})),
     (deeplab_xception_transfer_basemodel_savememory,
      lambda: ([], {}),
-     lambda: ([torch.rand([4, 3, 64, 64])], {}),
-     False),
+     lambda: ([torch.rand([4, 3, 64, 64])], {})),
     (deeplab_xception_transfer_projection,
      lambda: ([], {}),
-     lambda: ([torch.rand([4, 3, 64, 64])], {}),
-     False),
+     lambda: ([torch.rand([4, 3, 64, 64])], {})),
     (deeplab_xception_transfer_projection_savemem,
      lambda: ([], {}),
-     lambda: ([torch.rand([4, 3, 64, 64])], {}),
-     False),
+     lambda: ([torch.rand([4, 3, 64, 64])], {})),
+    (group,
+     lambda: ([], {'in_channels': 4, 'out_channels': 4, 'kernel_size': 4, 'stride': 1, 'padding': 4}),
+     lambda: ([torch.rand([4, 4, 4, 4])], {})),
+    (mfm,
+     lambda: ([], {'in_channels': 4, 'out_channels': 4}),
+     lambda: ([torch.rand([4, 4, 4, 4])], {})),
+    (resblock,
+     lambda: ([], {'in_channels': 4, 'out_channels': 4}),
+     lambda: ([torch.rand([4, 4, 4, 4])], {})),
 ]
-
-class Test_deepinsight_insightface(_paritybench_base):
-    def test_000(self):
-        self._check(*TESTCASES[0])
-
-    def test_001(self):
-        self._check(*TESTCASES[1])
-
-    def test_002(self):
-        self._check(*TESTCASES[2])
-
-    def test_003(self):
-        self._check(*TESTCASES[3])
-
-    def test_004(self):
-        self._check(*TESTCASES[4])
-
-    def test_005(self):
-        self._check(*TESTCASES[5])
-
-    def test_006(self):
-        self._check(*TESTCASES[6])
-
-    def test_007(self):
-        self._check(*TESTCASES[7])
-
-    def test_008(self):
-        self._check(*TESTCASES[8])
-
-    def test_009(self):
-        self._check(*TESTCASES[9])
-
-    def test_010(self):
-        self._check(*TESTCASES[10])
-
-    def test_011(self):
-        self._check(*TESTCASES[11])
-
-    def test_012(self):
-        self._check(*TESTCASES[12])
-
-    def test_013(self):
-        self._check(*TESTCASES[13])
-
-    def test_014(self):
-        self._check(*TESTCASES[14])
-
-    def test_015(self):
-        self._check(*TESTCASES[15])
-
-    def test_016(self):
-        self._check(*TESTCASES[16])
-
-    def test_017(self):
-        self._check(*TESTCASES[17])
-
-    def test_018(self):
-        self._check(*TESTCASES[18])
-
-    def test_019(self):
-        self._check(*TESTCASES[19])
-
-    def test_020(self):
-        self._check(*TESTCASES[20])
-
-    def test_021(self):
-        self._check(*TESTCASES[21])
-
-    def test_022(self):
-        self._check(*TESTCASES[22])
-
-    def test_023(self):
-        self._check(*TESTCASES[23])
-
-    def test_024(self):
-        self._check(*TESTCASES[24])
-
-    def test_025(self):
-        self._check(*TESTCASES[25])
-
-    def test_026(self):
-        self._check(*TESTCASES[26])
-
-    def test_027(self):
-        self._check(*TESTCASES[27])
-
-    def test_028(self):
-        self._check(*TESTCASES[28])
-
-    def test_029(self):
-        self._check(*TESTCASES[29])
-
-    def test_030(self):
-        self._check(*TESTCASES[30])
-
-    def test_031(self):
-        self._check(*TESTCASES[31])
-
-    def test_032(self):
-        self._check(*TESTCASES[32])
-
-    def test_033(self):
-        self._check(*TESTCASES[33])
-
-    def test_034(self):
-        self._check(*TESTCASES[34])
-
-    def test_035(self):
-        self._check(*TESTCASES[35])
-
-    def test_036(self):
-        self._check(*TESTCASES[36])
-
-    def test_037(self):
-        self._check(*TESTCASES[37])
-
-    def test_038(self):
-        self._check(*TESTCASES[38])
-
-    def test_039(self):
-        self._check(*TESTCASES[39])
-
-    def test_040(self):
-        self._check(*TESTCASES[40])
-
-    def test_041(self):
-        self._check(*TESTCASES[41])
-
-    def test_042(self):
-        self._check(*TESTCASES[42])
-
-    def test_043(self):
-        self._check(*TESTCASES[43])
-
-    def test_044(self):
-        self._check(*TESTCASES[44])
-
-    def test_045(self):
-        self._check(*TESTCASES[45])
-
-    def test_046(self):
-        self._check(*TESTCASES[46])
-
-    def test_047(self):
-        self._check(*TESTCASES[47])
-
-    def test_048(self):
-        self._check(*TESTCASES[48])
-
-    def test_049(self):
-        self._check(*TESTCASES[49])
-
-    def test_050(self):
-        self._check(*TESTCASES[50])
-
-    def test_051(self):
-        self._check(*TESTCASES[51])
-
-    def test_052(self):
-        self._check(*TESTCASES[52])
-
-    def test_053(self):
-        self._check(*TESTCASES[53])
-
-    def test_054(self):
-        self._check(*TESTCASES[54])
-
-    def test_055(self):
-        self._check(*TESTCASES[55])
-
-    def test_056(self):
-        self._check(*TESTCASES[56])
-
-    def test_057(self):
-        self._check(*TESTCASES[57])
-
-    def test_058(self):
-        self._check(*TESTCASES[58])
-
-    def test_059(self):
-        self._check(*TESTCASES[59])
 

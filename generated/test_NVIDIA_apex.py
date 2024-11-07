@@ -36,12 +36,23 @@ conv_bias_relu = _module
 conv_bias_relu = _module
 cudnn_gbn = _module
 batch_norm = _module
+benchmark_load = _module
+benchmark_save = _module
+example_load = _module
+example_save = _module
 func_test_multihead_attn = _module
 perf_test_multihead_attn = _module
+allreduce = _module
+cache = _module
+change_cuda_allocator = _module
+toy_ddp = _module
 fmha = _module
 fmha = _module
 focal_loss = _module
 focal_loss = _module
+gpu_direct_storage = _module
+group_norm = _module
+group_norm = _module
 groupbn = _module
 batch_norm = _module
 index_mul_2d = _module
@@ -58,6 +69,17 @@ fast_self_multihead_attn_norm_add_func = _module
 mask_softmax_dropout_func = _module
 self_multihead_attn = _module
 self_multihead_attn_func = _module
+nccl_allocator = _module
+nccl_allocator = _module
+openfold_triton = _module
+_layer_norm_backward_kernels = _module
+_layer_norm_config_ampere = _module
+_layer_norm_config_hopper = _module
+_layer_norm_forward_kernels = _module
+_mha_kernel = _module
+fused_adam_swa = _module
+layer_norm = _module
+mha = _module
 optimizers = _module
 distributed_fused_adam = _module
 distributed_fused_lamb = _module
@@ -81,6 +103,7 @@ sparse_masklib = _module
 checkpointing_test_part1 = _module
 checkpointing_test_part2 = _module
 checkpointing_test_reference = _module
+test_permutation_application = _module
 toy_problem = _module
 test_bottleneck_module = _module
 test_clip_grad = _module
@@ -89,6 +112,7 @@ test_cudnn_gbn_with_two_gpus = _module
 test_fmha = _module
 test_focal_loss = _module
 test_fused_dense = _module
+test_group_norm = _module
 test_index_mul_2d = _module
 test_fast_layer_norm = _module
 test_encdec_multihead_attn = _module
@@ -97,6 +121,8 @@ test_fast_self_multihead_attn_bias = _module
 test_mha_fused_softmax = _module
 test_self_multihead_attn = _module
 test_self_multihead_attn_norm_add = _module
+test_fused_adam_swa = _module
+test_openfold_mha = _module
 test_dist_adam = _module
 test_distributed_fused_lamb = _module
 test_peer_halo_exchange_module = _module
@@ -141,6 +167,7 @@ _ucc_util = _module
 grad_scaler = _module
 enums = _module
 functional = _module
+fused_rope = _module
 fused_softmax = _module
 layers = _module
 layer_norm = _module
@@ -188,9 +215,11 @@ test_larc = _module
 test_multi_tensor_axpby = _module
 test_multi_tensor_l2norm = _module
 test_multi_tensor_scale = _module
+test_multi_tensor_unscale_l2norm = _module
 test_multiple_models_optimizers_losses = _module
 test_promotion = _module
 test_rnn = _module
+test_update_scale_hysteresis = _module
 utils = _module
 test_deprecated_warning = _module
 run_fp16util = _module
@@ -198,6 +227,7 @@ test_fp16util = _module
 test_fused_layer_norm = _module
 test_mlp = _module
 run_optimizers = _module
+test_adam = _module
 test_fused_novograd = _module
 test_fused_optimizer = _module
 test_lamb = _module
@@ -209,6 +239,7 @@ test_bert_minimal = _module
 test_cross_entropy = _module
 test_data = _module
 test_dynamic_batchsize = _module
+test_fused_rope = _module
 test_fused_softmax = _module
 test_gpt_minimal = _module
 test_layers = _module
@@ -232,21 +263,14 @@ test_groups = _module
 two_gpu_test_different_batch_size = _module
 two_gpu_unit_test = _module
 
-from paritybench._paritybench_helpers import _mock_config, patch_functional
 from unittest.mock import mock_open, MagicMock
 from torch.autograd import Function
 from torch.nn import Module
 import abc, collections, copy, enum, functools, inspect, itertools, logging, math, matplotlib, numbers, numpy, pandas, queue, random, re, scipy, sklearn, string, tensorflow, time, torch, torchaudio, torchvision, types, typing, uuid, warnings
+import operator as op
+from dataclasses import dataclass
 import numpy as np
 from torch import Tensor
-patch_functional()
-open = mock_open()
-yaml = logging = sys = argparse = MagicMock()
-ArgumentParser = argparse.ArgumentParser
-_global_config = args = argv = cfg = config = params = _mock_config()
-argparse.ArgumentParser.return_value.parse_args.return_value = _global_config
-yaml.load.return_value = _global_config
-sys.argv = _global_config
 __version__ = '1.0.0'
 xrange = range
 wraps = functools.wraps
@@ -279,16 +303,16 @@ from typing import Optional
 from typing import Sequence
 
 
-from torch._six import string_classes
+import collections.abc as container_abcs
+
+
+from types import MethodType
 
 
 import functools
 
 
 import numpy as np
-
-
-from types import MethodType
 
 
 import types
@@ -315,9 +339,6 @@ import torch.distributed as dist
 from torch import nn
 
 
-from torch._six import inf
-
-
 from typing import Union
 
 
@@ -342,10 +363,67 @@ from torch.cuda.amp import custom_fwd
 from torch.cuda.amp import custom_bwd
 
 
+import torch.optim as optim
+
+
+from torch.nn.parallel import DistributedDataParallel as DDP
+
+
+import torch.nn.init as init
+
+
+from torch.nn.parameter import Parameter
+
+
+from functools import partial
+
+
 from torch.nn import init
 
 
 from torch.nn import Parameter
+
+
+from torch.cuda.memory import _CUDAAllocator
+
+
+from copy import deepcopy
+
+
+from typing import BinaryIO
+
+
+from collections import defaultdict
+
+
+from enum import Enum
+
+
+from enum import unique
+
+
+from itertools import chain
+
+
+from typing import Callable
+
+
+from typing import List
+
+
+from typing import Tuple
+
+
+from torch.optim import Adam
+
+
+from torch.optim import Optimizer
+
+
+from math import prod
+
+
+from torch.autograd import Function
 
 
 import collections
@@ -357,7 +435,19 @@ import enum
 import inspect
 
 
+from typing import Any
+
+
+from typing import Dict
+
+
+from typing import Set
+
+
 from torch.distributed.distributed_c10d import _get_default_group
+
+
+from torch.distributed.distributed_c10d import _coalescing_manager
 
 
 import torch.distributed.distributed_c10d as c10d
@@ -378,6 +468,9 @@ import time
 from itertools import permutations
 
 
+import torch.onnx
+
+
 from torch.testing._internal import common_utils
 
 
@@ -390,10 +483,10 @@ import copy
 import typing
 
 
+from torch.testing._internal.common_device_type import instantiate_device_type_tests
+
+
 from torch.cuda.amp import GradScaler
-
-
-from torch.nn.parameter import Parameter
 
 
 from torch._utils import _flatten_dense_tensors
@@ -406,15 +499,6 @@ from copy import copy
 
 
 import numbers
-
-
-from copy import deepcopy
-
-
-from itertools import chain
-
-
-from collections import defaultdict
 
 
 from collections import abc as container_abcs
@@ -432,31 +516,13 @@ import abc
 from torch import distributed as dist
 
 
-from typing import Tuple
-
-
 from functools import reduce
-
-
-from typing import Any
-
-
-from typing import Callable
-
-
-from typing import Dict
-
-
-from typing import List
 
 
 from torch.autograd.variable import Variable
 
 
 from torch.nn.parallel import DistributedDataParallel
-
-
-import torch.nn.init as init
 
 
 from torch import _C
@@ -484,9 +550,6 @@ import torch.nn.parallel
 
 
 import torch.backends.cudnn as cudnn
-
-
-import torch.optim as optim
 
 
 import torch.utils.data
@@ -540,7 +603,10 @@ from math import floor
 from time import time
 
 
-from torch.optim import Optimizer
+from torch.testing._internal.common_device_type import onlyCUDA
+
+
+from torch.testing._internal.common_device_type import largeTensorTest
 
 
 from torch.utils.data import Dataset
@@ -552,16 +618,13 @@ from torch.utils.data import DataLoader
 import torch.testing
 
 
-from functools import partial
-
-
 import re
 
 
+from torch.testing._internal import common_cuda
+
+
 from torch.nn import Module
-
-
-from torch.nn.parallel import DistributedDataParallel as DDP
 
 
 class RNNCell(nn.Module):
@@ -587,14 +650,14 @@ class RNNCell(nn.Module):
             self.output_size = hidden_size
         self.gate_size = gate_multiplier * self.hidden_size
         self.n_hidden_states = n_hidden_states
-        self.w_ih = nn.Parameter(torch.Tensor(self.gate_size, self.input_size))
-        self.w_hh = nn.Parameter(torch.Tensor(self.gate_size, self.output_size))
+        self.w_ih = nn.Parameter(torch.empty(self.gate_size, self.input_size))
+        self.w_hh = nn.Parameter(torch.empty(self.gate_size, self.output_size))
         if self.output_size != self.hidden_size:
-            self.w_ho = nn.Parameter(torch.Tensor(self.output_size, self.hidden_size))
+            self.w_ho = nn.Parameter(torch.empty(self.output_size, self.hidden_size))
         self.b_ih = self.b_hh = None
         if self.bias:
-            self.b_ih = nn.Parameter(torch.Tensor(self.gate_size))
-            self.b_hh = nn.Parameter(torch.Tensor(self.gate_size))
+            self.b_ih = nn.Parameter(torch.empty(self.gate_size))
+            self.b_hh = nn.Parameter(torch.empty(self.gate_size))
         self.hidden = [None for states in range(self.n_hidden_states)]
         self.reset_parameters()
 
@@ -899,8 +962,8 @@ class mLSTMRNNCell(RNNCell):
     def __init__(self, input_size, hidden_size, bias=False, output_size=None):
         gate_multiplier = 4
         super(mLSTMRNNCell, self).__init__(gate_multiplier, input_size, hidden_size, mLSTMCell, n_hidden_states=2, bias=bias, output_size=output_size)
-        self.w_mih = nn.Parameter(torch.Tensor(self.output_size, self.input_size))
-        self.w_mhh = nn.Parameter(torch.Tensor(self.output_size, self.output_size))
+        self.w_mih = nn.Parameter(torch.empty(self.output_size, self.input_size))
+        self.w_mhh = nn.Parameter(torch.empty(self.output_size, self.output_size))
         self.reset_parameters()
 
     def forward(self, input):
@@ -1612,7 +1675,7 @@ class GroupBatchNorm2d(_BatchNorm):
         if input.size(1) % 8 != 0:
             raise ValueError('GroupBatchNorm2d number of input channels should be a multiple of 8')
 
-    def forward(self, input: Tensor) ->Tensor:
+    def forward(self, input: 'Tensor') ->Tensor:
         if not input.is_cuda:
             raise ValueError('GroupBatchNorm2d expected input tensor to be on GPU')
         if not input.is_contiguous(memory_format=torch.channels_last):
@@ -1626,6 +1689,18 @@ class GroupBatchNorm2d(_BatchNorm):
         if not self.training:
             return F.batch_norm(input, self.running_mean, self.running_var, self.weight, self.bias, False, self.momentum, self.eps)
         return _GroupBatchNorm2d.apply(input, self.weight, self.bias, self.running_mean, self.running_var, self.minibatch_mean, self.minibatch_inv_var, self.momentum, self.eps, self.group_size, self.group_rank, self.fwd_peer_buffers, self.bwd_peer_buffers)
+
+
+class ToyModel(nn.Module):
+
+    def __init__(self):
+        super(ToyModel, self).__init__()
+        self.net1 = nn.Linear(10, 10)
+        self.relu = nn.ReLU()
+        self.net2 = nn.Linear(10, 5)
+
+    def forward(self, x):
+        return self.net2(self.relu(self.net1(x)))
 
 
 class FMHAFun(torch.autograd.Function):
@@ -1669,6 +1744,110 @@ class FMHA(torch.nn.Module):
     def forward(self, qkv, cu_seqlens, max_s, is_training=True, zero_tensors=False):
         ctx = FMHAFun.apply(qkv.view(-1, 3, self.h, self.d), cu_seqlens, self.p_dropout, max_s, is_training, zero_tensors)
         return ctx.view(-1, self.hidden_size)
+
+
+def torch_group_norm(x, g, w, b, eps, act=''):
+    xdtype, wdtype = x.dtype, w.dtype
+    if xdtype != wdtype:
+        x = x
+    y = torch.nn.functional.group_norm(x, g, w, b, eps)
+    if act in ['silu', 'swish']:
+        y = torch.nn.functional.silu(y)
+    if xdtype != wdtype and y.dtype != xdtype:
+        y = y
+    return y
+
+
+class GroupNorm(torch.nn.Module):
+    """Optimized GroupNorm for NHWC layout with optional Swish/SiLU fusion.
+
+    There are two version of CUDA kernels under the hood: one pass and two
+    passes. This operator contains a simple heuristic to choose algorithm.
+
+    Limitations:
+
+    * Designed for 32 groups, also tested with 16 groups, some other number
+      of groups can also work but not guaranteed;
+    * Supported number of channels C are:
+
+        128, 256, 320, 448, 512, 640, 768, 896, 960, 1024, 1280, 1344, 1536,
+        1792, 1920, 2048, 2240, 2560, 2688, 3072, 3136, 3584, 4096.
+
+      One pass algorithm supports only channels mentioned above. Two pass
+      algorithm might automatically support some other channels as well.
+    * N/H/W do not have lower (except >0) and upper bound limitations;
+
+    All the unsupported cases will be forwarded to PyTorch implementation.
+    """
+    __constants__ = ['num_groups', 'num_channels', 'eps', 'affine', 'act', 'SUPPORTED_CHANNELS', 'SUPPORTED_GROUPS']
+    num_groups: 'int'
+    num_channels: 'int'
+    eps: 'float'
+    affine: 'bool'
+    act: 'str | None'
+    SUPPORTED_CHANNELS = frozenset([128, 256, 320, 448, 512, 640, 768, 896, 960, 1024, 1280, 1344, 1536, 1792, 1920, 2048, 2240, 2560, 2688, 3072, 3136, 3584, 4096])
+    SUPPORTED_GROUPS = frozenset([16, 32])
+    SUPPORTED_DTYPES = frozenset([(torch.float32, torch.float32), (torch.float32, torch.float16), (torch.float32, torch.bfloat16), (torch.float16, torch.float16), (torch.float16, torch.bfloat16), (torch.float16, torch.float32), (torch.bfloat16, torch.bfloat16), (torch.bfloat16, torch.float16), (torch.bfloat16, torch.float32)])
+
+    def __init__(self, num_groups: 'int', num_channels: 'int', eps: 'float'=1e-05, affine: 'bool'=True, device=None, dtype=None, act=None) ->None:
+        factory_kwargs = {'device': device, 'dtype': dtype}
+        super().__init__()
+        if num_channels % num_groups != 0:
+            raise ValueError('num_channels must be divisible by num_groups')
+        self.num_groups = num_groups
+        self.num_channels = num_channels
+        self.eps = eps
+        self.affine = affine
+        self.act = act.lower() if act else act
+        if self.affine:
+            self.weight = Parameter(torch.empty(num_channels, **factory_kwargs))
+            self.bias = Parameter(torch.empty(num_channels, **factory_kwargs))
+        else:
+            self.register_parameter('weight', None)
+            self.register_parameter('bias', None)
+        self.reset_parameters()
+        sm = torch.cuda.get_device_capability(device)
+        self.sm = sm[0] * 10 + sm[1]
+
+    def reset_parameters(self) ->None:
+        if self.affine:
+            init.ones_(self.weight)
+            init.zeros_(self.bias)
+
+    def _check_legality(self, input: 'Tensor') ->bool:
+        is_nhwc = input.is_contiguous(memory_format=torch.channels_last)
+        is_legal_groups = self.num_groups in self.SUPPORTED_GROUPS
+        is_legal_channels = self.num_channels in self.SUPPORTED_CHANNELS
+        is_input_half_or_float_or_bf16 = input.dtype in [torch.float16, torch.bfloat16, torch.float32]
+        is_supported_dtype_combination = not self.affine or (input.dtype, self.weight.dtype) in self.SUPPORTED_DTYPES
+        is_legal_act = self.act in [None, '', 'silu', 'swish']
+        if is_nhwc and is_input_half_or_float_or_bf16 and is_supported_dtype_combination and is_legal_act and self.affine and is_legal_groups and is_legal_channels:
+            return True
+        else:
+            return False
+
+    def forward(self, input: 'Tensor') ->Tensor:
+        can_use_nhwc_group_norm = self._check_legality(input)
+        if can_use_nhwc_group_norm:
+            channels = input.shape[1]
+            hw = 1
+            for i in range(2, len(input.shape)):
+                hw *= input.shape[i]
+            max_hw_one_pass = 1024 if self.sm >= 80 else 256
+            if hw >= 512 and channels in (3136, 3584, 4096) or hw > max_hw_one_pass:
+                passes = 2
+            else:
+                passes = 1
+            y, _ = group_norm_nhwc_fprop(input, self.num_groups, self.weight, self.bias, self.eps, self.act, passes)
+            return y
+        else:
+            return torch_group_norm(input, self.num_groups, self.weight, self.bias, self.eps, self.act)
+
+    def extra_repr(self) ->str:
+        if self.act:
+            return '{num_groups}, {num_channels}, eps={eps}, affine={affine}, act={act}'.format(**self.__dict__)
+        else:
+            return '{num_groups}, {num_channels}, eps={eps}, affine={affine}'.format(**self.__dict__)
 
 
 class bn_NHWC_impl(torch.autograd.Function):
@@ -1843,26 +2022,29 @@ class BatchNorm2d_NHWC(_BatchNorm):
 class FastLayerNormFN(torch.autograd.Function):
 
     @staticmethod
-    def forward(ctx, x, gamma, beta, epsilon):
+    def forward(ctx, x, gamma, beta, epsilon, memory_efficient=False):
+        ctx.x_shape = x.shape
+        ctx.memory_efficient = memory_efficient
         x = x.contiguous()
         gamma = gamma.contiguous()
         beta = beta.contiguous()
         hidden_size = gamma.numel()
         xmat = x.view((-1, hidden_size))
         ymat, mu, rsigma = fast_layer_norm.ln_fwd(xmat, gamma, beta, epsilon)
-        ctx.save_for_backward(x, gamma, mu, rsigma)
+        if ctx.memory_efficient:
+            ctx.save_for_backward(ymat, gamma, None, rsigma, beta)
+        else:
+            ctx.save_for_backward(xmat, gamma, mu, rsigma, None)
         return ymat.view(x.shape)
 
     @staticmethod
     def backward(ctx, dy):
         dy = dy.contiguous()
-        x, gamma, mu, rsigma = ctx.saved_tensors
-        hidden_size = gamma.numel()
-        xmat = x.view((-1, hidden_size))
-        dymat = dy.view(xmat.shape)
-        dxmat, dgamma, dbeta, _, _ = fast_layer_norm.ln_bwd(dymat, xmat, mu, rsigma, gamma)
-        dx = dxmat.view(x.shape)
-        return dx, dgamma, dbeta, None
+        x_or_y_mat, gamma, mu, rsigma, beta = ctx.saved_tensors
+        dymat = dy.view(x_or_y_mat.shape)
+        dxmat, dgamma, dbeta, _, _ = fast_layer_norm.ln_bwd(dymat, x_or_y_mat, mu, rsigma, gamma, beta, ctx.memory_efficient)
+        dx = dxmat.view(ctx.x_shape)
+        return dx, dgamma, dbeta, None, None
 
 
 def _cast_if_autocast_enabled(*args):
@@ -1872,19 +2054,20 @@ def _cast_if_autocast_enabled(*args):
         return torch.amp.autocast_mode._cast(args, torch.get_autocast_gpu_dtype())
 
 
-def _fast_layer_norm(x, weight, bias, epsilon):
-    args = _cast_if_autocast_enabled(x, weight, bias, epsilon)
-    with torch.amp.autocast(enabled=False):
+def _fast_layer_norm(x, weight, bias, epsilon, memory_efficient):
+    args = _cast_if_autocast_enabled(x, weight, bias, epsilon, memory_efficient)
+    with torch.amp.autocast('cuda', enabled=False):
         return FastLayerNormFN.apply(*args)
 
 
 class FastLayerNorm(torch.nn.Module):
 
-    def __init__(self, hidden_size, eps=1e-05):
+    def __init__(self, hidden_size, eps=1e-05, memory_efficient=False):
         super().__init__()
         self.epsilon = eps
-        self.weight = torch.nn.Parameter(torch.Tensor(hidden_size))
-        self.bias = torch.nn.Parameter(torch.Tensor(hidden_size))
+        self.memory_efficient = memory_efficient
+        self.weight = torch.nn.Parameter(torch.empty(hidden_size))
+        self.bias = torch.nn.Parameter(torch.empty(hidden_size))
         self.reset_parameters()
 
     def reset_parameters(self):
@@ -1892,10 +2075,10 @@ class FastLayerNorm(torch.nn.Module):
         init.zeros_(self.bias)
 
     def forward(self, x):
-        return _fast_layer_norm(x, self.weight, self.bias, self.epsilon)
+        return _fast_layer_norm(x, self.weight, self.bias, self.epsilon, self.memory_efficient)
 
 
-def _set_sequence_parallel_enabled(param: torch.Tensor, sequence_parallel_enabled: bool) ->None:
+def _set_sequence_parallel_enabled(param: 'torch.Tensor', sequence_parallel_enabled: 'bool') ->None:
     setattr(param, 'sequence_parallel_enabled', sequence_parallel_enabled)
 
 
@@ -2069,14 +2252,14 @@ class EncdecMultiheadAttn(nn.Module):
         self.include_norm_add = include_norm_add
         self.impl = impl
         self.scaling = self.head_dim ** -0.5
-        self.in_proj_weight_q = Parameter(torch.Tensor(embed_dim, embed_dim))
-        self.in_proj_weight_kv = Parameter(torch.Tensor(2 * embed_dim, embed_dim))
-        self.out_proj_weight = Parameter(torch.Tensor(embed_dim, embed_dim))
+        self.in_proj_weight_q = Parameter(torch.empty(embed_dim, embed_dim))
+        self.in_proj_weight_kv = Parameter(torch.empty(2 * embed_dim, embed_dim))
+        self.out_proj_weight = Parameter(torch.empty(embed_dim, embed_dim))
         if self.bias:
             assert impl != 'fast', 'ERROR! The Fast implementation does not support biases!'
-            self.in_proj_bias_q = Parameter(torch.Tensor(embed_dim))
-            self.in_proj_bias_kv = Parameter(torch.Tensor(2 * embed_dim))
-            self.out_proj_bias = Parameter(torch.Tensor(embed_dim))
+            self.in_proj_bias_q = Parameter(torch.empty(embed_dim))
+            self.in_proj_bias_kv = Parameter(torch.empty(2 * embed_dim))
+            self.out_proj_bias = Parameter(torch.empty(embed_dim))
         else:
             self.register_parameter('in_proj_bias_q', None)
             self.register_parameter('in_proj_bias_kv', None)
@@ -2085,8 +2268,8 @@ class EncdecMultiheadAttn(nn.Module):
             self.out_proj_bias = None
         if self.include_norm_add:
             if impl == 'fast':
-                self.lyr_nrm_gamma_weights = Parameter(torch.Tensor(embed_dim))
-                self.lyr_nrm_beta_weights = Parameter(torch.Tensor(embed_dim))
+                self.lyr_nrm_gamma_weights = Parameter(torch.empty(embed_dim))
+                self.lyr_nrm_beta_weights = Parameter(torch.empty(embed_dim))
                 self.lyr_nrm = None
             else:
                 self.register_parameter('lyr_norm_gamma_weights', None)
@@ -2336,20 +2519,20 @@ class SelfMultiheadAttn(nn.Module):
             assert self.include_norm_add == False, 'additive mask not supported with layer norm'
             assert impl == 'default' or impl == 'fast' and bias, 'additive mask not supported for fast mode without bias'
         if separate_qkv_params:
-            self.q_weight = Parameter(torch.Tensor(embed_dim, embed_dim))
-            self.k_weight = Parameter(torch.Tensor(embed_dim, embed_dim))
-            self.v_weight = Parameter(torch.Tensor(embed_dim, embed_dim))
+            self.q_weight = Parameter(torch.empty(embed_dim, embed_dim))
+            self.k_weight = Parameter(torch.empty(embed_dim, embed_dim))
+            self.v_weight = Parameter(torch.empty(embed_dim, embed_dim))
         else:
-            self.in_proj_weight = Parameter(torch.Tensor(3 * embed_dim, embed_dim))
-        self.out_proj_weight = Parameter(torch.Tensor(embed_dim, embed_dim))
+            self.in_proj_weight = Parameter(torch.empty(3 * embed_dim, embed_dim))
+        self.out_proj_weight = Parameter(torch.empty(embed_dim, embed_dim))
         if self.bias:
             if separate_qkv_params:
-                self.q_bias = Parameter(torch.Tensor(embed_dim))
-                self.k_bias = Parameter(torch.Tensor(embed_dim))
-                self.v_bias = Parameter(torch.Tensor(embed_dim))
+                self.q_bias = Parameter(torch.empty(embed_dim))
+                self.k_bias = Parameter(torch.empty(embed_dim))
+                self.v_bias = Parameter(torch.empty(embed_dim))
             else:
-                self.in_proj_bias = Parameter(torch.Tensor(3 * embed_dim))
-            self.out_proj_bias = Parameter(torch.Tensor(embed_dim))
+                self.in_proj_bias = Parameter(torch.empty(3 * embed_dim))
+            self.out_proj_bias = Parameter(torch.empty(embed_dim))
         else:
             if separate_qkv_params:
                 self.register_parameter('q_bias', None)
@@ -2365,8 +2548,8 @@ class SelfMultiheadAttn(nn.Module):
             self.out_proj_bias = None
         if self.include_norm_add:
             if impl == 'fast':
-                self.lyr_nrm_gamma_weights = Parameter(torch.Tensor(embed_dim))
-                self.lyr_nrm_beta_weights = Parameter(torch.Tensor(embed_dim))
+                self.lyr_nrm_gamma_weights = Parameter(torch.empty(embed_dim))
+                self.lyr_nrm_beta_weights = Parameter(torch.empty(embed_dim))
                 self.lyr_nrm = None
             else:
                 self.register_parameter('lyr_norm_gamma_weights', None)
@@ -2457,6 +2640,509 @@ class SelfMultiheadAttn(nn.Module):
         return outputs, None
 
 
+class simple_convs(torch.nn.Module):
+    """Stack of 2d convolutions with different normalization and activation functions"""
+
+    def __init__(self, num_convs: 'int', channels: 'int', normalization: 'str'='none', activation: 'str'='ReLU'):
+        super().__init__()
+        self.num_convs = num_convs
+        self.channels = channels
+        self.normalization = normalization
+        self.activation = activation
+        self.input_shape = [4, channels, 7, 7]
+        self.expected_C_params = -1
+        self.expected_K_params = 0
+        self.conv_stack = torch.nn.Sequential()
+        for c in range(self.num_convs - 1):
+            self.conv_stack.add_module(f'conv_{c}', torch.nn.Conv2d(self.channels, self.channels, kernel_size=(3, 3), padding=1))
+            self.expected_C_params += 1
+            self.expected_K_params += 2
+            if self.normalization == 'BatchNorm2d':
+                self.conv_stack.add_module(f'norm_{c}', torch.nn.BatchNorm2d(self.channels, track_running_stats=False))
+                self.expected_K_params += 2
+            elif self.normalization == 'LazyBatchNorm2d':
+                self.conv_stack.add_module(f'norm_{c}', torch.nn.LazyBatchNorm2d(track_running_stats=False))
+                self.expected_K_params += 2
+            elif self.normalization == 'GroupNorm':
+                self.conv_stack.add_module(f'norm_{c}', torch.nn.GroupNorm(4, self.channels, affine=True))
+                self.expected_C_params -= 1
+                self.expected_K_params -= 2
+            elif self.normalization == 'InstanceNorm2d':
+                self.conv_stack.add_module(f'norm_{c}', torch.nn.InstanceNorm2d(self.channels, affine=True, track_running_stats=False))
+                self.expected_K_params += 2
+            elif self.normalization == 'LocalResponseNorm':
+                self.conv_stack.add_module(f'norm_{c}', torch.nn.LocalResponseNorm(16))
+            elif self.normalization == 'LayerNorm1':
+                self.conv_stack.add_module(f'norm_{c}', torch.nn.LayerNorm(7))
+            elif self.normalization == 'LayerNorm2':
+                self.conv_stack.add_module(f'norm_{c}', torch.nn.LayerNorm([7, 7]))
+            elif self.normalization == 'LayerNorm3':
+                self.conv_stack.add_module(f'norm_{c}', torch.nn.LayerNorm([self.channels, 7, 7]))
+                self.expected_K_params += 2
+            elif self.normalization == 'SyncBatchNorm':
+                self.conv_stack.add_module(f'norm_{c}', torch.nn.SyncBatchNorm(self.channels, track_running_stats=False))
+                self.expected_K_params += 2
+            self.conv_stack.add_module(f'act_{c}', torch.nn.ReLU())
+        self.conv_stack.add_module('conv_out', torch.nn.Conv2d(self.channels, 8, kernel_size=(1, 1)))
+        self.expected_C_params += 1
+
+    def forward(self, x: 'torch.Tensor'):
+        x = self.conv_stack(x)
+        return x
+
+
+class conv_1d(torch.nn.Module):
+    """1D convolutions in isolation and with siblings"""
+
+    def __init__(self, with_2d=False):
+        super().__init__()
+        self.input_shape = [4, 16, 7, 7]
+        self.expected_C_params = 0
+        self.expected_K_params = 0
+        self.with_2d = with_2d
+        self.input_conv = torch.nn.Conv2d(self.input_shape[1], 32, kernel_size=(3, 3), padding=1)
+        self.expected_K_params += 2
+        self.branch_a_1D = torch.nn.Conv1d(32, 32, kernel_size=3, padding=1)
+        self.expected_C_params += 1
+        self.expected_K_params += 2
+        if self.with_2d:
+            self.branch_b_2D = torch.nn.Conv2d(32, 32, kernel_size=(3, 3), padding=1)
+            self.expected_C_params += 1
+            self.expected_K_params += 2
+        self.out_conv = torch.nn.Conv2d(32, 8, kernel_size=(1, 1))
+        self.expected_C_params += 1
+
+    def forward(self, x: 'torch.Tensor'):
+        step0 = self.input_conv(x)
+        s0shape = step0.shape
+        step1 = self.branch_a_1D(step0.view(s0shape[0], s0shape[1], s0shape[2] * s0shape[3])).view(s0shape)
+        if self.with_2d:
+            step1 = step1 + self.branch_b_2D(step0)
+        return self.out_conv(step1)
+
+
+class grouped_convs(torch.nn.Module):
+    """Stack of 2d convolutions with different types of grouped convolutions"""
+
+    def __init__(self):
+        super().__init__()
+        self.channels = 128
+        self.input_shape = [4, self.channels, 7, 7]
+        self.expected_C_params = 0
+        self.expected_K_params = 0
+        self.conv_stack = torch.nn.Sequential()
+        self.conv_stack.add_module('conv_in', torch.nn.Conv2d(self.channels, self.channels, kernel_size=(3, 3), padding=1))
+        self.expected_K_params += 4
+        self.conv_stack.add_module('conv_dw', torch.nn.Conv2d(self.channels, self.channels, kernel_size=(3, 3), padding=1, groups=self.channels))
+        self.expected_C_params += 1
+        self.expected_K_params += 2
+        self.conv_stack.add_module('conv_0', torch.nn.Conv2d(self.channels, self.channels, kernel_size=(3, 3), padding=1, groups=1))
+        self.expected_C_params += 1
+        self.conv_stack.add_module('conv_gr2', torch.nn.Conv2d(self.channels, self.channels, kernel_size=(3, 3), padding=1, groups=2))
+        self.conv_stack.add_module('conv_1', torch.nn.Conv2d(self.channels, self.channels, kernel_size=(3, 3), padding=1))
+        self.conv_stack.add_module('conv_gr64', torch.nn.Conv2d(self.channels, self.channels, kernel_size=(3, 3), padding=1, groups=self.channels // 2))
+
+    def forward(self, input: 'torch.Tensor'):
+        return self.conv_stack(input)
+
+
+class simple_forks_joins(torch.nn.Module):
+    """Some simple residual connections to test collecting parameters into a single group.  Four sections: input, blocka + residual, blockb + blockc, output"""
+
+    def __init__(self):
+        super().__init__()
+        self.channels = 64
+        self.input_shape = [4, self.channels, 7, 7]
+        self.expected_C_params = 0
+        self.expected_K_params = 0
+        self.input_convs = torch.nn.Sequential()
+        self.expected_K_params += 2
+        self.input_convs.add_module('conv_in0', torch.nn.Conv2d(self.channels, self.channels, kernel_size=(3, 3), padding=1))
+        self.expected_C_params += 1
+        self.expected_K_params += 2
+        self.input_convs.add_module('conv_in1', torch.nn.Conv2d(self.channels, self.channels, kernel_size=(3, 3), padding=1))
+        self.expected_K_params += 2
+        self.input_convs.add_module('bn_in1', torch.nn.BatchNorm2d(self.channels, track_running_stats=False))
+        self.block_a = torch.nn.Sequential()
+        self.expected_C_params += 2
+        self.expected_K_params += 4
+        self.block_a.add_module('conv_a0', torch.nn.Conv2d(self.channels, self.channels // 2, kernel_size=(3, 3), padding=1))
+        self.block_a.add_module('conv_a1', torch.nn.Conv2d(self.channels // 2, self.channels, kernel_size=(3, 3), padding=1))
+        self.block_b = torch.nn.Sequential()
+        self.expected_C_params += 2
+        self.expected_K_params += 4
+        self.block_b.add_module('conv_b0', torch.nn.Conv2d(self.channels, self.channels // 2, kernel_size=(3, 3), padding=1))
+        self.block_b.add_module('conv_b1', torch.nn.Conv2d(self.channels // 2, self.channels, kernel_size=(3, 3), padding=1))
+        self.block_c = torch.nn.Sequential()
+        self.expected_C_params += 2
+        self.expected_K_params += 4
+        self.block_c.add_module('conv_c0', torch.nn.Conv2d(self.channels, self.channels // 2, kernel_size=(3, 3), padding=1))
+        self.block_c.add_module('conv_c1', torch.nn.Conv2d(self.channels // 2, self.channels, kernel_size=(3, 3), padding=1))
+        self.output_conv = torch.nn.Sequential()
+        self.expected_C_params += 1
+        self.output_conv.add_module('conv_out', torch.nn.Conv2d(self.channels, 8, kernel_size=(3, 3), padding=1))
+
+    def forward(self, input: 'torch.Tensor'):
+        step0 = self.input_convs(input)
+        step1 = step0 + self.block_a(step0)
+        step2 = self.block_b(step1) + self.block_c(step1)
+        return self.output_conv(step2)
+
+
+class different_grouped_convs(torch.nn.Module):
+    """Convolutions with different group sizes need to use the GCD of the input channel counts if siblings"""
+
+    def __init__(self):
+        super().__init__()
+        self.channels = 16
+        self.input_shape = [4, self.channels, 7, 7]
+        self.expected_C_params = 0
+        self.expected_K_params = 0
+        self.input_conv = torch.nn.Sequential()
+        self.expected_K_params += 2
+        self.input_conv.add_module('input_conv', torch.nn.Conv2d(self.channels, 128, kernel_size=(3, 3), padding=1))
+        self.expected_C_params += 4
+        self.block_a = torch.nn.Sequential()
+        self.block_a.add_module('conv_a', torch.nn.Conv2d(128, 128, kernel_size=(3, 3), padding=1))
+        self.block_b = torch.nn.Sequential()
+        self.block_b.add_module('conv_b', torch.nn.Conv2d(128, 128, kernel_size=(3, 3), padding=1, groups=2))
+        self.block_c = torch.nn.Sequential()
+        self.block_c.add_module('conv_c', torch.nn.Conv2d(128, 128, kernel_size=(3, 3), padding=1, groups=4))
+        self.block_d = torch.nn.Sequential()
+        self.block_d.add_module('conv_d', torch.nn.Conv2d(128, 128, kernel_size=(3, 3), padding=1, groups=8))
+        self.output_conv = torch.nn.Sequential()
+        self.output_conv.add_module('output_conv', torch.nn.Conv2d(128, 8, kernel_size=(3, 3), padding=1))
+
+    def forward(self, input: 'torch.Tensor'):
+        step0 = self.input_conv(input)
+        step1 = self.block_a(step0) + self.block_b(step0) + self.block_c(step0) + self.block_d(step0)
+        return self.output_conv(step1)
+
+
+class siblings_poison(torch.nn.Module):
+    """A single sibling that cannot permute along C poisons all other siblings in its group"""
+
+    def __init__(self):
+        super().__init__()
+        self.input_shape = [4, 16, 7, 7]
+        self.expected_C_params = 0
+        self.expected_K_params = 0
+        self.input_conv = torch.nn.Sequential()
+        self.input_conv.add_module('input_conv', torch.nn.Conv2d(self.input_shape[1], 128, kernel_size=(3, 3), padding=1))
+        self.expected_K_params += 4
+        self.block_a = torch.nn.Sequential()
+        self.block_a.add_module('conv_a', torch.nn.Conv2d(128, 128, kernel_size=(3, 3), padding=1))
+        self.block_a.add_module('flatten_a', torch.nn.Flatten(1))
+        self.block_a.add_module('linear_a', torch.nn.Linear(6272, 128))
+        self.block_b = torch.nn.Sequential()
+        self.block_b.add_module('flatten_b', torch.nn.Flatten(1))
+        self.block_b.add_module('linear_b', torch.nn.Linear(6272, 128))
+        self.output = torch.nn.Sequential()
+        self.expected_C_params += 1
+        self.output.add_module('output', torch.nn.Linear(128, 8))
+
+    def forward(self, input: 'torch.Tensor'):
+        step0 = self.input_conv(input)
+        step1 = self.block_a(step0) + self.block_b(step0)
+        return self.output(step1)
+
+
+class coparent_poison(torch.nn.Module):
+    """A single coparent that cannot permute along K poisons all other coparents in its group"""
+
+    def __init__(self):
+        super().__init__()
+        self.input_shape = [4, 16, 7, 7]
+        self.expected_C_params = 0
+        self.expected_K_params = 0
+        self.input_conv = torch.nn.Sequential()
+        self.expected_K_params += 2
+        self.input_conv.add_module('input_conv', torch.nn.Conv2d(self.input_shape[1], 128, kernel_size=(3, 3), padding=1))
+        self.expected_C_params += 3
+        self.expected_K_params += 2
+        self.block_a = torch.nn.Sequential()
+        self.block_a.add_module('conv_a', torch.nn.Conv2d(128, 128, kernel_size=(3, 3), padding=1))
+        self.block_b = torch.nn.Sequential()
+        self.block_b.add_module('conv_b0', torch.nn.Conv2d(128, 128, kernel_size=(3, 3), padding=1))
+        self.block_b.add_module('conv_b1', torch.nn.Conv2d(128, 128, kernel_size=(3, 3), padding=1, groups=4))
+        self.output = torch.nn.Sequential()
+        self.output.add_module('output', torch.nn.Conv2d(128, 8, kernel_size=(1, 1)))
+
+    def forward(self, input: 'torch.Tensor'):
+        step0 = self.input_conv(input)
+        step1 = self.block_a(step0) + self.block_b(step0)
+        return self.output(step1)
+
+
+class depthwise_child_is_sibling(torch.nn.Module):
+    """The child of a depthwise convolution should act as a sibling"""
+
+    def __init__(self):
+        super().__init__()
+        self.input_shape = [4, 16, 7, 7]
+        self.expected_C_params = 0
+        self.expected_K_params = 0
+        self.input_conv = torch.nn.Sequential()
+        self.expected_K_params += 2
+        self.input_conv.add_module('input_conv', torch.nn.Conv2d(self.input_shape[1], 128, kernel_size=(3, 3), padding=1))
+        self.expected_C_params += 2
+        self.expected_K_params += 4 + 2
+        self.block_a = torch.nn.Sequential()
+        self.block_a.add_module('conv_a', torch.nn.Conv2d(128, 128, kernel_size=(3, 3), padding=1))
+        self.block_b = torch.nn.Sequential()
+        self.block_b.add_module('conv_b_dw', torch.nn.Conv2d(128, 128, kernel_size=(3, 3), padding=1, groups=128))
+        self.block_b.add_module('conv_b_1', torch.nn.Conv2d(128, 128, kernel_size=(3, 3), padding=1))
+        self.output_conv = torch.nn.Sequential()
+        self.expected_C_params += 1
+        self.output_conv.add_module('output_conv', torch.nn.Conv2d(128, 8, kernel_size=(1, 1)))
+
+    def forward(self, input: 'torch.Tensor'):
+        step0 = self.input_conv(input)
+        step1 = self.block_a(step0) + self.block_b(step0)
+        return self.output_conv(step1)
+
+
+class module_attribute(torch.nn.Module):
+    """Attributes of some module must be permuted if they feed some operation that is permuted"""
+
+    def __init__(self, complexity: 'int'=0):
+        super().__init__()
+        self.input_shape = [4, 16, 7, 7]
+        self.expected_C_params = 0
+        self.expected_K_params = 0
+        self.complexity = complexity
+        self.input_conv = torch.nn.Sequential()
+        self.expected_K_params += 3
+        self.input_offset = torch.nn.Parameter(torch.zeros(128, 7, 7))
+        torch.nn.init.normal_(self.input_offset.data, mean=0.0, std=2.0)
+        self.input_conv.add_module('conv_input', torch.nn.Conv2d(self.input_shape[1], 128, kernel_size=(3, 3), padding=1))
+        if complexity == 1:
+            self.expected_C_params += 2
+            self.expected_K_params += 4
+            self.stack_a = torch.nn.Sequential()
+            self.stack_a.add_module('conv_a', torch.nn.Conv2d(128, 128, kernel_size=(3, 3), padding=1))
+            self.stack_b = torch.nn.Sequential()
+            self.stack_b.add_module('conv_b', torch.nn.Conv2d(128, 128, kernel_size=(3, 3), padding=1))
+        self.output_conv = torch.nn.Sequential()
+        self.expected_C_params += 1
+        self.output_conv.add_module('conv_output', torch.nn.Conv2d(128, 8, kernel_size=(3, 3)))
+
+    def forward(self, input: 'torch.Tensor'):
+        batch_input_offset = self.input_offset.expand(input.shape[0], -1, -1, -1)
+        x = self.input_conv(input) + batch_input_offset
+        if self.complexity == 1:
+            x = self.stack_a(x) + batch_input_offset
+            x = self.stack_b(x) + batch_input_offset
+        return self.output_conv(x)
+
+
+class square_attribute(torch.nn.Module):
+    """Attributes with multiple dimensions matching the permutation length should only be permuted along the correct dimension"""
+
+    def __init__(self):
+        super().__init__()
+        self.input_shape = [4, 16, 16]
+        self.expected_C_params = 0
+        self.expected_K_params = 0
+        self.input_linear = torch.nn.Sequential()
+        self.input_linear.add_module('linear_input', torch.nn.Linear(self.input_shape[1], 16))
+        self.input_offset = torch.nn.Parameter(torch.zeros(16, 16))
+        torch.nn.init.normal_(self.input_offset.data, mean=0.0, std=2.0)
+        self.output_linear = torch.nn.Sequential()
+        self.output_linear.add_module('linear_output', torch.nn.Linear(16, 8))
+
+    def forward(self, input: 'torch.Tensor'):
+        batch_input_offset = self.input_offset.expand(input.shape[0], -1, -1)
+        x = self.input_linear(input) + torch.permute(batch_input_offset, (0, 2, 1))
+        return self.output_linear(x)
+
+
+class MHA_test(torch.nn.Module):
+    """MultiheadAttention modules are unique, we need to check permutations for input and ouput projections"""
+
+    def __init__(self, hidden_dim: 'int'=256, seq_len: 'int'=64, num_heads: 'int'=16):
+        super().__init__()
+        self.hidden_dim = hidden_dim
+        self.seq_len = seq_len
+        self.num_heads = num_heads
+        self.input_shape = [4, self.seq_len, self.hidden_dim]
+        self.expected_C_params = 1
+        self.expected_K_params = 2
+        self.MHA0 = torch.nn.MultiheadAttention(self.hidden_dim, self.num_heads, dropout=False, batch_first=True)
+        self.MHA1 = torch.nn.MultiheadAttention(self.hidden_dim, self.num_heads, dropout=False, batch_first=True)
+
+    def forward(self, input: 'torch.Tensor'):
+        step0, _ = self.MHA0(input, input, input)
+        step1, _ = self.MHA1(step0, step0, step0)
+        return step1
+
+
+class one_sparse_sibling(torch.nn.Module):
+    """If only one of two siblings is sparse, both need to be permuted"""
+
+    def __init__(self):
+        super().__init__()
+        self.input_shape = [4, 16, 7, 7]
+        self.expected_C_params = 0
+        self.expected_K_params = 0
+        self.in_conv = torch.nn.Sequential()
+        self.expected_K_params += 2
+        self.in_conv.add_module('conv_in', torch.nn.Conv2d(self.input_shape[1], 128, kernel_size=(3, 3), padding=1))
+        self.block_a = torch.nn.Sequential()
+        self.expected_C_params += 1
+        self.expected_K_params += 2
+        self.block_a.add_module('conv_a0', torch.nn.Conv2d(128, 3, kernel_size=(1, 1)))
+        self.block_a.add_module('conv_a1', torch.nn.Conv2d(3, 128, kernel_size=(3, 3), padding=1))
+        self.block_b = torch.nn.Sequential()
+        self.expected_C_params += 2
+        self.expected_K_params += 4
+        self.block_b.add_module('conv_b0', torch.nn.Conv2d(128, 128, kernel_size=(3, 3), padding=1))
+        self.block_b.add_module('conv_b1', torch.nn.Conv2d(128, 128, kernel_size=(1, 1)))
+        self.out_conv = torch.nn.Sequential()
+        self.expected_C_params += 1
+        self.out_conv.add_module('conv_out', torch.nn.Conv2d(128, 8, kernel_size=(1, 1)))
+
+    def forward(self, input: 'torch.Tensor'):
+        step0 = self.in_conv(input)
+        step1 = self.block_a(step0) + self.block_b(step0)
+        return self.out_conv(step1)
+
+
+class test_concat(torch.nn.Module):
+    """If concats are along the channel dimension (dim1 of NCHW), downstream layers can still be permuted despite C!=parentK"""
+
+    def __init__(self, ratio=1, dim=1, depth=1):
+        super().__init__()
+        assert dim == 1 or ratio == 1, "can't concat along dimensions other than K if K's don't match"
+        self.dim = dim
+        self.depth = depth
+        self.input_shape = [4, 16, 7, 7]
+        self.expected_C_params = 0
+        self.expected_K_params = 0
+        self.in_conv = torch.nn.Sequential()
+        self.expected_K_params += 2
+        self.in_conv.add_module('conv_in', torch.nn.Conv2d(self.input_shape[1], 64, kernel_size=(1, 1)))
+        self.left_paths = torch.nn.ModuleList([torch.nn.Conv2d(64, 64, kernel_size=(1, 1))])
+        self.expected_C_params += 1
+        self.expected_K_params += 2
+        in_C = 64
+        out_C = 64
+        for d in range(1, depth, 1):
+            self.expected_C_params += 1
+            self.expected_K_params += 2
+            if dim == 1:
+                out_C += 64
+            self.left_paths.append(torch.nn.Conv2d(in_C + 64, out_C, kernel_size=(1, 1)))
+            if dim == 1:
+                in_C += 64
+        self.right_path = torch.nn.Sequential()
+        self.expected_C_params += 1
+        self.expected_K_params += 2
+        self.right_path.add_module('conv_b', torch.nn.Conv2d(64, 64 * ratio, kernel_size=(1, 1)))
+        self.out_conv = torch.nn.Sequential()
+        self.expected_C_params += 1
+        if dim == 1:
+            out_C += 64 * ratio
+        self.out_conv.add_module('conv_out', torch.nn.Conv2d(out_C, 16, kernel_size=(1, 1)))
+
+    def forward(self, input: 'torch.Tensor'):
+        step0 = self.in_conv(input)
+        step1 = step0
+        for d, layer in enumerate(self.left_paths):
+            if d == 0:
+                step1 = layer(step1)
+            else:
+                step1 = layer(torch.cat([step1, step0], 1))
+        step2 = torch.cat([step1, self.right_path(step0)], self.dim)
+        return self.out_conv(step2)
+
+
+class test_flatten_op(torch.nn.Module):
+    """flatten ops may change the effective channel count, typically by collapsing N,C,H,W into N,C*H*W before a classifier"""
+
+    def __init__(self, change_dims=True):
+        super().__init__()
+        self.change_dims = change_dims
+        self.input_shape = [4, 16, 3, 3]
+        self.expected_C_params = 0
+        self.expected_K_params = 0
+        if not self.change_dims:
+            self.input_shape = [4, 16, 1, 1]
+            self.expected_C_params = 1
+            self.expected_K_params = 2
+        self.flattened_C = self.input_shape[2] * self.input_shape[3] * 64
+        self.in_conv = torch.nn.Conv2d(self.input_shape[1], 64, kernel_size=(1, 1))
+        self.out_gemm = torch.nn.Linear(self.flattened_C, 16)
+
+    def forward(self, input: 'torch.Tensor'):
+        step0 = self.in_conv(input)
+        step1 = torch.flatten(step0, start_dim=1)
+        return self.out_gemm(step1)
+
+
+class test_flatten_module(torch.nn.Module):
+    """flatten modules may change the effective channel count, typically by collapsing N,C,H,W into N,C*H*W before a classifier"""
+
+    def __init__(self, change_dims=True):
+        super().__init__()
+        self.change_dims = change_dims
+        self.input_shape = [4, 16, 3, 3]
+        self.expected_C_params = 0
+        self.expected_K_params = 0
+        if not self.change_dims:
+            self.input_shape = [4, 16, 1, 1]
+            self.expected_C_params = 1
+            self.expected_K_params = 2
+        self.flattened_C = self.input_shape[2] * self.input_shape[3] * 64
+        self.stack = torch.nn.Sequential()
+        self.stack.add_module('conv_in', torch.nn.Conv2d(self.input_shape[1], 64, kernel_size=(1, 1)))
+        self.stack.add_module('flatten', torch.nn.Flatten(1))
+        self.stack.add_module('gemm_out', torch.nn.Linear(self.flattened_C, 16))
+
+    def forward(self, input: 'torch.Tensor'):
+        return self.stack(input)
+
+
+class test_trace_failure(torch.nn.Module):
+    """make sure tracing failures are handled gracefully"""
+
+    def __init__(self):
+        super().__init__()
+        self.input_shape = [4, 16, 1, 1]
+        self.expected_C_params = 0
+        self.expected_K_params = 0
+        self.in_conv = torch.nn.Conv2d(self.input_shape[1], 64, kernel_size=(1, 1))
+        self.out_conv = torch.nn.Conv2d(64, 16, kernel_size=(1, 1))
+
+    def forward(self, input: 'torch.Tensor'):
+        step0 = self.in_conv(input)
+        channels = step0.size(1)
+        channel_offset = torch.arange(channels, dtype=torch.long, device=step0.device)
+        channel_offset = channel_offset.unsqueeze(0).unsqueeze(2).unsqueeze(3).expand_as(step0)
+        step0.add_(channel_offset)
+        return self.out_conv(step0)
+
+
+class already_sparse(torch.nn.Module):
+    """if weights are already sparse, permutations should be skipped"""
+
+    def __init__(self):
+        super().__init__()
+        self.input_shape = [4, 16, 3, 3]
+        self.expected_C_params = 0
+        self.expected_K_params = 0
+        self.in_conv = torch.nn.Conv2d(self.input_shape[1], 64, kernel_size=(1, 1))
+        self.out_conv = torch.nn.Conv2d(64, 16, kernel_size=(1, 1))
+        out_weights = torch.ones_like(self.out_conv.weight)
+        out_weights[:, 0::2, ...] = 0
+        assert torch.sum(out_weights) == torch.numel(out_weights) / 2
+        self.out_conv.weight.data.copy_(out_weights)
+
+    def forward(self, input: 'torch.Tensor'):
+        step0 = self.in_conv(input)
+        return self.out_conv(step0)
+
+
 class BNModelRef(nn.Module):
 
     def __init__(self, num_features, num_layers=1000):
@@ -2475,6 +3161,39 @@ class BNModel(nn.Module):
 
     def forward(self, x):
         return self.fwd(x)
+
+
+class swa_avg_fn:
+    """Averaging function for EMA with configurable decay rate
+    (Supplementary '1.11.7 Evaluator setup')."""
+
+    def __init__(self, decay_rate: 'float') ->None:
+        self._decay_rate = decay_rate
+
+    def __call__(self, averaged_model_parameter: 'torch.Tensor', model_parameter: 'torch.Tensor', num_averaged: 'torch.Tensor') ->torch.Tensor:
+        return averaged_model_parameter + (model_parameter - averaged_model_parameter) * (1.0 - self._decay_rate)
+
+
+class AlphaFoldSWA(nn.Module):
+    """AlphaFold SWA (Stochastic Weight Averaging) module wrapper."""
+
+    def __init__(self, alphafold: 'nn.Module', enabled: 'bool', decay_rate: 'float') ->None:
+        super(AlphaFoldSWA, self).__init__()
+        if enabled:
+            self.averaged_model = torch.optim.swa_utils.AveragedModel(model=alphafold, avg_fn=swa_avg_fn(decay_rate=decay_rate))
+            self.enabled = True
+        else:
+            self.averaged_model = None
+            self.enabled = False
+
+    def update(self, alphafold: 'nn.Module') ->None:
+        if self.enabled:
+            self.averaged_model.update_parameters(model=alphafold)
+
+    def forward(self, batch):
+        if not self.enabled:
+            raise RuntimeError('AlphaFoldSWA is not enabled')
+        return self.averaged_model(batch)
 
 
 class SimpleModel(torch.nn.Module):
@@ -2721,6 +3440,15 @@ def convert_network(network, dtype):
     return network
 
 
+class DeprecatedFeatureWarning(FutureWarning):
+    pass
+
+
+def deprecated_warning(msg: 'str') ->None:
+    if not torch.distributed.is_available or not torch.distributed.is_initialized() or torch.distributed.is_initialized() and torch.distributed.get_rank() == 0:
+        warnings.warn(msg, DeprecatedFeatureWarning)
+
+
 class FP16Model(nn.Module):
     """
     Convert model to half precision in a batchnorm-safe way.
@@ -2754,7 +3482,7 @@ class DenseNoBiasFunc(torch.autograd.Function):
 
 def _dense_no_bias(input, weight):
     args = _cast_if_autocast_enabled(input, weight)
-    with torch.amp.autocast(enabled=False):
+    with torch.amp.autocast('cuda', enabled=False):
         return DenseNoBiasFunc.apply(*args)
 
 
@@ -2775,7 +3503,7 @@ class FusedDenseFunc(torch.autograd.Function):
 
 def _fused_dense(input, weight, bias):
     args = _cast_if_autocast_enabled(input, weight, bias)
-    with torch.amp.autocast(enabled=False):
+    with torch.amp.autocast('cuda', enabled=False):
         return FusedDenseFunc.apply(*args)
 
 
@@ -2785,9 +3513,9 @@ class FusedDense(nn.Module):
         super(FusedDense, self).__init__()
         self.in_features = in_features
         self.out_features = out_features
-        self.weight = nn.Parameter(torch.Tensor(out_features, in_features))
+        self.weight = nn.Parameter(torch.empty(out_features, in_features))
         if bias:
-            self.bias = nn.Parameter(torch.Tensor(out_features))
+            self.bias = nn.Parameter(torch.empty(out_features))
         else:
             self.register_parameter('bias', None)
 
@@ -2816,7 +3544,7 @@ class FusedDenseGeluDenseFunc(torch.autograd.Function):
 
 def _fused_dense_gelu_dense(input, weight1, bias1, weight2, bias2):
     args = _cast_if_autocast_enabled(input, weight1, bias1, weight2, bias2)
-    with torch.amp.autocast(enabled=False):
+    with torch.amp.autocast('cuda', enabled=False):
         return FusedDenseGeluDenseFunc.apply(*args)
 
 
@@ -2828,10 +3556,10 @@ class FusedDenseGeluDense(nn.Module):
         self.in_features = in_features
         self.intermediate_features = intermediate_features
         self.out_features = out_features
-        self.weight1 = nn.Parameter(torch.Tensor(intermediate_features, in_features))
-        self.bias1 = nn.Parameter(torch.Tensor(intermediate_features))
-        self.weight2 = nn.Parameter(torch.Tensor(out_features, intermediate_features))
-        self.bias2 = nn.Parameter(torch.Tensor(out_features))
+        self.weight1 = nn.Parameter(torch.empty(intermediate_features, in_features))
+        self.bias1 = nn.Parameter(torch.empty(intermediate_features))
+        self.weight2 = nn.Parameter(torch.empty(out_features, intermediate_features))
+        self.bias2 = nn.Parameter(torch.empty(out_features))
 
     def forward(self, input):
         return _fused_dense_gelu_dense(input, self.weight1, self.bias1, self.weight2, self.bias2)
@@ -2917,57 +3645,65 @@ class MLP(torch.nn.Module):
 class FusedRMSNormFunction(torch.autograd.Function):
 
     @staticmethod
-    def forward(ctx, input, normalized_shape, eps):
+    def forward(ctx, input, normalized_shape, eps, memory_efficient=False):
         global fused_layer_norm_cuda
         if fused_layer_norm_cuda is None:
             fused_layer_norm_cuda = importlib.import_module('fused_layer_norm_cuda')
         ctx.normalized_shape = normalized_shape
         ctx.eps = eps
+        ctx.memory_efficient = memory_efficient
         input_ = input.contiguous()
         output, invvar = fused_layer_norm_cuda.rms_forward(input_, ctx.normalized_shape, ctx.eps)
-        ctx.save_for_backward(input_, invvar)
+        if ctx.memory_efficient:
+            ctx.save_for_backward(output, invvar)
+        else:
+            ctx.save_for_backward(input_, invvar)
         return output
 
     @staticmethod
     def backward(ctx, grad_output):
-        input_, invvar = ctx.saved_tensors
+        input_or_output, invvar = ctx.saved_tensors
         grad_input = None
-        grad_input = fused_layer_norm_cuda.rms_backward(grad_output.contiguous(), invvar, input_, ctx.normalized_shape, ctx.eps)
-        return grad_input, None, None
+        grad_input = fused_layer_norm_cuda.rms_backward(grad_output.contiguous(), invvar, input_or_output, ctx.normalized_shape, ctx.eps, ctx.memory_efficient)
+        return grad_input, None, None, None
 
 
-def fused_rms_norm(input, normalized_shape, eps=1e-06):
-    args = _cast_if_autocast_enabled(input, normalized_shape, eps)
-    with torch.amp.autocast(enabled=False):
+def fused_rms_norm(input, normalized_shape, eps=1e-06, memory_efficient=False):
+    args = _cast_if_autocast_enabled(input, normalized_shape, eps, memory_efficient)
+    with torch.amp.autocast('cuda', enabled=False):
         return FusedRMSNormFunction.apply(*args)
 
 
 class FusedRMSNormAffineFunction(torch.autograd.Function):
 
     @staticmethod
-    def forward(ctx, input, weight, normalized_shape, eps):
+    def forward(ctx, input, weight, normalized_shape, eps, memory_efficient=False):
         global fused_layer_norm_cuda
         if fused_layer_norm_cuda is None:
             fused_layer_norm_cuda = importlib.import_module('fused_layer_norm_cuda')
         ctx.normalized_shape = normalized_shape
         ctx.eps = eps
+        ctx.memory_efficient = memory_efficient
         input_ = input.contiguous()
         weight_ = weight.contiguous()
         output, invvar = fused_layer_norm_cuda.rms_forward_affine(input_, ctx.normalized_shape, weight_, ctx.eps)
-        ctx.save_for_backward(input_, weight_, invvar)
+        if ctx.memory_efficient:
+            ctx.save_for_backward(output, weight_, invvar)
+        else:
+            ctx.save_for_backward(input_, weight_, invvar)
         return output
 
     @staticmethod
     def backward(ctx, grad_output):
-        input_, weight_, invvar = ctx.saved_tensors
+        input_or_output, weight_, invvar = ctx.saved_tensors
         grad_input = grad_weight = None
-        grad_input, grad_weight = fused_layer_norm_cuda.rms_backward_affine(grad_output.contiguous(), invvar, input_, ctx.normalized_shape, weight_, ctx.eps)
-        return grad_input, grad_weight, None, None
+        grad_input, grad_weight = fused_layer_norm_cuda.rms_backward_affine(grad_output.contiguous(), invvar, input_or_output, ctx.normalized_shape, weight_, ctx.eps, ctx.memory_efficient)
+        return grad_input, grad_weight, None, None, None
 
 
-def fused_rms_norm_affine(input, weight, normalized_shape, eps=1e-06):
-    args = _cast_if_autocast_enabled(input, weight, normalized_shape, eps)
-    with torch.amp.autocast(enabled=False):
+def fused_rms_norm_affine(input, weight, normalized_shape, eps=1e-06, memory_efficient=False):
+    args = _cast_if_autocast_enabled(input, weight, normalized_shape, eps, memory_efficient)
+    with torch.amp.autocast('cuda', enabled=False):
         return FusedRMSNormAffineFunction.apply(*args)
 
 
@@ -3042,7 +3778,7 @@ class FusedRMSNorm(torch.nn.Module):
     .. _`Root Mean Square Layer Normalization`: https://arxiv.org/pdf/1910.07467.pdf
     """
 
-    def __init__(self, normalized_shape, eps=1e-05, elementwise_affine=True):
+    def __init__(self, normalized_shape, eps=1e-05, elementwise_affine=True, memory_efficient=False):
         super().__init__()
         global fused_layer_norm_cuda
         fused_layer_norm_cuda = importlib.import_module('fused_layer_norm_cuda')
@@ -3051,8 +3787,9 @@ class FusedRMSNorm(torch.nn.Module):
         self.normalized_shape = torch.Size(normalized_shape)
         self.eps = eps
         self.elementwise_affine = elementwise_affine
+        self.memory_efficient = memory_efficient
         if self.elementwise_affine:
-            self.weight = Parameter(torch.Tensor(*normalized_shape))
+            self.weight = Parameter(torch.empty(*normalized_shape))
         else:
             self.register_parameter('weight', None)
         self.reset_parameters()
@@ -3062,12 +3799,12 @@ class FusedRMSNorm(torch.nn.Module):
             init.ones_(self.weight)
 
     def forward(self, input):
-        if not input.is_cuda:
+        if torch.jit.is_tracing() or torch.jit.is_scripting() or torch.compiler.is_compiling() or not input.is_cuda:
             return manual_rms_norm(input, self.normalized_shape, self.weight, self.eps)
         if self.elementwise_affine:
-            return fused_rms_norm_affine(input, self.weight, self.normalized_shape, self.eps)
+            return fused_rms_norm_affine(input, self.weight, self.normalized_shape, self.eps, self.memory_efficient)
         else:
-            return fused_rms_norm(input, self.normalized_shape, self.eps)
+            return fused_rms_norm(input, self.normalized_shape, self.eps, self.memory_efficient)
 
     def extra_repr(self):
         return '{normalized_shape}, eps={eps}, elementwise_affine={elementwise_affine}'.format(**self.__dict__)
@@ -3076,40 +3813,44 @@ class FusedRMSNorm(torch.nn.Module):
 class FusedRMSNormAffineMixedDtypesFunction(FusedRMSNormAffineFunction):
 
     @staticmethod
-    def forward(ctx, input, weight, normalized_shape, eps):
+    def forward(ctx, input, weight, normalized_shape, eps, memory_efficient=False):
         global fused_layer_norm_cuda
         if fused_layer_norm_cuda is None:
             fused_layer_norm_cuda = importlib.import_module('fused_layer_norm_cuda')
         ctx.normalized_shape = normalized_shape
         ctx.eps = eps
+        ctx.memory_efficient = memory_efficient
         input_ = input.contiguous()
         weight_ = weight.contiguous()
         output, invvar = fused_layer_norm_cuda.rms_forward_affine_mixed_dtypes(input_, ctx.normalized_shape, weight_, ctx.eps)
-        ctx.save_for_backward(input_, weight_, invvar)
+        if ctx.memory_efficient:
+            ctx.save_for_backward(output, weight_, invvar)
+        else:
+            ctx.save_for_backward(input_, weight_, invvar)
         return output
 
 
-def mixed_dtype_fused_rms_norm_affine(input, weight, normalized_shape, eps=1e-06):
-    args = _cast_if_autocast_enabled(input, weight, normalized_shape, eps)
-    with torch.amp.autocast(enabled=False):
+def mixed_dtype_fused_rms_norm_affine(input, weight, normalized_shape, eps=1e-06, memory_efficient=False):
+    args = _cast_if_autocast_enabled(input, weight, normalized_shape, eps, memory_efficient)
+    with torch.amp.autocast('cuda', enabled=False):
         return FusedRMSNormAffineMixedDtypesFunction.apply(*args)
 
 
 class MixedFusedRMSNorm(FusedRMSNorm):
 
-    def __init__(self, normalized_shape, eps=1e-05, **kwargs):
+    def __init__(self, normalized_shape, eps=1e-05, *, memory_efficient=False, **kwargs):
         if 'elementwise_affine' in kwargs:
             import warnings
             warnings.warn('MixedFusedRMSNorm does not support `elementwise_affine` argument')
             elementwise_affine = kwargs.pop('elementwise_affine')
             if not elementwise_affine:
                 raise RuntimeError('MixedFusedRMSNorm does not support `elementwise_affine = False`')
-        super().__init__(normalized_shape=normalized_shape, eps=eps, elementwise_affine=True)
+        super().__init__(normalized_shape=normalized_shape, eps=eps, elementwise_affine=True, memory_efficient=memory_efficient)
 
-    def forward(self, input: torch.Tensor):
-        if not input.is_cuda:
+    def forward(self, input: 'torch.Tensor'):
+        if torch.jit.is_tracing() or torch.jit.is_scripting() or not input.is_cuda:
             return manual_rms_norm(input, self.normalized_shape, self.weight, self.eps)
-        return mixed_dtype_fused_rms_norm_affine(input, self.weight, self.normalized_shape, self.eps)
+        return mixed_dtype_fused_rms_norm_affine(input, self.weight, self.normalized_shape, self.eps, self.memory_efficient)
 
 
 def import_flatten_impl():
@@ -3408,11 +4149,11 @@ class ScaledSoftmax(torch.autograd.Function):
 def scaled_masked_softmax(inputs, mask, scale):
     if mask is not None:
         args = _cast_if_autocast_enabled(inputs, mask, scale)
-        with torch.amp.autocast(enabled=False):
+        with torch.amp.autocast('cuda', enabled=False):
             return ScaledMaskedSoftmax.apply(*args)
     else:
         args = _cast_if_autocast_enabled(inputs, scale)
-        with torch.amp.autocast(enabled=False):
+        with torch.amp.autocast('cuda', enabled=False):
             return ScaledSoftmax.apply(*args)
 
 
@@ -3443,7 +4184,7 @@ def scaled_upper_triang_masked_softmax(inputs, _, scale):
     assert sq == sk, 'causal mask is only for self attention'
     inputs = inputs.view(-1, sq, sk)
     args = _cast_if_autocast_enabled(inputs, scale)
-    with torch.amp.autocast(enabled=False):
+    with torch.amp.autocast('cuda', enabled=False):
         probs = ScaledUpperTriangMaskedSoftmax.apply(*args)
     return probs.view(b, np, sq, sk)
 
@@ -3493,8 +4234,8 @@ class FusedScaleMaskSoftmax(torch.nn.Module):
 
     def is_kernel_available(self, mask, b, np, sq, sk):
         attn_batches = b * np
-        if self.scaled_masked_softmax_fusion and self.input_in_float16 and (self.attn_mask_type == AttnMaskType.causal or self.attn_mask_type == AttnMaskType.padding) and 16 < sk <= 4096 and sq % 4 == 0 and sk % 4 == 0 and attn_batches % 4 == 0:
-            if 0 <= sk <= 4096:
+        if self.scaled_masked_softmax_fusion and self.input_in_float16 and (self.attn_mask_type == AttnMaskType.causal or self.attn_mask_type == AttnMaskType.padding) and 16 < sk <= 16384 and sq % 4 == 0 and sk % 4 == 0 and attn_batches % 4 == 0:
+            if 0 <= sk <= 16384:
                 batch_per_block = self.get_batch_per_block(sq, sk, b, np)
                 if self.attn_mask_type == AttnMaskType.causal:
                     if attn_batches % batch_per_block == 0:
@@ -3544,7 +4285,7 @@ class GenericScaledMaskedSoftmax(torch.autograd.Function):
 
 def generic_scaled_masked_softmax(inputs, mask, scale):
     args = _cast_if_autocast_enabled(inputs, mask, scale)
-    with torch.amp.autocast(enabled=False):
+    with torch.amp.autocast('cuda', enabled=False):
         return GenericScaledMaskedSoftmax.apply(*args)
 
 
@@ -3592,13 +4333,13 @@ class VocabUtility:
     partition: Note that indices in [fist, last)"""
 
     @staticmethod
-    def vocab_range_from_per_partition_vocab_size(per_partition_vocab_size: int, rank, world_size: int) ->Sequence[int]:
+    def vocab_range_from_per_partition_vocab_size(per_partition_vocab_size: 'int', rank, world_size: 'int') ->Sequence[int]:
         index_f = rank * per_partition_vocab_size
         index_l = index_f + per_partition_vocab_size
         return index_f, index_l
 
     @staticmethod
-    def vocab_range_from_global_vocab_size(global_vocab_size: int, rank: int, world_size: int) ->Sequence[int]:
+    def vocab_range_from_global_vocab_size(global_vocab_size: 'int', rank: 'int', world_size: 'int') ->Sequence[int]:
         per_partition_vocab_size = divide(global_vocab_size, world_size)
         return VocabUtility.vocab_range_from_per_partition_vocab_size(per_partition_vocab_size, rank, world_size)
 
@@ -3631,7 +4372,7 @@ def get_tensor_model_parallel_world_size():
 _MODEL_PARALLEL_ATTRIBUTE_DEFAULTS = {'tensor_model_parallel': False, 'partition_dim': -1, 'partition_stride': 1}
 
 
-def set_tensor_model_parallel_attributes(tensor: torch.Tensor, is_parallel: bool, dim: int, stride: int) ->None:
+def set_tensor_model_parallel_attributes(tensor: 'torch.Tensor', is_parallel: 'bool', dim: 'int', stride: 'int') ->None:
     for attribute in _MODEL_PARALLEL_ATTRIBUTE_DEFAULTS:
         assert not hasattr(tensor, attribute)
     setattr(tensor, 'tensor_model_parallel', is_parallel)
@@ -3713,7 +4454,7 @@ def _initialize_affine_weight_gpu(weight, init_method, partition_dim, stride=1):
         init_method(weight)
 
 
-def _reduce(input_: torch.Tensor) ->torch.Tensor:
+def _reduce(input_: 'torch.Tensor') ->torch.Tensor:
     """All-reduce the input tensor across model parallel group."""
     if get_tensor_model_parallel_world_size() == 1:
         return input_
@@ -3737,7 +4478,7 @@ class _ReduceFromModelParallelRegion(torch.autograd.Function):
         return grad_output
 
 
-def reduce_from_tensor_model_parallel_region(input_: torch.Tensor) ->torch.Tensor:
+def reduce_from_tensor_model_parallel_region(input_: 'torch.Tensor') ->torch.Tensor:
     return _ReduceFromModelParallelRegion.apply(input_)
 
 
@@ -3752,7 +4493,7 @@ class VocabParallelEmbedding(torch.nn.Module):
         init_method: method to initialize weights.
     """
 
-    def __init__(self, num_embeddings: int, embedding_dim: int, init_method=init.xavier_normal_, *, params_dtype: torch.dtype=torch.float32, use_cpu_initialization: bool=False):
+    def __init__(self, num_embeddings: 'int', embedding_dim: 'int', init_method=init.xavier_normal_, *, params_dtype: torch.dtype=torch.float32, use_cpu_initialization: bool=False):
         super().__init__()
         self.num_embeddings = num_embeddings
         self.embedding_dim = embedding_dim
@@ -3805,11 +4546,11 @@ class _CopyToModelParallelRegion(torch.autograd.Function):
         return _reduce(grad_output)
 
 
-def copy_to_tensor_model_parallel_region(input_: torch.Tensor) ->torch.Tensor:
+def copy_to_tensor_model_parallel_region(input_: 'torch.Tensor') ->torch.Tensor:
     return _CopyToModelParallelRegion.apply(input_)
 
 
-def _gather_along_last_dim(input_: torch.Tensor) ->torch.Tensor:
+def _gather_along_last_dim(input_: 'torch.Tensor') ->torch.Tensor:
     """Gather tensors and concatenate along the last dimension."""
     world_size = get_tensor_model_parallel_world_size()
     if world_size == 1:
@@ -3823,7 +4564,7 @@ def _gather_along_last_dim(input_: torch.Tensor) ->torch.Tensor:
     return output
 
 
-def split_tensor_along_last_dim(tensor: torch.Tensor, num_partitions: int, contiguous_split_chunks: bool=False) ->List[torch.Tensor]:
+def split_tensor_along_last_dim(tensor: 'torch.Tensor', num_partitions: 'int', contiguous_split_chunks: 'bool'=False) ->List[torch.Tensor]:
     """Split a tensor along its last dimension.
     Arguments:
         tensor: input tensor.
@@ -3839,7 +4580,7 @@ def split_tensor_along_last_dim(tensor: torch.Tensor, num_partitions: int, conti
     return tensor_list
 
 
-def _split_along_last_dim(input_: torch.Tensor) ->torch.Tensor:
+def _split_along_last_dim(input_: 'torch.Tensor') ->torch.Tensor:
     """Split the tensor along its last dimension and keep the
     corresponding slice."""
     world_size = get_tensor_model_parallel_world_size()
@@ -3867,7 +4608,7 @@ class _GatherFromModelParallelRegion(torch.autograd.Function):
         return _split_along_last_dim(grad_output)
 
 
-def gather_from_tensor_model_parallel_region(input_: torch.Tensor) ->torch.Tensor:
+def gather_from_tensor_model_parallel_region(input_: 'torch.Tensor') ->torch.Tensor:
     return _GatherFromModelParallelRegion.apply(input_)
 
 
@@ -3875,13 +4616,14 @@ class LinearWithGradAccumulationAndAsyncCommunication(torch.autograd.Function):
     """Linear layer execution with asynchronous communication and gradient accumulation fusion in backprop."""
 
     @staticmethod
-    def forward(ctx, input: torch.Tensor, weight: torch.Tensor, bias: Optional[torch.Tensor], gradient_accumulation_fusion: bool, async_grad_allreduce: bool, sequence_parallel_enabled: bool, use_16bit_in_wgrad_accum_fusion: bool=False):
+    def forward(ctx, input: 'torch.Tensor', weight: 'torch.Tensor', bias: 'Optional[torch.Tensor]', gradient_accumulation_fusion: 'bool', async_grad_allreduce: 'bool', sequence_parallel_enabled: 'bool', use_16bit_in_wgrad_accum_fusion: 'Optional[bool]'=None):
         ctx.use_bias = bias is not None and weight.requires_grad
         ctx.gradient_accumulation_fusion = gradient_accumulation_fusion
         ctx.async_grad_allreduce = async_grad_allreduce
         ctx.sequence_parallel_enabled = sequence_parallel_enabled
-        ctx.use_16bit_in_wgrad_accum_fusion = use_16bit_in_wgrad_accum_fusion
         ctx.compute_weight_gradient = weight.requires_grad
+        if use_16bit_in_wgrad_accum_fusion is not None:
+            warnings.warn(f'Deprecated option `use_16bit_in_wgrad_accum_fusion` is set to {use_16bit_in_wgrad_accum_fusion}')
         if ctx.compute_weight_gradient:
             ctx.save_for_backward(input, weight)
         else:
@@ -3937,6 +4679,7 @@ class LinearWithGradAccumulationAndAsyncCommunication(torch.autograd.Function):
             if ctx.async_grad_allreduce:
                 handle.wait()
             return grad_input, None, None, None, None, None, None
+        grad_output = grad_output.contiguous()
         grad_output = grad_output.view(grad_output.shape[0] * grad_output.shape[1], grad_output.shape[2])
         total_input = total_input.view(total_input.shape[0] * total_input.shape[1], total_input.shape[2])
         if ctx.sequence_parallel_enabled:
@@ -3944,10 +4687,14 @@ class LinearWithGradAccumulationAndAsyncCommunication(torch.autograd.Function):
             sub_grad_input = torch.empty(input.shape, dtype=input.dtype, device=torch.cuda.current_device(), requires_grad=False)
             handle = torch.distributed.reduce_scatter_tensor(sub_grad_input, grad_input, group=get_tensor_model_parallel_group(), async_op=True)
         if ctx.gradient_accumulation_fusion:
-            if not ctx.use_16bit_in_wgrad_accum_fusion:
+            if not hasattr(weight, 'main_grad'):
+                raise RuntimeError('attempted to perform gradient accumulation fusion on param without setting main_grad')
+            if weight.main_grad.dtype == torch.float32:
                 fused_weight_gradient_mlp_cuda.wgrad_gemm_accum_fp32(total_input, grad_output, weight.main_grad)
-            else:
+            elif weight.main_grad.dtype in (torch.float16, torch.bfloat16):
                 fused_weight_gradient_mlp_cuda.wgrad_gemm_accum_fp16(total_input, grad_output, weight.main_grad)
+            else:
+                raise RuntimeError(f'unsupported dtype for main_grad ({weight.main_grad.dtype})')
             grad_weight = None
         else:
             grad_weight = grad_output.t().matmul(total_input)
@@ -3960,15 +4707,9 @@ class LinearWithGradAccumulationAndAsyncCommunication(torch.autograd.Function):
         return grad_input, grad_weight, grad_bias, None, None, None, None
 
 
-def linear_with_grad_accumulation_and_async_allreduce(input: torch.Tensor, weight: torch.Tensor, bias: Optional[torch.Tensor], gradient_accumulation_fusion: bool, async_grad_allreduce: bool, sequence_parallel_enabled: bool) ->torch.Tensor:
-    args = _cast_if_autocast_enabled(input, weight, bias, gradient_accumulation_fusion, async_grad_allreduce, sequence_parallel_enabled, False)
-    with torch.amp.autocast(enabled=False):
-        return LinearWithGradAccumulationAndAsyncCommunication.apply(*args)
-
-
-def linear_with_grad_accumulation_and_async_allreduce_in16bit(input: torch.Tensor, weight: torch.Tensor, bias: Optional[torch.Tensor], gradient_accumulation_fusion: bool, async_grad_allreduce: bool, sequence_parallel_enabled: bool) ->torch.Tensor:
-    args = _cast_if_autocast_enabled(input, weight, bias, gradient_accumulation_fusion, async_grad_allreduce, sequence_parallel_enabled, True)
-    with torch.amp.autocast(enabled=False):
+def linear_with_grad_accumulation_and_async_allreduce(input: 'torch.Tensor', weight: 'torch.Tensor', bias: 'Optional[torch.Tensor]', gradient_accumulation_fusion: 'bool', async_grad_allreduce: 'bool', sequence_parallel_enabled: 'bool') ->torch.Tensor:
+    args = _cast_if_autocast_enabled(input, weight, bias, gradient_accumulation_fusion, async_grad_allreduce, sequence_parallel_enabled)
+    with torch.amp.autocast('cuda', enabled=False):
         return LinearWithGradAccumulationAndAsyncCommunication.apply(*args)
 
 
@@ -4004,11 +4745,11 @@ class ColumnParallelLinear(torch.nn.Module):
         params_dtype:
         use_cpu_initialization:
         gradient_accumulation_fusion:
-        accumulation_in_fp16:
         sequence_parallel_enabled:
+        accumulation_in_fp16: Deprecated
     """
 
-    def __init__(self, input_size, output_size, bias=True, gather_output=True, init_method=init.xavier_normal_, stride=1, keep_master_weight_for_test=False, skip_bias_add=False, *, no_async_tensor_model_parallel_allreduce=False, params_dtype=torch.float32, use_cpu_initialization=False, gradient_accumulation_fusion=False, accumulation_in_fp16: bool=False, sequence_parallel_enabled: bool=False):
+    def __init__(self, input_size, output_size, bias=True, gather_output=True, init_method=init.xavier_normal_, stride=1, keep_master_weight_for_test=False, skip_bias_add=False, *, no_async_tensor_model_parallel_allreduce=False, params_dtype=torch.float32, use_cpu_initialization=False, gradient_accumulation_fusion=False, sequence_parallel_enabled: bool=False, accumulation_in_fp16: Optional[bool]=None):
         super().__init__()
         self.input_size = input_size
         self.output_size = output_size
@@ -4016,6 +4757,8 @@ class ColumnParallelLinear(torch.nn.Module):
         world_size = get_tensor_model_parallel_world_size()
         self.output_size_per_partition = divide(output_size, world_size)
         self.skip_bias_add = skip_bias_add
+        if accumulation_in_fp16 is not None:
+            warnings.warn(f'Deprecated option `accumulation_in_fp16` is set to {accumulation_in_fp16}')
         if use_cpu_initialization:
             self.weight = Parameter(torch.empty(self.output_size_per_partition, self.input_size, dtype=params_dtype))
             self.master_weight = _initialize_affine_weight_cpu(self.weight, self.output_size, self.input_size, self.output_size_per_partition, 0, init_method, stride=stride, return_master_weight=keep_master_weight_for_test, params_dtype=params_dtype)
@@ -4044,9 +4787,9 @@ class ColumnParallelLinear(torch.nn.Module):
         self.gradient_accumulation_fusion = gradient_accumulation_fusion
         if self.async_tensor_model_parallel_allreduce and self.sequence_parallel_enabled:
             raise RuntimeError('`async_tensor_model_parallel_allreduce` and `sequence_parallel_enabled` cannot be enabled at the same time.')
-        self._forward_impl = linear_with_grad_accumulation_and_async_allreduce_in16bit if accumulation_in_fp16 else linear_with_grad_accumulation_and_async_allreduce
+        self._forward_impl = linear_with_grad_accumulation_and_async_allreduce
 
-    def forward(self, input_: torch.Tensor) ->Tuple[torch.Tensor, Optional[torch.Tensor]]:
+    def forward(self, input_: 'torch.Tensor') ->Tuple[torch.Tensor, Optional[torch.Tensor]]:
         """Forward of ColumnParallelLinear
 
         Args:
@@ -4071,7 +4814,7 @@ class ColumnParallelLinear(torch.nn.Module):
         return output, output_bias
 
 
-def _gather_along_first_dim(input_: torch.Tensor) ->torch.Tensor:
+def _gather_along_first_dim(input_: 'torch.Tensor') ->torch.Tensor:
     """Gather tensors and concatenate along the first dimension."""
     world_size = get_tensor_model_parallel_world_size()
     if world_size == 1:
@@ -4083,7 +4826,7 @@ def _gather_along_first_dim(input_: torch.Tensor) ->torch.Tensor:
     return output
 
 
-def _reduce_scatter_along_first_dim(input_: torch.Tensor) ->torch.Tensor:
+def _reduce_scatter_along_first_dim(input_: 'torch.Tensor') ->torch.Tensor:
     """Reduce-scatter the input tensor across model parallel group."""
     world_size = get_tensor_model_parallel_world_size()
     if world_size == 1:
@@ -4112,7 +4855,7 @@ class _ReduceScatterToSequenceParallelRegion(torch.autograd.Function):
         return _gather_along_first_dim(grad_output)
 
 
-def reduce_scatter_to_sequence_parallel_region(input_: torch.Tensor) ->torch.Tensor:
+def reduce_scatter_to_sequence_parallel_region(input_: 'torch.Tensor') ->torch.Tensor:
     return _ReduceScatterToSequenceParallelRegion.apply(input_)
 
 
@@ -4132,7 +4875,7 @@ class _ScatterToModelParallelRegion(torch.autograd.Function):
         return _gather_along_last_dim(grad_output)
 
 
-def scatter_to_tensor_model_parallel_region(input_: torch.Tensor) ->torch.Tensor:
+def scatter_to_tensor_model_parallel_region(input_: 'torch.Tensor') ->torch.Tensor:
     return _ScatterToModelParallelRegion.apply(input_)
 
 
@@ -4173,11 +4916,11 @@ class RowParallelLinear(torch.nn.Module):
         params_dtype:
         use_cpu_initialization:
         gradient_accumulation_fusion:
-        accumulation_in_fp16:
         sequence_parallel_enabled:
+        accumulation_in_fp16: Deprecated
     """
 
-    def __init__(self, input_size, output_size, bias=True, input_is_parallel=False, init_method=init.xavier_normal_, stride=1, keep_master_weight_for_test=False, skip_bias_add=False, *, params_dtype=torch.float32, use_cpu_initialization=False, gradient_accumulation_fusion=False, accumulation_in_fp16: bool=False, sequence_parallel_enabled: bool=False):
+    def __init__(self, input_size, output_size, bias=True, input_is_parallel=False, init_method=init.xavier_normal_, stride=1, keep_master_weight_for_test=False, skip_bias_add=False, *, params_dtype=torch.float32, use_cpu_initialization=False, gradient_accumulation_fusion=False, sequence_parallel_enabled: bool=False, accumulation_in_fp16: Optional[bool]=None):
         super().__init__()
         self.input_size = input_size
         self.output_size = output_size
@@ -4189,6 +4932,8 @@ class RowParallelLinear(torch.nn.Module):
         self.sequence_parallel_enabled = sequence_parallel_enabled
         if self.sequence_parallel_enabled and not self.input_is_parallel:
             raise RuntimeError('To enable `sequence_parallel_enabled`, `input_is_parallel` must be `True`')
+        if accumulation_in_fp16 is not None:
+            warnings.warn(f'Deprecated option `accumulation_in_fp16` is set to {accumulation_in_fp16}')
         if use_cpu_initialization:
             self.weight = Parameter(torch.empty(self.output_size, self.input_size_per_partition, dtype=params_dtype))
             self.master_weight = _initialize_affine_weight_cpu(self.weight, self.output_size, self.input_size, self.input_size_per_partition, 1, init_method, stride=stride, return_master_weight=keep_master_weight_for_test, params_dtype=params_dtype)
@@ -4205,9 +4950,9 @@ class RowParallelLinear(torch.nn.Module):
             setattr(self.bias, 'sequence_parallel_enabled', sequence_parallel_enabled)
         else:
             self.register_parameter('bias', None)
-        self._forward_impl = linear_with_grad_accumulation_and_async_allreduce_in16bit if accumulation_in_fp16 else linear_with_grad_accumulation_and_async_allreduce
+        self._forward_impl = linear_with_grad_accumulation_and_async_allreduce
 
-    def forward(self, input_: torch.Tensor) ->Tuple[torch.Tensor, Optional[torch.Tensor]]:
+    def forward(self, input_: 'torch.Tensor') ->Tuple[torch.Tensor, Optional[torch.Tensor]]:
         """Forward of RowParallelLinear
 
         Args:
@@ -4238,7 +4983,7 @@ class RowParallelLinear(torch.nn.Module):
 
 class MyLayer(nn.Module):
 
-    def __init__(self, hidden_size: int, pre_process: bool, post_process: bool):
+    def __init__(self, hidden_size: 'int', pre_process: 'bool', post_process: 'bool'):
         super().__init__()
         self.pre_process = pre_process
         self.post_process = post_process
@@ -4265,7 +5010,7 @@ class MyModel(torch.nn.Module):
 
 class ToyParallelMLP(nn.Module):
 
-    def __init__(self, hidden_size: int, pre_process: bool=False, post_process: bool=False, *, sequence_parallel_enabled: bool=False, add_encoder: bool=False, add_decoder: bool=False) ->None:
+    def __init__(self, hidden_size: 'int', pre_process: 'bool'=False, post_process: 'bool'=False, *, sequence_parallel_enabled: bool=False, add_encoder: bool=False, add_decoder: bool=False) ->None:
         super().__init__()
         self.pre_process = pre_process
         self.post_process = post_process
@@ -4275,12 +5020,12 @@ class ToyParallelMLP(nn.Module):
         self.dense_4h_to_h = RowParallelLinear(ffn_hidden_size, hidden_size, input_is_parallel=True, skip_bias_add=False, bias=True, sequence_parallel_enabled=sequence_parallel_enabled)
         self.activation_func = torch.nn.GELU()
 
-    def set_input_tensor(self, input_tensor: Union[torch.Tensor, List[torch.Tensor]]) ->None:
+    def set_input_tensor(self, input_tensor: 'Union[torch.Tensor, List[torch.Tensor]]') ->None:
         if not isinstance(input_tensor, list):
             input_tensor = [input_tensor]
         self.input_tensor = input_tensor[0]
 
-    def forward(self, x: Optional[torch.Tensor]) ->torch.Tensor:
+    def forward(self, x: 'Optional[torch.Tensor]') ->torch.Tensor:
         """Forward of Simplified ParallelMLP.
 
         Args:
@@ -4327,7 +5072,7 @@ def get_args():
 class MegatronModule(torch.nn.Module):
     """Megatron specific extensions of torch Module with support for pipelining."""
 
-    def __init__(self, share_word_embeddings: bool=True) ->None:
+    def __init__(self, share_word_embeddings: 'bool'=True) ->None:
         super().__init__()
         self.share_word_embeddings = share_word_embeddings
 
@@ -4538,7 +5283,7 @@ class LayerType(enum.Enum):
     decoder = 2
 
 
-def bias_dropout_add(x: torch.Tensor, bias: torch.Tensor, residual: torch.Tensor, prob: float, training: bool) ->torch.Tensor:
+def bias_dropout_add(x: 'torch.Tensor', bias: 'torch.Tensor', residual: 'torch.Tensor', prob: 'float', training: 'bool') ->torch.Tensor:
     out = torch.nn.functional.dropout(x + bias, p=prob, training=training)
     out = residual + out
     return out
@@ -4818,7 +5563,7 @@ class Pooler(MegatronModule):
         return pooled
 
 
-def _split_along_first_dim(input_: torch.Tensor) ->torch.Tensor:
+def _split_along_first_dim(input_: 'torch.Tensor') ->torch.Tensor:
     """Split the tensor along its first dimension and keep the corresponding slice."""
     world_size = get_tensor_model_parallel_world_size()
     if world_size == 1:
@@ -4847,7 +5592,7 @@ class _ScatterToSequenceParallelRegion(torch.autograd.Function):
         return _gather_along_first_dim(grad_output)
 
 
-def scatter_to_sequence_parallel_region(input_: torch.Tensor) ->torch.Tensor:
+def scatter_to_sequence_parallel_region(input_: 'torch.Tensor') ->torch.Tensor:
     return _ScatterToSequenceParallelRegion.apply(input_)
 
 
@@ -5029,12 +5774,6 @@ class TransformerLanguageModel(MegatronModule):
             return decoder_output, encoder_output
 
 
-parser = argparse.ArgumentParser()
-
-
-opt = parser.parse_args()
-
-
 class Generator(nn.Module):
 
     def __init__(self, ngpu):
@@ -5160,74 +5899,73 @@ class Model(Module):
 
 import torch
 from torch.nn import MSELoss, ReLU
-from paritybench._paritybench_helpers import _mock_config, _mock_layer, _paritybench_base, _fails_compile
+from types import SimpleNamespace
 
 
 TESTCASES = [
-    # (nn.Module, init_args, forward_args, jit_compiles)
+    # (nn.Module, init_args, forward_args)
     (BNModelRef,
      lambda: ([], {'num_features': 4}),
-     lambda: ([torch.rand([4, 4, 4, 4])], {}),
-     True),
+     lambda: ([torch.rand([4, 4, 4, 4])], {})),
     (DummyNet,
      lambda: ([], {}),
-     lambda: ([torch.rand([4, 3, 64, 64])], {}),
-     True),
+     lambda: ([torch.rand([4, 3, 64, 64])], {})),
     (IdentityLayer,
      lambda: ([], {'size': 4}),
-     lambda: ([], {}),
-     True),
-    (Model,
-     lambda: ([], {}),
-     lambda: ([torch.rand([4, 4, 4, 16777216])], {}),
-     True),
+     lambda: ([], {})),
     (MyLayer,
      lambda: ([], {'hidden_size': 4, 'pre_process': 4, 'post_process': 4}),
-     lambda: ([torch.rand([4, 4, 4, 4])], {}),
-     True),
+     lambda: ([torch.rand([4, 4, 4, 4])], {})),
     (NoopTransformerLayer,
      lambda: ([], {'layer_number': 1}),
-     lambda: ([torch.rand([4, 4, 4, 4]), torch.rand([4, 4, 4, 4])], {}),
-     True),
+     lambda: ([torch.rand([4, 4, 4, 4]), torch.rand([4, 4, 4, 4])], {})),
     (SimpleModel,
      lambda: ([], {'num_layers': 1, 'size': 4}),
-     lambda: ([torch.rand([4, 4, 4, 4])], {}),
-     True),
+     lambda: ([torch.rand([4, 4, 4, 4])], {})),
+    (SyncBatchNorm,
+     lambda: ([], {'num_features': 4}),
+     lambda: ([torch.rand([4, 4, 4, 4])], {})),
+    (already_sparse,
+     lambda: ([], {}),
+     lambda: ([torch.rand([4, 16, 64, 64])], {})),
+    (conv_1d,
+     lambda: ([], {}),
+     lambda: ([torch.rand([4, 16, 64, 64])], {})),
+    (coparent_poison,
+     lambda: ([], {}),
+     lambda: ([torch.rand([4, 16, 64, 64])], {})),
+    (depthwise_child_is_sibling,
+     lambda: ([], {}),
+     lambda: ([torch.rand([4, 16, 64, 64])], {})),
+    (different_grouped_convs,
+     lambda: ([], {}),
+     lambda: ([torch.rand([4, 16, 64, 64])], {})),
+    (grouped_convs,
+     lambda: ([], {}),
+     lambda: ([torch.rand([4, 128, 64, 64])], {})),
     (mLSTMRNNCell,
      lambda: ([], {'input_size': 4, 'hidden_size': 4}),
-     lambda: ([torch.rand([4, 4])], {}),
-     False),
+     lambda: ([torch.rand([4, 4])], {})),
+    (module_attribute,
+     lambda: ([], {}),
+     lambda: ([torch.rand([4, 16, 7, 7])], {})),
+    (one_sparse_sibling,
+     lambda: ([], {}),
+     lambda: ([torch.rand([4, 16, 64, 64])], {})),
+    (simple_convs,
+     lambda: ([], {'num_convs': 4, 'channels': 4}),
+     lambda: ([torch.rand([4, 4, 4, 4])], {})),
+    (simple_forks_joins,
+     lambda: ([], {}),
+     lambda: ([torch.rand([4, 64, 64, 64])], {})),
+    (test_concat,
+     lambda: ([], {}),
+     lambda: ([torch.rand([4, 16, 64, 64])], {})),
+    (test_trace_failure,
+     lambda: ([], {}),
+     lambda: ([torch.rand([4, 16, 64, 64])], {})),
     (tofp16,
      lambda: ([], {}),
-     lambda: ([torch.rand([4, 4, 4, 4])], {}),
-     True),
+     lambda: ([torch.rand([4, 4, 4, 4])], {})),
 ]
-
-class Test_NVIDIA_apex(_paritybench_base):
-    def test_000(self):
-        self._check(*TESTCASES[0])
-
-    def test_001(self):
-        self._check(*TESTCASES[1])
-
-    def test_002(self):
-        self._check(*TESTCASES[2])
-
-    def test_003(self):
-        self._check(*TESTCASES[3])
-
-    def test_004(self):
-        self._check(*TESTCASES[4])
-
-    def test_005(self):
-        self._check(*TESTCASES[5])
-
-    def test_006(self):
-        self._check(*TESTCASES[6])
-
-    def test_007(self):
-        self._check(*TESTCASES[7])
-
-    def test_008(self):
-        self._check(*TESTCASES[8])
 

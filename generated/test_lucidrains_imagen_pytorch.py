@@ -16,21 +16,14 @@ utils = _module
 version = _module
 setup = _module
 
-from paritybench._paritybench_helpers import _mock_config, patch_functional
 from unittest.mock import mock_open, MagicMock
 from torch.autograd import Function
 from torch.nn import Module
 import abc, collections, copy, enum, functools, inspect, itertools, logging, math, matplotlib, numbers, numpy, pandas, queue, random, re, scipy, sklearn, string, tensorflow, time, torch, torchaudio, torchvision, types, typing, uuid, warnings
+import operator as op
+from dataclasses import dataclass
 import numpy as np
 from torch import Tensor
-patch_functional()
-open = mock_open()
-yaml = logging = sys = argparse = MagicMock()
-ArgumentParser = argparse.ArgumentParser
-_global_config = args = argv = cfg = config = params = _mock_config()
-argparse.ArgumentParser.return_value.parse_args.return_value = _global_config
-yaml.load.return_value = _global_config
-sys.argv = _global_config
 __version__ = '1.0.0'
 xrange = range
 wraps = functools.wraps
@@ -54,12 +47,6 @@ from torch.utils.data import DataLoader
 from torchvision import transforms as T
 
 
-from torchvision import utils
-
-
-import torch.nn.functional as F
-
-
 from torch.nn.utils.rnn import pad_sequence
 
 
@@ -78,10 +65,10 @@ from typing import Union
 from collections import namedtuple
 
 
-from torch import einsum
+import torch.nn.functional as F
 
 
-from torch.cuda.amp import autocast
+from torch.amp import autocast
 
 
 from torch.nn.parallel import DistributedDataParallel
@@ -93,16 +80,16 @@ import torchvision.transforms as T
 import math
 
 
-import copy
-
-
 from functools import wraps
+
+
+from torch import einsum
 
 
 from torch.special import expm1
 
 
-import time
+import functools
 
 
 from math import ceil
@@ -123,6 +110,9 @@ from torch.optim.lr_scheduler import CosineAnnealingLR
 from torch.optim.lr_scheduler import LambdaLR
 
 
+from torch.cuda.amp import autocast
+
+
 from torch.cuda.amp import GradScaler
 
 
@@ -135,12 +125,12 @@ from functools import reduce
 DEFAULT_T5_NAME = 'google/t5-v1_1-base'
 
 
-def log(t, eps: float=1e-12):
+def log(t, eps: 'float'=1e-12):
     return torch.log(t.clamp(min=eps))
 
 
 @torch.jit.script
-def alpha_cosine_log_snr(t, s: float=0.008):
+def alpha_cosine_log_snr(t, s: 'float'=0.008):
     return -log(torch.cos((t + s) / (1 + s) * math.pi * 0.5) ** -2 - 1, eps=1e-05)
 
 
@@ -366,9 +356,23 @@ class ChanLayerNorm(nn.Module):
         return (x - mean) * (var + eps).rsqrt() * self.g
 
 
-def ChanFeedForward(dim, mult=2):
+def Sequential(*modules):
+    return nn.Sequential(*filter(exists, modules))
+
+
+class TimeTokenShift(nn.Module):
+
+    def forward(self, x):
+        if x.ndim != 5:
+            return x
+        x, x_shift = x.chunk(2, dim=1)
+        x_shift = F.pad(x_shift, (0, 0, 0, 0, 1, -1), value=0.0)
+        return torch.cat((x, x_shift), dim=1)
+
+
+def ChanFeedForward(dim, mult=2, time_token_shift=True):
     hidden_dim = int(dim * mult)
-    return nn.Sequential(ChanLayerNorm(dim), Conv2d(dim, hidden_dim, 1, bias=False), nn.GELU(), ChanLayerNorm(hidden_dim), Conv2d(hidden_dim, dim, 1, bias=False))
+    return Sequential(ChanLayerNorm(dim), Conv2d(dim, hidden_dim, 1, bias=False), nn.GELU(), TimeTokenShift() if time_token_shift else None, ChanLayerNorm(hidden_dim), Conv2d(hidden_dim, dim, 1, bias=False))
 
 
 class LinearAttention(nn.Module):
@@ -390,11 +394,11 @@ class LinearAttention(nn.Module):
         h, x, y = self.heads, *fmap.shape[-2:]
         fmap = self.norm(fmap)
         q, k, v = map(lambda fn: fn(fmap), (self.to_q, self.to_k, self.to_v))
-        q, k, v = rearrange_many((q, k, v), 'b (h c) x y -> (b h) (x y) c', h=h)
+        q, k, v = map(lambda t: rearrange(t, 'b (h c) x y -> (b h) (x y) c', h=h), (q, k, v))
         if exists(context):
             assert exists(self.to_context)
             ck, cv = self.to_context(context).chunk(2, dim=-1)
-            ck, cv = rearrange_many((ck, cv), 'b n (h d) -> (b h) n d', h=h)
+            ck, cv = map(lambda t: rearrange(t, 'b n (h d) -> (b h) n d', h=h), (ck, cv))
             k = torch.cat((k, ck), dim=-2)
             v = torch.cat((v, cv), dim=-2)
         q = q.softmax(dim=-1)
@@ -409,11 +413,11 @@ class LinearAttention(nn.Module):
 
 class LinearAttentionTransformerBlock(nn.Module):
 
-    def __init__(self, dim, *, depth=1, heads=8, dim_head=32, ff_mult=2, context_dim=None, **kwargs):
+    def __init__(self, dim, *, depth=1, heads=8, dim_head=32, ff_mult=2, ff_time_token_shift=True, context_dim=None, **kwargs):
         super().__init__()
         self.layers = nn.ModuleList([])
         for _ in range(depth):
-            self.layers.append(nn.ModuleList([LinearAttention(dim=dim, heads=heads, dim_head=dim_head, context_dim=context_dim), ChanFeedForward(dim=dim, mult=ff_mult)]))
+            self.layers.append(nn.ModuleList([LinearAttention(dim=dim, heads=heads, dim_head=dim_head, context_dim=context_dim), ChanFeedForward(dim=dim, mult=ff_mult, time_token_shift=ff_time_token_shift)]))
 
     def forward(self, x, context=None):
         for attn, ff in self.layers:
@@ -460,17 +464,17 @@ def l2norm(t):
 
 class PerceiverAttention(nn.Module):
 
-    def __init__(self, *, dim, dim_head=64, heads=8, cosine_sim_attn=False):
+    def __init__(self, *, dim, dim_head=64, heads=8, scale=8):
         super().__init__()
-        self.scale = dim_head ** -0.5 if not cosine_sim_attn else 1
-        self.cosine_sim_attn = cosine_sim_attn
-        self.cosine_sim_scale = 16 if cosine_sim_attn else 1
+        self.scale = scale
         self.heads = heads
         inner_dim = dim_head * heads
         self.norm = nn.LayerNorm(dim)
         self.norm_latents = nn.LayerNorm(dim)
         self.to_q = nn.Linear(dim, inner_dim, bias=False)
         self.to_kv = nn.Linear(dim, inner_dim * 2, bias=False)
+        self.q_scale = nn.Parameter(torch.ones(dim_head))
+        self.k_scale = nn.Parameter(torch.ones(dim_head))
         self.to_out = nn.Sequential(nn.Linear(inner_dim, dim, bias=False), nn.LayerNorm(dim))
 
     def forward(self, x, latents, mask=None):
@@ -480,11 +484,11 @@ class PerceiverAttention(nn.Module):
         q = self.to_q(latents)
         kv_input = torch.cat((x, latents), dim=-2)
         k, v = self.to_kv(kv_input).chunk(2, dim=-1)
-        q, k, v = rearrange_many((q, k, v), 'b n (h d) -> b h n d', h=h)
-        q = q * self.scale
-        if self.cosine_sim_attn:
-            q, k = map(l2norm, (q, k))
-        sim = einsum('... i d, ... j d  -> ... i j', q, k) * self.cosine_sim_scale
+        q, k, v = map(lambda t: rearrange(t, 'b n (h d) -> b h n d', h=h), (q, k, v))
+        q, k = map(l2norm, (q, k))
+        q = q * self.q_scale
+        k = k * self.k_scale
+        sim = einsum('... i d, ... j d  -> ... i j', q, k) * self.scale
         if exists(mask):
             max_neg_value = -torch.finfo(sim.dtype).max
             mask = F.pad(mask, (0, latents.shape[-2]), value=True)
@@ -507,7 +511,7 @@ def masked_mean(t, *, dim, mask=None):
 
 class PerceiverResampler(nn.Module):
 
-    def __init__(self, *, dim, depth, dim_head=64, heads=8, num_latents=64, num_latents_mean_pooled=4, max_seq_len=512, ff_mult=4, cosine_sim_attn=False):
+    def __init__(self, *, dim, depth, dim_head=64, heads=8, num_latents=64, num_latents_mean_pooled=4, max_seq_len=512, ff_mult=4):
         super().__init__()
         self.pos_emb = nn.Embedding(max_seq_len, dim)
         self.latents = nn.Parameter(torch.randn(num_latents, dim))
@@ -516,7 +520,7 @@ class PerceiverResampler(nn.Module):
             self.to_latents_from_mean_pooled_seq = nn.Sequential(LayerNorm(dim), nn.Linear(dim, dim * num_latents_mean_pooled), Rearrange('b (n d) -> b n d', n=num_latents_mean_pooled))
         self.layers = nn.ModuleList([])
         for _ in range(depth):
-            self.layers.append(nn.ModuleList([PerceiverAttention(dim=dim, dim_head=dim_head, heads=heads, cosine_sim_attn=cosine_sim_attn), FeedForward(dim=dim, mult=ff_mult)]))
+            self.layers.append(nn.ModuleList([PerceiverAttention(dim=dim, dim_head=dim_head, heads=heads), FeedForward(dim=dim, mult=ff_mult)]))
 
     def forward(self, x, mask=None):
         n, device = x.shape[1], x.device
@@ -568,6 +572,17 @@ class Always:
         return self.val
 
 
+class ChanRMSNorm(nn.Module):
+
+    def __init__(self, dim):
+        super().__init__()
+        self.scale = dim ** 0.5
+        self.gamma = nn.Parameter(torch.ones(dim, 1, 1, 1))
+
+    def forward(self, x):
+        return F.normalize(x, dim=1) * self.scale * self.gamma
+
+
 class Conv3d(nn.Module):
 
     def __init__(self, dim, dim_out=None, kernel_size=3, *, temporal_kernel_size=None, **kwargs):
@@ -602,14 +617,14 @@ class Conv3d(nn.Module):
 
 class Block(nn.Module):
 
-    def __init__(self, dim, dim_out, groups=8, norm=True):
+    def __init__(self, dim, dim_out, norm=True):
         super().__init__()
-        self.groupnorm = nn.GroupNorm(groups, dim) if norm else Identity()
+        self.norm = ChanRMSNorm(dim) if norm else Identity()
         self.activation = nn.SiLU()
         self.project = Conv3d(dim, dim_out, 3, padding=1)
 
     def forward(self, x, scale_shift=None, ignore_time=False):
-        x = self.groupnorm(x)
+        x = self.norm(x)
         if exists(scale_shift):
             scale, shift = scale_shift
             x = x * (scale + 1) + shift
@@ -619,11 +634,9 @@ class Block(nn.Module):
 
 class CrossAttention(nn.Module):
 
-    def __init__(self, dim, *, context_dim=None, dim_head=64, heads=8, norm_context=False, cosine_sim_attn=False):
+    def __init__(self, dim, *, context_dim=None, dim_head=64, heads=8, norm_context=False, scale=8):
         super().__init__()
-        self.scale = dim_head ** -0.5 if not cosine_sim_attn else 1.0
-        self.cosine_sim_attn = cosine_sim_attn
-        self.cosine_sim_scale = 16 if cosine_sim_attn else 1
+        self.scale = scale
         self.heads = heads
         inner_dim = dim_head * heads
         context_dim = default(context_dim, dim)
@@ -632,6 +645,8 @@ class CrossAttention(nn.Module):
         self.null_kv = nn.Parameter(torch.randn(2, dim_head))
         self.to_q = nn.Linear(dim, inner_dim, bias=False)
         self.to_kv = nn.Linear(context_dim, inner_dim * 2, bias=False)
+        self.q_scale = nn.Parameter(torch.ones(dim_head))
+        self.k_scale = nn.Parameter(torch.ones(dim_head))
         self.to_out = nn.Sequential(nn.Linear(inner_dim, dim, bias=False), LayerNorm(dim))
 
     def forward(self, x, context, mask=None):
@@ -639,14 +654,14 @@ class CrossAttention(nn.Module):
         x = self.norm(x)
         context = self.norm_context(context)
         q, k, v = self.to_q(x), *self.to_kv(context).chunk(2, dim=-1)
-        q, k, v = rearrange_many((q, k, v), 'b n (h d) -> b h n d', h=self.heads)
-        nk, nv = repeat_many(self.null_kv.unbind(dim=-2), 'd -> b h 1 d', h=self.heads, b=b)
+        q, k, v = map(lambda t: rearrange(t, 'b n (h d) -> b h n d', h=self.heads), (q, k, v))
+        nk, nv = map(lambda t: repeat(t, 'd -> b h 1 d', h=self.heads, b=b), self.null_kv.unbind(dim=-2))
         k = torch.cat((nk, k), dim=-2)
         v = torch.cat((nv, v), dim=-2)
-        q = q * self.scale
-        if self.cosine_sim_attn:
-            q, k = map(l2norm, (q, k))
-        sim = einsum('b h i d, b h j d -> b h i j', q, k) * self.cosine_sim_scale
+        q, k = map(l2norm, (q, k))
+        q = q * self.q_scale
+        k = k * self.k_scale
+        sim = einsum('b h i d, b h j d -> b h i j', q, k) * self.scale
         max_neg_value = -torch.finfo(sim.dtype).max
         if exists(mask):
             mask = F.pad(mask, (1, 0), value=True)
@@ -669,7 +684,7 @@ class GlobalContext(nn.Module):
 
     def forward(self, x):
         context = self.to_k(x)
-        x, context = rearrange_many((x, context), 'b n ... -> b n (...)')
+        x, context = map(lambda t: rearrange(t, 'b n ... -> b n (...)'), (x, context))
         out = einsum('b i n, b c n -> b c i', context.softmax(dim=-1), x)
         out = rearrange(out, '... -> ... 1 1')
         return self.net(out)
@@ -682,8 +697,8 @@ class LinearCrossAttention(CrossAttention):
         x = self.norm(x)
         context = self.norm_context(context)
         q, k, v = self.to_q(x), *self.to_kv(context).chunk(2, dim=-1)
-        q, k, v = rearrange_many((q, k, v), 'b n (h d) -> (b h) n d', h=self.heads)
-        nk, nv = repeat_many(self.null_kv.unbind(dim=-2), 'd -> (b h) 1 d', h=self.heads, b=b)
+        q, k, v = map(lambda t: rearrange(t, 'b n (h d) -> (b h) n d', h=self.heads), (q, k, v))
+        nk, nv = map(lambda t: repeat(t, 'd -> (b h) 1 d', h=self.heads, b=b), self.null_kv.unbind(dim=-2))
         k = torch.cat((nk, k), dim=-2)
         v = torch.cat((nv, v), dim=-2)
         max_neg_value = -torch.finfo(x.dtype).max
@@ -703,7 +718,7 @@ class LinearCrossAttention(CrossAttention):
 
 class ResnetBlock(nn.Module):
 
-    def __init__(self, dim, dim_out, *, cond_dim=None, time_cond_dim=None, groups=8, linear_attn=False, use_gca=False, squeeze_excite=False, **attn_kwargs):
+    def __init__(self, dim, dim_out, *, cond_dim=None, time_cond_dim=None, linear_attn=False, use_gca=False, squeeze_excite=False, **attn_kwargs):
         super().__init__()
         self.time_mlp = None
         if exists(time_cond_dim):
@@ -711,9 +726,9 @@ class ResnetBlock(nn.Module):
         self.cross_attn = None
         if exists(cond_dim):
             attn_klass = CrossAttention if not linear_attn else LinearCrossAttention
-            self.cross_attn = EinopsToAndFrom('b c f h w', 'b (f h w) c', attn_klass(dim=dim_out, context_dim=cond_dim, **attn_kwargs))
-        self.block1 = Block(dim, dim_out, groups=groups)
-        self.block2 = Block(dim_out, dim_out, groups=groups)
+            self.cross_attn = attn_klass(dim=dim_out, context_dim=cond_dim, **attn_kwargs)
+        self.block1 = Block(dim, dim_out)
+        self.block2 = Block(dim_out, dim_out)
         self.gca = GlobalContext(dim_in=dim_out, dim_out=dim_out) if use_gca else Always(1)
         self.res_conv = Conv2d(dim, dim_out, 1) if dim != dim_out else Identity()
 
@@ -726,20 +741,47 @@ class ResnetBlock(nn.Module):
         h = self.block1(x, ignore_time=ignore_time)
         if exists(self.cross_attn):
             assert exists(cond)
+            h = rearrange(h, 'b c ... -> b ... c')
+            h, ps = pack([h], 'b * c')
             h = self.cross_attn(h, context=cond) + h
+            h, = unpack(h, ps, 'b * c')
+            h = rearrange(h, 'b ... c -> b c ...')
         h = self.block2(h, scale_shift=scale_shift, ignore_time=ignore_time)
         h = h * self.gca(h)
         return h + self.res_conv(x)
 
 
+class DynamicPositionBias(nn.Module):
+
+    def __init__(self, dim, *, heads, depth):
+        super().__init__()
+        self.mlp = nn.ModuleList([])
+        self.mlp.append(nn.Sequential(nn.Linear(1, dim), LayerNorm(dim), nn.SiLU()))
+        for _ in range(max(depth - 1, 0)):
+            self.mlp.append(nn.Sequential(nn.Linear(dim, dim), LayerNorm(dim), nn.SiLU()))
+        self.mlp.append(nn.Linear(dim, heads))
+
+    def forward(self, n, device, dtype):
+        i = torch.arange(n, device=device)
+        j = torch.arange(n, device=device)
+        indices = rearrange(i, 'i -> i 1') - rearrange(j, 'j -> 1 j')
+        indices += n - 1
+        pos = torch.arange(-n + 1, n, device=device, dtype=dtype)
+        pos = rearrange(pos, '... -> ... 1')
+        for layer in self.mlp:
+            pos = layer(pos)
+        bias = pos[indices]
+        bias = rearrange(bias, 'i j h -> h i j')
+        return bias
+
+
 class Attention(nn.Module):
 
-    def __init__(self, dim, *, dim_head=64, heads=8, causal=False, context_dim=None, cosine_sim_attn=False):
+    def __init__(self, dim, *, dim_head=64, heads=8, causal=False, context_dim=None, rel_pos_bias=False, rel_pos_bias_mlp_depth=2, init_zero=False, scale=8):
         super().__init__()
-        self.scale = dim_head ** -0.5 if not cosine_sim_attn else 1.0
+        self.scale = scale
         self.causal = causal
-        self.cosine_sim_attn = cosine_sim_attn
-        self.cosine_sim_scale = 16 if cosine_sim_attn else 1
+        self.rel_pos_bias = DynamicPositionBias(dim=dim, heads=heads, depth=rel_pos_bias_mlp_depth) if rel_pos_bias else None
         self.heads = heads
         inner_dim = dim_head * heads
         self.norm = LayerNorm(dim)
@@ -747,16 +789,19 @@ class Attention(nn.Module):
         self.null_kv = nn.Parameter(torch.randn(2, dim_head))
         self.to_q = nn.Linear(dim, inner_dim, bias=False)
         self.to_kv = nn.Linear(dim, dim_head * 2, bias=False)
+        self.q_scale = nn.Parameter(torch.ones(dim_head))
+        self.k_scale = nn.Parameter(torch.ones(dim_head))
         self.to_context = nn.Sequential(nn.LayerNorm(context_dim), nn.Linear(context_dim, dim_head * 2)) if exists(context_dim) else None
         self.to_out = nn.Sequential(nn.Linear(inner_dim, dim, bias=False), LayerNorm(dim))
+        if init_zero:
+            nn.init.zeros_(self.to_out[-1].g)
 
     def forward(self, x, context=None, mask=None, attn_bias=None):
         b, n, device = *x.shape[:2], x.device
         x = self.norm(x)
         q, k, v = self.to_q(x), *self.to_kv(x).chunk(2, dim=-1)
         q = rearrange(q, 'b n (h d) -> b h n d', h=self.heads)
-        q = q * self.scale
-        nk, nv = repeat_many(self.null_kv.unbind(dim=-2), 'd -> b 1 d', b=b)
+        nk, nv = map(lambda t: repeat(t, 'd -> b 1 d', b=b), self.null_kv.unbind(dim=-2))
         k = torch.cat((nk, k), dim=-2)
         v = torch.cat((nv, v), dim=-2)
         if exists(context):
@@ -764,9 +809,12 @@ class Attention(nn.Module):
             ck, cv = self.to_context(context).chunk(2, dim=-1)
             k = torch.cat((ck, k), dim=-2)
             v = torch.cat((cv, v), dim=-2)
-        if self.cosine_sim_attn:
-            q, k = map(l2norm, (q, k))
-        sim = einsum('b h i d, b j d -> b h i j', q, k) * self.cosine_sim_scale
+        q, k = map(l2norm, (q, k))
+        q = q * self.q_scale
+        k = k * self.k_scale
+        sim = einsum('b h i d, b j d -> b h i j', q, k) * self.scale
+        if not exists(attn_bias) and exists(self.rel_pos_bias):
+            attn_bias = self.rel_pos_bias(n, device=device, dtype=q.dtype)
         if exists(attn_bias):
             null_attn_bias = repeat(self.null_attn_bias, 'h -> h n 1', n=n)
             attn_bias = torch.cat((null_attn_bias, attn_bias), dim=-1)
@@ -788,15 +836,19 @@ class Attention(nn.Module):
 
 class TransformerBlock(nn.Module):
 
-    def __init__(self, dim, *, depth=1, heads=8, dim_head=32, ff_mult=2, context_dim=None, cosine_sim_attn=False):
+    def __init__(self, dim, *, depth=1, heads=8, dim_head=32, ff_mult=2, ff_time_token_shift=True, context_dim=None):
         super().__init__()
         self.layers = nn.ModuleList([])
         for _ in range(depth):
-            self.layers.append(nn.ModuleList([EinopsToAndFrom('b c f h w', 'b (f h w) c', Attention(dim=dim, heads=heads, dim_head=dim_head, context_dim=context_dim, cosine_sim_attn=cosine_sim_attn)), ChanFeedForward(dim=dim, mult=ff_mult)]))
+            self.layers.append(nn.ModuleList([Attention(dim=dim, heads=heads, dim_head=dim_head, context_dim=context_dim), ChanFeedForward(dim=dim, mult=ff_mult, time_token_shift=ff_time_token_shift)]))
 
     def forward(self, x, context=None):
         for attn, ff in self.layers:
+            x = rearrange(x, 'b c ... -> b ... c')
+            x, ps = pack([x], 'b * c')
             x = attn(x, context=context) + x
+            x, = unpack(x, ps, 'b * c')
+            x = rearrange(x, 'b ... c -> b c ...')
             x = ff(x) + x
         return x
 
@@ -806,16 +858,16 @@ def Upsample(dim, dim_out=None):
     return nn.Sequential(nn.Upsample(scale_factor=2, mode='nearest'), Conv2d(dim, dim_out, 3, padding=1))
 
 
-def resize_video_to(video, target_image_size, clamp_range=None):
+def resize_video_to(video, target_image_size, target_frames=None, clamp_range=None, mode='nearest'):
     orig_video_size = video.shape[-1]
-    if orig_video_size == target_image_size:
-        return video
     frames = video.shape[2]
-    video = rearrange(video, 'b c f h w -> (b f) c h w')
-    out = F.interpolate(video, target_image_size, mode='nearest')
+    target_frames = default(target_frames, frames)
+    target_shape = target_frames, target_image_size, target_image_size
+    if tuple(video.shape[-3:]) == target_shape:
+        return video
+    out = F.interpolate(video, target_shape, mode=mode)
     if exists(clamp_range):
         out = out.clamp(*clamp_range)
-    out = rearrange(out, '(b f) c h w -> b c f h w', f=frames)
     return out
 
 
@@ -883,11 +935,31 @@ def prob_mask_like(shape, prob, device):
         return torch.zeros(shape, device=device).float().uniform_(0, 1) < prob
 
 
-def resize_image_to(image, target_image_size, clamp_range=None):
+def pack_one_with_inverse(x, pattern):
+    packed, packed_shape = pack([x], pattern)
+
+    def inverse(x, inverse_pattern=None):
+        inverse_pattern = default(inverse_pattern, pattern)
+        return unpack(x, packed_shape, inverse_pattern)[0]
+    return packed, inverse
+
+
+def project(x, y):
+    x, inverse = pack_one_with_inverse(x, 'b *')
+    y, _ = pack_one_with_inverse(y, 'b *')
+    dtype = x.dtype
+    x, y = x.double(), y.double()
+    unit = F.normalize(y, dim=-1)
+    parallel = (x * unit).sum(dim=-1, keepdim=True) * unit
+    orthogonal = x - parallel
+    return inverse(parallel), inverse(orthogonal)
+
+
+def resize_image_to(image, target_image_size, clamp_range=None, mode='nearest'):
     orig_image_size = image.shape[-1]
     if orig_image_size == target_image_size:
         return image
-    out = F.interpolate(image, target_image_size, mode='nearest')
+    out = F.interpolate(image, target_image_size, mode=mode)
     if exists(clamp_range):
         out = out.clamp(*clamp_range)
     return out
@@ -897,30 +969,6 @@ def zero_init_(m):
     nn.init.zeros_(m.weight)
     if exists(m.bias):
         nn.init.zeros_(m.bias)
-
-
-class DynamicPositionBias(nn.Module):
-
-    def __init__(self, dim, *, heads, depth):
-        super().__init__()
-        self.mlp = nn.ModuleList([])
-        self.mlp.append(nn.Sequential(nn.Linear(1, dim), LayerNorm(dim), nn.SiLU()))
-        for _ in range(max(depth - 1, 0)):
-            self.mlp.append(nn.Sequential(nn.Linear(dim, dim), LayerNorm(dim), nn.SiLU()))
-        self.mlp.append(nn.Linear(dim, heads))
-
-    def forward(self, n, device, dtype):
-        i = torch.arange(n, device=device)
-        j = torch.arange(n, device=device)
-        indices = rearrange(i, 'i -> i 1') - rearrange(j, 'j -> 1 j')
-        indices += n - 1
-        pos = torch.arange(-n + 1, n, device=device, dtype=dtype)
-        pos = rearrange(pos, '... -> ... 1')
-        for layer in self.mlp:
-            pos = layer(pos)
-        bias = pos[indices]
-        bias = rearrange(bias, 'i j h -> h i j')
-        return bias
 
 
 class Pad(nn.Module):
@@ -934,6 +982,21 @@ class Pad(nn.Module):
         return F.pad(x, self.padding, value=self.value)
 
 
+class RearrangeTimeCentric(nn.Module):
+
+    def __init__(self, fn):
+        super().__init__()
+        self.fn = fn
+
+    def forward(self, x):
+        x = rearrange(x, 'b c f ... -> b ... f c')
+        x, ps = pack([x], '* f c')
+        x = self.fn(x)
+        x, = unpack(x, ps, '* f c')
+        x = rearrange(x, 'b ... f c -> b c f ...')
+        return x
+
+
 class Residual(nn.Module):
 
     def __init__(self, fn):
@@ -944,10 +1007,60 @@ class Residual(nn.Module):
         return self.fn(x, **kwargs) + x
 
 
+def TemporalDownsample(dim, dim_out=None, stride=2):
+    dim_out = default(dim_out, dim)
+    return nn.Sequential(Rearrange('b c (f p) h w -> b (c p) f h w', p=stride), Conv2d(dim * stride, dim_out, 1))
+
+
+class TemporalPixelShuffleUpsample(nn.Module):
+
+    def __init__(self, dim, dim_out=None, stride=2):
+        super().__init__()
+        self.stride = stride
+        dim_out = default(dim_out, dim)
+        conv = nn.Conv1d(dim, dim_out * stride, 1)
+        self.net = nn.Sequential(conv, nn.SiLU())
+        self.pixel_shuffle = Rearrange('b (c r) n -> b c (n r)', r=stride)
+        self.init_conv_(conv)
+
+    def init_conv_(self, conv):
+        o, i, f = conv.weight.shape
+        conv_weight = torch.empty(o // self.stride, i, f)
+        nn.init.kaiming_uniform_(conv_weight)
+        conv_weight = repeat(conv_weight, 'o ... -> (o r) ...', r=self.stride)
+        conv.weight.data.copy_(conv_weight)
+        nn.init.zeros_(conv.bias.data)
+
+    def forward(self, x):
+        b, c, f, h, w = x.shape
+        x = rearrange(x, 'b c f h w -> (b h w) c f')
+        out = self.net(x)
+        out = self.pixel_shuffle(out)
+        return rearrange(out, '(b h w) c f -> b c f h w', h=h, w=w)
+
+
+def divisible_by(numer, denom):
+    return numer % denom == 0
+
+
+def calc_all_frame_dims(downsample_factors: 'List[int]', frames):
+    if not exists(frames):
+        return (tuple(),) * len(downsample_factors)
+    all_frame_dims = []
+    for divisor in downsample_factors:
+        assert divisible_by(frames, divisor)
+        all_frame_dims.append((frames // divisor,))
+    return all_frame_dims
+
+
 def cast_uint8_images_to_float(images):
     if not images.dtype == torch.uint8:
         return images
     return images / 255
+
+
+def compact(input_dict):
+    return {key: value for key, value in input_dict.items() if exists(value)}
 
 
 def eval_decorator(fn):
@@ -971,8 +1084,12 @@ def identity(t, *args, **kwargs):
     return t
 
 
-def is_float_dtype(dtype):
-    return any([(dtype == float_dtype) for float_dtype in (torch.float64, torch.float32, torch.float16, torch.bfloat16)])
+def maybe_transform_dict_key(input_dict, key, fn):
+    if key not in input_dict:
+        return input_dict
+    copied_dict = input_dict.copy()
+    copied_dict[key] = fn(copied_dict[key])
+    return copied_dict
 
 
 def module_device(module):
@@ -981,6 +1098,22 @@ def module_device(module):
 
 def normalize_neg_one_to_one(img):
     return img * 2 - 1
+
+
+def safe_get_tuple_index(tup, index, default=None):
+    if len(tup) <= index:
+        return default
+    return tup[index]
+
+
+def scale_video_time(video, downsample_scale=1, mode='nearest'):
+    if downsample_scale == 1:
+        return video
+    image_size, frames = video.shape[-1], video.shape[-3]
+    assert divisible_by(frames, downsample_scale), f'trying to temporally downsample a conditioning video frames of length {frames} by {downsample_scale}, however it is not neatly divisible'
+    target_frames = frames // downsample_scale
+    resized_video = resize_video_to(video, image_size, target_frames=target_frames, mode=mode)
+    return resized_video
 
 
 def get_model(name):
@@ -1020,7 +1153,7 @@ def t5_encode_tokenized_text(token_ids, attn_mask=None, pad_id=None, name=DEFAUL
     return encoded_text
 
 
-def t5_tokenize(texts: List[str], name=DEFAULT_T5_NAME):
+def t5_tokenize(texts: 'List[str]', name=DEFAULT_T5_NAME):
     t5, tokenizer = get_model_and_tokenizer(name)
     if torch.cuda.is_available():
         t5 = t5
@@ -1031,7 +1164,7 @@ def t5_tokenize(texts: List[str], name=DEFAULT_T5_NAME):
     return input_ids, attn_mask
 
 
-def t5_encode_text(texts: List[str], name=DEFAULT_T5_NAME, return_attn_mask=False):
+def t5_encode_text(texts: 'List[str]', name=DEFAULT_T5_NAME, return_attn_mask=False):
     token_ids, attn_mask = t5_tokenize(texts, name=name)
     encoded_text = t5_encode_tokenized_text(token_ids, attn_mask=attn_mask, name=name)
     if return_attn_mask:
@@ -1158,7 +1291,7 @@ def split_args_and_kwargs(*args, split_size=None, **kwargs):
     dict_keys = kwargs.keys()
     split_kwargs_index = len_all_args - dict_len
     split_all_args = [(split(arg, split_size=split_size) if exists(arg) and isinstance(arg, (torch.Tensor, Iterable)) else (arg,) * num_chunks) for arg in all_args]
-    chunk_sizes = tuple(map(len, split_all_args[0]))
+    chunk_sizes = num_to_groups(batch_size, split_size)
     for chunk_size, *chunked_all_args in tuple(zip(chunk_sizes, *split_all_args)):
         chunked_args, chunked_kwargs_values = chunked_all_args[:split_kwargs_index], chunked_all_args[split_kwargs_index:]
         chunked_kwargs = dict(tuple(zip(dict_keys, chunked_kwargs_values)))
@@ -1207,67 +1340,40 @@ def url_to_bucket(url):
 
 import torch
 from torch.nn import MSELoss, ReLU
-from paritybench._paritybench_helpers import _mock_config, _mock_layer, _paritybench_base, _fails_compile
+from types import SimpleNamespace
 
 
 TESTCASES = [
-    # (nn.Module, init_args, forward_args, jit_compiles)
+    # (nn.Module, init_args, forward_args)
     (ChanLayerNorm,
      lambda: ([], {'dim': 4}),
-     lambda: ([torch.rand([4, 4, 4, 4])], {}),
-     True),
+     lambda: ([torch.rand([4, 4, 4, 4])], {})),
+    (ChanRMSNorm,
+     lambda: ([], {'dim': 4}),
+     lambda: ([torch.rand([4, 4, 4, 4])], {})),
     (CrossEmbedLayer,
      lambda: ([], {'dim_in': 4, 'kernel_sizes': [4, 4]}),
-     lambda: ([torch.rand([4, 4, 4, 4])], {}),
-     False),
+     lambda: ([torch.rand([4, 4, 4, 4])], {})),
     (Identity,
      lambda: ([], {}),
-     lambda: ([torch.rand([4, 4, 4, 4])], {}),
-     False),
+     lambda: ([torch.rand([4, 4, 4, 4])], {})),
     (LayerNorm,
      lambda: ([], {'dim': 4}),
-     lambda: ([torch.rand([4, 4, 4, 4])], {}),
-     True),
+     lambda: ([torch.rand([4, 4, 4, 4])], {})),
     (NullUnet,
      lambda: ([], {}),
-     lambda: ([torch.rand([4, 4, 4, 4])], {}),
-     False),
+     lambda: ([torch.rand([4, 4, 4, 4])], {})),
     (Parallel,
      lambda: ([], {}),
-     lambda: ([torch.rand([4, 4, 4, 4])], {}),
-     False),
+     lambda: ([torch.rand([4, 4, 4, 4])], {})),
     (Residual,
-     lambda: ([], {'fn': _mock_layer()}),
-     lambda: ([torch.rand([4, 4, 4, 4])], {}),
-     False),
+     lambda: ([], {'fn': torch.nn.ReLU()}),
+     lambda: ([torch.rand([4, 4, 4, 4])], {})),
+    (TimeTokenShift,
+     lambda: ([], {}),
+     lambda: ([torch.rand([4, 4, 4, 4])], {})),
     (UpsampleCombiner,
      lambda: ([], {'dim': 4}),
-     lambda: ([torch.rand([4, 4, 4, 4])], {}),
-     False),
+     lambda: ([torch.rand([4, 4, 4, 4])], {})),
 ]
-
-class Test_lucidrains_imagen_pytorch(_paritybench_base):
-    def test_000(self):
-        self._check(*TESTCASES[0])
-
-    def test_001(self):
-        self._check(*TESTCASES[1])
-
-    def test_002(self):
-        self._check(*TESTCASES[2])
-
-    def test_003(self):
-        self._check(*TESTCASES[3])
-
-    def test_004(self):
-        self._check(*TESTCASES[4])
-
-    def test_005(self):
-        self._check(*TESTCASES[5])
-
-    def test_006(self):
-        self._check(*TESTCASES[6])
-
-    def test_007(self):
-        self._check(*TESTCASES[7])
 

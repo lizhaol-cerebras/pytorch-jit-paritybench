@@ -7,24 +7,19 @@ gaussian_diffusion = _module
 respace = _module
 timestep_sampler = _module
 download = _module
-main = _module
 models = _module
+sample = _module
+sample_ddp = _module
+train = _module
 
-from paritybench._paritybench_helpers import _mock_config, patch_functional
 from unittest.mock import mock_open, MagicMock
 from torch.autograd import Function
 from torch.nn import Module
 import abc, collections, copy, enum, functools, inspect, itertools, logging, math, matplotlib, numbers, numpy, pandas, queue, random, re, scipy, sklearn, string, tensorflow, time, torch, torchaudio, torchvision, types, typing, uuid, warnings
+import operator as op
+from dataclasses import dataclass
 import numpy as np
 from torch import Tensor
-patch_functional()
-open = mock_open()
-yaml = logging = sys = argparse = MagicMock()
-ArgumentParser = argparse.ArgumentParser
-_global_config = args = argv = cfg = config = params = _mock_config()
-argparse.ArgumentParser.return_value.parse_args.return_value = _global_config
-yaml.load.return_value = _global_config
-sys.argv = _global_config
 __version__ = '1.0.0'
 xrange = range
 wraps = functools.wraps
@@ -57,10 +52,37 @@ from torchvision.datasets.utils import download_url
 import torch
 
 
+import torch.nn as nn
+
+
 from torchvision.utils import save_image
 
 
-import torch.nn as nn
+from torch.nn.parallel import DistributedDataParallel as DDP
+
+
+from torch.utils.data import DataLoader
+
+
+from torch.utils.data.distributed import DistributedSampler
+
+
+from torchvision.datasets import ImageFolder
+
+
+from torchvision import transforms
+
+
+from collections import OrderedDict
+
+
+from copy import deepcopy
+
+
+from time import time
+
+
+import logging
 
 
 class TimestepEmbedder(nn.Module):
@@ -114,7 +136,7 @@ class LabelEmbedder(nn.Module):
         Drops labels to enable classifier-free guidance.
         """
         if force_drop_ids is None:
-            drop_ids = torch.rand(labels.shape[0]) < self.dropout_prob
+            drop_ids = torch.rand(labels.shape[0], device=labels.device) < self.dropout_prob
         else:
             drop_ids = force_drop_ids == 1
         labels = torch.where(drop_ids, self.num_classes, labels)
@@ -134,7 +156,7 @@ def modulate(x, shift, scale):
 
 class DiTBlock(nn.Module):
     """
-    A DiT block with gated adaptive layer norm (adaLN) conditioning.
+    A DiT block with adaptive layer norm zero (adaLN-Zero) conditioning.
     """
 
     def __init__(self, hidden_size, num_heads, mlp_ratio=4.0, **block_kwargs):
@@ -179,7 +201,7 @@ def get_1d_sincos_pos_embed_from_grid(embed_dim, pos):
     out: (M, D)
     """
     assert embed_dim % 2 == 0
-    omega = np.arange(embed_dim // 2, dtype=np.float)
+    omega = np.arange(embed_dim // 2, dtype=np.float64)
     omega /= embed_dim / 2.0
     omega = 1.0 / 10000 ** omega
     pos = pos.reshape(-1)
@@ -248,6 +270,7 @@ class DiT(nn.Module):
         self.pos_embed.data.copy_(torch.from_numpy(pos_embed).float().unsqueeze(0))
         w = self.x_embedder.proj.weight.data
         nn.init.xavier_uniform_(w.view([w.shape[0], -1]))
+        nn.init.constant_(self.x_embedder.proj.bias, 0)
         nn.init.normal_(self.y_embedder.embedding_table.weight, std=0.02)
         nn.init.normal_(self.t_embedder.mlp[0].weight, std=0.02)
         nn.init.normal_(self.t_embedder.mlp[2].weight, std=0.02)
@@ -306,18 +329,13 @@ class DiT(nn.Module):
 
 import torch
 from torch.nn import MSELoss, ReLU
-from paritybench._paritybench_helpers import _mock_config, _mock_layer, _paritybench_base, _fails_compile
+from types import SimpleNamespace
 
 
 TESTCASES = [
-    # (nn.Module, init_args, forward_args, jit_compiles)
+    # (nn.Module, init_args, forward_args)
     (FinalLayer,
      lambda: ([], {'hidden_size': 4, 'patch_size': 4, 'out_channels': 4}),
-     lambda: ([torch.rand([4, 4]), torch.rand([4, 4])], {}),
-     True),
+     lambda: ([torch.rand([4, 4]), torch.rand([4, 4])], {})),
 ]
-
-class Test_facebookresearch_DiT(_paritybench_base):
-    def test_000(self):
-        self._check(*TESTCASES[0])
 

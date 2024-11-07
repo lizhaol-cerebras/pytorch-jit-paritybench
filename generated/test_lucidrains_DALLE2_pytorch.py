@@ -21,21 +21,14 @@ setup = _module
 train_decoder = _module
 train_diffusion_prior = _module
 
-from paritybench._paritybench_helpers import _mock_config, patch_functional
 from unittest.mock import mock_open, MagicMock
 from torch.autograd import Function
 from torch.nn import Module
 import abc, collections, copy, enum, functools, inspect, itertools, logging, math, matplotlib, numbers, numpy, pandas, queue, random, re, scipy, sklearn, string, tensorflow, time, torch, torchaudio, torchvision, types, typing, uuid, warnings
+import operator as op
+from dataclasses import dataclass
 import numpy as np
 from torch import Tensor
-patch_functional()
-open = mock_open()
-yaml = logging = sys = argparse = MagicMock()
-ArgumentParser = argparse.ArgumentParser
-_global_config = args = argv = cfg = config = params = _mock_config()
-argparse.ArgumentParser.return_value.parse_args.return_value = _global_config
-yaml.load.return_value = _global_config
-sys.argv = _global_config
 __version__ = '1.0.0'
 xrange = range
 wraps = functools.wraps
@@ -591,6 +584,21 @@ class NoiseScheduler(nn.Module):
         return loss * extract(self.p2_loss_weight, times, loss.shape)
 
 
+class RearrangeToSequence(nn.Module):
+
+    def __init__(self, fn):
+        super().__init__()
+        self.fn = fn
+
+    def forward(self, x):
+        x = rearrange(x, 'b c ... -> b ... c')
+        x, ps = pack([x], 'b * c')
+        x = self.fn(x)
+        x, = unpack(x, ps, 'b * c')
+        x = rearrange(x, 'b ... c -> b c ...')
+        return x
+
+
 class LayerNorm(nn.Module):
 
     def __init__(self, dim, eps=1e-05, fp16_eps=0.001, stable=False):
@@ -703,7 +711,7 @@ class Attention(nn.Module):
         h = self.heads
         x = self.norm(x)
         q, k, v = self.to_qkv(x).chunk(3, dim=-1)
-        q, k, v = rearrange_many((q, k, v), 'b n (h d) -> b h n d', h=h)
+        q, k, v = map(lambda t: rearrange(t, 'b n (h d) -> b h n d', h=h), (q, k, v))
         q = q * self.scale
         sim = einsum('b h i d, b h j d -> b h i j', q, k)
         sim = sim - sim.amax(dim=-1, keepdim=True).detach()
@@ -830,7 +838,7 @@ class DiffusionPriorNetwork(nn.Module):
         time_embed = self.to_time_embeds(diffusion_timesteps)
         learned_queries = repeat(self.learned_query, 'd -> b 1 d', b=batch)
         if self.self_cond:
-            learned_queries = torch.cat((image_embed, self_cond), dim=-2)
+            learned_queries = torch.cat((self_cond, learned_queries), dim=-2)
         tokens = torch.cat((text_encodings, text_embed, time_embed, image_embed, learned_queries), dim=-2)
         tokens = self.causal_transformer(tokens)
         pred_image_embed = tokens[..., -1, :]
@@ -971,10 +979,7 @@ class DiffusionPrior(nn.Module):
                 x_start.clamp_(-1.0, 1.0)
             if self.predict_x_start and self.sampling_clamp_l2norm:
                 x_start = self.l2norm_clamp_embed(x_start)
-            if self.predict_x_start or self.predict_v:
-                pred_noise = self.noise_scheduler.predict_noise_from_start(image_embed, t=time_cond, x0=x_start)
-            else:
-                pred_noise = pred
+            pred_noise = self.noise_scheduler.predict_noise_from_start(image_embed, t=time_cond, x0=x_start)
             if time_next < 0:
                 image_embed = x_start
                 continue
@@ -1149,8 +1154,8 @@ class CrossAttention(nn.Module):
         x = self.norm(x)
         context = self.norm_context(context)
         q, k, v = self.to_q(x), *self.to_kv(context).chunk(2, dim=-1)
-        q, k, v = rearrange_many((q, k, v), 'b n (h d) -> b h n d', h=self.heads)
-        nk, nv = repeat_many(self.null_kv.unbind(dim=-2), 'd -> b h 1 d', h=self.heads, b=b)
+        q, k, v = map(lambda t: rearrange(t, 'b n (h d) -> b h n d', h=self.heads), (q, k, v))
+        nk, nv = map(lambda t: repeat(t, 'd -> b h 1 d', h=self.heads, b=b), self.null_kv.unbind(dim=-2))
         k = torch.cat((nk, k), dim=-2)
         v = torch.cat((nv, v), dim=-2)
         if self.cosine_sim:
@@ -1178,7 +1183,7 @@ class ResnetBlock(nn.Module):
             self.time_mlp = nn.Sequential(nn.SiLU(), nn.Linear(time_cond_dim, dim_out * 2))
         self.cross_attn = None
         if exists(cond_dim):
-            self.cross_attn = EinopsToAndFrom('b c h w', 'b (h w) c', CrossAttention(dim=dim_out, context_dim=cond_dim, cosine_sim=cosine_sim_cross_attn))
+            self.cross_attn = CrossAttention(dim=dim_out, context_dim=cond_dim, cosine_sim=cosine_sim_cross_attn)
         self.block1 = Block(dim, dim_out, groups=groups, weight_standardization=weight_standardization)
         self.block2 = Block(dim_out, dim_out, groups=groups, weight_standardization=weight_standardization)
         self.res_conv = nn.Conv2d(dim, dim_out, 1) if dim != dim_out else nn.Identity()
@@ -1192,7 +1197,11 @@ class ResnetBlock(nn.Module):
         h = self.block1(x, scale_shift=scale_shift)
         if exists(self.cross_attn):
             assert exists(cond)
+            h = rearrange(h, 'b c ... -> b ... c')
+            h, ps = pack([h], 'b * c')
             h = self.cross_attn(h, context=cond) + h
+            h, = unpack(h, ps, 'b * c')
+            h = rearrange(h, 'b ... c -> b c ...')
         h = self.block2(h)
         return h + self.res_conv(x)
 
@@ -1214,7 +1223,7 @@ class LinearAttention(nn.Module):
         seq_len = x * y
         fmap = self.norm(fmap)
         q, k, v = self.to_qkv(fmap).chunk(3, dim=1)
-        q, k, v = rearrange_many((q, k, v), 'b (h c) x y -> (b h) (x y) c', h=h)
+        q, k, v = map(lambda t: rearrange(t, 'b (h c) x y -> (b h) (x y) c', h=h), (q, k, v))
         q = q.softmax(dim=-1)
         k = k.softmax(dim=-2)
         q = q * self.scale
@@ -1361,7 +1370,7 @@ class Unet(nn.Module):
         self.skip_connect_scale = 1.0 if not scale_skip_connection else 2 ** -0.5
         attn_kwargs = dict(heads=attn_heads, dim_head=attn_dim_head, cosine_sim=cosine_sim_self_attn)
         self_attn = cast_tuple(self_attn, num_stages)
-        create_self_attn = lambda dim: EinopsToAndFrom('b c h w', 'b (h w) c', Residual(Attention(dim, **attn_kwargs)))
+        create_self_attn = lambda dim: RearrangeToSequence(Residual(Attention(dim, **attn_kwargs)))
         resnet_groups = cast_tuple(resnet_groups, num_stages)
         top_level_resnet_group = first(resnet_groups)
         num_resnet_blocks = cast_tuple(num_resnet_blocks, num_stages)
@@ -2731,67 +2740,34 @@ class VQGanVAETrainer(nn.Module):
 
 import torch
 from torch.nn import MSELoss, ReLU
-from paritybench._paritybench_helpers import _mock_config, _mock_layer, _paritybench_base, _fails_compile
+from types import SimpleNamespace
 
 
 TESTCASES = [
-    # (nn.Module, init_args, forward_args, jit_compiles)
+    # (nn.Module, init_args, forward_args)
     (ChanLayerNorm,
      lambda: ([], {'dim': 4}),
-     lambda: ([torch.rand([4, 4, 4, 4])], {}),
-     True),
+     lambda: ([torch.rand([4, 4, 4, 4])], {})),
     (CrossEmbedLayer,
      lambda: ([], {'dim_in': 4, 'kernel_sizes': [4, 4]}),
-     lambda: ([torch.rand([4, 4, 4, 4])], {}),
-     False),
+     lambda: ([torch.rand([4, 4, 4, 4])], {})),
     (LayerNorm,
      lambda: ([], {'dim': 4}),
-     lambda: ([torch.rand([4, 4, 4, 4])], {}),
-     True),
+     lambda: ([torch.rand([4, 4, 4, 4])], {})),
     (LayerNormChan,
      lambda: ([], {'dim': 4}),
-     lambda: ([torch.rand([4, 4, 4, 4])], {}),
-     True),
+     lambda: ([torch.rand([4, 4, 4, 4])], {})),
     (MLP,
      lambda: ([], {'dim_in': 4, 'dim_out': 4}),
-     lambda: ([torch.rand([4, 4, 4, 4])], {}),
-     True),
+     lambda: ([torch.rand([4, 4, 4, 4])], {})),
     (Residual,
-     lambda: ([], {'fn': _mock_layer()}),
-     lambda: ([torch.rand([4, 4, 4, 4])], {}),
-     False),
+     lambda: ([], {'fn': torch.nn.ReLU()}),
+     lambda: ([torch.rand([4, 4, 4, 4])], {})),
     (SwiGLU,
      lambda: ([], {}),
-     lambda: ([torch.rand([4, 4, 4, 4])], {}),
-     True),
+     lambda: ([torch.rand([4, 4, 4, 4])], {})),
     (UpsampleCombiner,
      lambda: ([], {'dim': 4}),
-     lambda: ([torch.rand([4, 4, 4, 4])], {}),
-     False),
+     lambda: ([torch.rand([4, 4, 4, 4])], {})),
 ]
-
-class Test_lucidrains_DALLE2_pytorch(_paritybench_base):
-    def test_000(self):
-        self._check(*TESTCASES[0])
-
-    def test_001(self):
-        self._check(*TESTCASES[1])
-
-    def test_002(self):
-        self._check(*TESTCASES[2])
-
-    def test_003(self):
-        self._check(*TESTCASES[3])
-
-    def test_004(self):
-        self._check(*TESTCASES[4])
-
-    def test_005(self):
-        self._check(*TESTCASES[5])
-
-    def test_006(self):
-        self._check(*TESTCASES[6])
-
-    def test_007(self):
-        self._check(*TESTCASES[7])
 

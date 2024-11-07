@@ -3,25 +3,53 @@ _module = sys.modules[__name__]
 del sys
 big_model_inference = _module
 measures_util = _module
+ddp = _module
+distrib_deepspeed = _module
+fp8_utils = _module
+non_distributed = _module
+ddp = _module
+distrib_deepspeed = _module
+fp8_utils = _module
+fsdp = _module
+non_distributed = _module
 automatic_gradient_accumulation = _module
 checkpointing = _module
 cross_validation = _module
+ddp_comm_hook = _module
 deepspeed_with_config_support = _module
+early_stopping = _module
 fsdp_with_peak_mem_tracking = _module
 gradient_accumulation = _module
+local_sgd = _module
 megatron_lm_gpt_pretraining = _module
 memory = _module
 multi_process_metrics = _module
+profiler = _module
+schedule_free = _module
 tracking = _module
 complete_cv_example = _module
 complete_nlp_example = _module
+run_me = _module
 cv_example = _module
+distributed_image_generation = _module
+distributed_speech_generation = _module
+florence2 = _module
+phi2 = _module
+stable_diffusion = _module
+bert = _module
+gpt2 = _module
+llama = _module
+t5 = _module
+multigpu_remote_launcher = _module
 nlp_example = _module
 stage_1 = _module
 stage_2 = _module
 stage_3 = _module
 stage_4 = _module
 stage_5 = _module
+stage_0 = _module
+stage_6 = _module
+stage_7 = _module
 setup = _module
 accelerate = _module
 accelerator = _module
@@ -37,6 +65,7 @@ default = _module
 sagemaker = _module
 update = _module
 env = _module
+estimate = _module
 launch = _module
 menu = _module
 cursor = _module
@@ -44,11 +73,15 @@ helpers = _module
 input = _module
 keymap = _module
 selection_menu = _module
+merge = _module
 test = _module
 tpu = _module
+utils = _module
 data_loader = _module
 hooks = _module
+inference = _module
 launchers = _module
+local_sgd = _module
 logging = _module
 memory_utils = _module
 optimizer = _module
@@ -59,21 +92,29 @@ examples = _module
 scripts = _module
 external_deps = _module
 test_checkpointing = _module
+test_ds_multiple_model = _module
 test_metrics = _module
 test_peak_memory_usage = _module
 test_performance = _module
+test_pippy = _module
+test_zero3_integration = _module
 test_cli = _module
+test_ddp_comm_hook = _module
 test_distributed_data_loop = _module
+test_merge_weights = _module
+test_notebook = _module
+test_ops = _module
 test_script = _module
 test_sync = _module
 testing = _module
 training = _module
 tracking = _module
-utils = _module
+bnb = _module
 constants = _module
 dataclasses = _module
 deepspeed = _module
 environment = _module
+fsdp_utils = _module
 imports = _module
 launch = _module
 megatron_lm = _module
@@ -86,8 +127,10 @@ random = _module
 rich = _module
 torch_xla = _module
 tqdm = _module
+transformer_engine = _module
 versions = _module
 test_deepspeed = _module
+test_deepspeed_multiple_model = _module
 test_fsdp = _module
 test_accelerator = _module
 test_big_modeling = _module
@@ -97,13 +140,15 @@ test_data_loader = _module
 test_examples = _module
 test_grad_sync = _module
 test_hooks = _module
+test_imports = _module
 test_kwargs_handlers = _module
+test_logging = _module
 test_memory_utils = _module
-test_metrics = _module
 test_modeling_utils = _module
 test_multigpu = _module
 test_offload = _module
 test_optimizer = _module
+test_quantization = _module
 test_sagemaker = _module
 test_scheduler = _module
 test_state_checkpointing = _module
@@ -113,23 +158,15 @@ test_utils = _module
 xla_spawn = _module
 log_reports = _module
 stale = _module
-style_doc = _module
 
-from paritybench._paritybench_helpers import _mock_config, patch_functional
 from unittest.mock import mock_open, MagicMock
 from torch.autograd import Function
 from torch.nn import Module
 import abc, collections, copy, enum, functools, inspect, itertools, logging, math, matplotlib, numbers, numpy, pandas, queue, random, re, scipy, sklearn, string, tensorflow, time, torch, torchaudio, torchvision, types, typing, uuid, warnings
+import operator as op
+from dataclasses import dataclass
 import numpy as np
 from torch import Tensor
-patch_functional()
-open = mock_open()
-yaml = logging = sys = argparse = MagicMock()
-ArgumentParser = argparse.ArgumentParser
-_global_config = args = argv = cfg = config = params = _mock_config()
-argparse.ArgumentParser.return_value.parse_args.return_value = _global_config
-yaml.load.return_value = _global_config
-sys.argv = _global_config
 __version__ = '1.0.0'
 xrange = range
 wraps = functools.wraps
@@ -139,6 +176,21 @@ import time
 
 
 import torch
+
+
+from torch.nn.parallel import DistributedDataParallel as DDP
+
+
+from functools import partial
+
+
+from torch.distributed.fsdp import FullyShardedDataParallel as FSDP
+
+
+from torch.distributed.fsdp import MixedPrecision
+
+
+from torch.distributed.fsdp.wrap import transformer_auto_wrap_policy
 
 
 from torch.optim import AdamW
@@ -168,6 +220,12 @@ import random
 from itertools import chain
 
 
+from torch.distributed.fsdp.fully_sharded_data_parallel import FullOptimStateDictConfig
+
+
+from torch.distributed.fsdp.fully_sharded_data_parallel import FullStateDictConfig
+
+
 import re
 
 
@@ -189,19 +247,46 @@ from torchvision.transforms import Resize
 from torchvision.transforms import ToTensor
 
 
-import warnings
-
-
-from functools import wraps
-
-
-from typing import Optional
+import queue
 
 
 from typing import Union
 
 
+import scipy.io.wavfile
+
+
+import functools
+
+
+import warnings
+
+
+from collections import OrderedDict
+
+
+from types import MethodType
+
+
+from typing import Any
+
+
+from typing import Callable
+
+
+import torch.utils.hooks as hooks
+
+
+from torch.distributed.algorithms.join import Join
+
+
+from functools import wraps
+
+
 from typing import Dict
+
+
+from typing import Optional
 
 
 import torch.nn as nn
@@ -216,10 +301,13 @@ from torch.utils.data import BatchSampler
 from torch.utils.data import IterableDataset
 
 
-import functools
+from torch.utils.data import RandomSampler
 
 
 from typing import Mapping
+
+
+from typing import Tuple
 
 
 import inspect
@@ -228,7 +316,22 @@ import inspect
 from copy import deepcopy
 
 
+import torch.distributed
+
+
 from torch.utils.data import TensorDataset
+
+
+from torch.utils.data import default_collate
+
+
+from torch.distributed.fsdp.fully_sharded_data_parallel import ShardingStrategy
+
+
+from torch.distributed.fsdp.fully_sharded_data_parallel import StateDictType
+
+
+from torch.distributed.elastic.multiprocessing.errors import ChildFailedError
 
 
 import torch.nn.functional as F
@@ -237,37 +340,25 @@ import torch.nn.functional as F
 from torch.optim.lr_scheduler import LambdaLR
 
 
-from functools import partial
-
-
-from abc import ABCMeta
-
-
-from abc import abstractmethod
-
-
-from abc import abstractproperty
-
-
-from typing import Any
-
-
 import copy
 
 
 import enum
 
 
-import typing
-
-
-from typing import Callable
-
-
 from typing import Iterable
 
 
+from typing import Literal
+
+
+from typing import get_args
+
+
 from functools import lru_cache
+
+
+from collections import defaultdict
 
 
 from abc import ABC
@@ -285,10 +376,7 @@ from torch.nn import MSELoss
 from torch.nn.parallel.distributed import DistributedDataParallel as torchDDP
 
 
-from collections import defaultdict
-
-
-from typing import Tuple
+from typing import Set
 
 
 from collections.abc import Mapping
@@ -297,19 +385,86 @@ from collections.abc import Mapping
 from functools import update_wrapper
 
 
-from torch.distributed import ReduceOp
+import collections
+
+
+from functools import reduce
+
+
+from typing import OrderedDict
 
 
 import itertools
 
 
+from torch.utils.data import SequentialSampler
+
+
+from torch.fx import symbolic_trace
+
+
 from torch import nn
+
+
+import uuid
 
 
 from collections import UserDict
 
 
 from collections import namedtuple
+
+
+from typing import NamedTuple
+
+
+class NoiseModel(torch.nn.Module):
+
+    def __init__(self, noise_factor=0.1):
+        super().__init__()
+        self.noise_factor = torch.nn.Parameter(torch.tensor(noise_factor, dtype=torch.float32))
+
+    def forward(self, loss):
+        return loss * self.noise_factor
+
+
+class MockModel(torch.nn.Module):
+
+    def __init__(self):
+        super().__init__()
+        torch.manual_seed(0)
+        self.p = torch.nn.Parameter(torch.randn(40, 20))
+
+    def forward(self, x, rank):
+        return self.p * x ** (1 + rank)
+
+
+class TinyModel(torch.nn.Module):
+
+    def __init__(self):
+        super().__init__()
+        self.linear1 = torch.nn.Linear(16, 16)
+        self.activation = torch.nn.ReLU()
+        self.linear2 = torch.nn.Linear(16, 16)
+        self.softmax = torch.nn.Softmax()
+
+    def forward(self, x):
+        return self.linear2(self.activation(self.linear1(x)))
+
+
+class RegressionModel4XPU(torch.nn.Module):
+
+    def __init__(self, a=0, b=0, double_output=False):
+        super().__init__()
+        self.a = torch.nn.Parameter(torch.tensor([2, 3]).float())
+        self.b = torch.nn.Parameter(torch.tensor([2, 3]).float())
+        self.first_batch = True
+
+    def forward(self, x=None):
+        if self.first_batch:
+            None
+            self.first_batch = False
+        return x * self.a[0] + self.b[0]
 
 
 class RegressionModel(torch.nn.Module):
@@ -334,64 +489,154 @@ class AbstractTrainStep(ABC):
         super().__init__()
         self.name = name
 
-    def get_batch_func(self):
+    def get_batch_func(self, accelerator, megatron_dataset_flag):
         pass
 
     def get_forward_step_func(self):
         pass
 
-    def get_loss_func(self):
+    def get_loss_func(self, accelerator):
         pass
+
+
+def is_namedtuple(data):
+    """
+    Checks if `data` is a `namedtuple` or not. Can have false positives, but only if a user is trying to mimic a
+    `namedtuple` perfectly.
+    """
+    return isinstance(data, tuple) and hasattr(data, '_asdict') and hasattr(data, '_fields')
 
 
 def honor_type(obj, generator):
     """
-    Cast a generator to the same type as obj (list, tuple or namedtuple)
+    Cast a generator to the same type as obj (list, tuple, or namedtuple)
     """
-    try:
-        return type(obj)(generator)
-    except TypeError:
+    if is_namedtuple(obj):
         return type(obj)(*list(generator))
+    else:
+        return type(obj)(generator)
+
+
+@lru_cache
+def is_npu_available(check_device=False):
+    """Checks if `torch_npu` is installed and potentially if a NPU is in the environment"""
+    if importlib.util.find_spec('torch_npu') is None:
+        return False
+    if check_device:
+        try:
+            _ = torch.npu.device_count()
+            return torch.npu.is_available()
+        except RuntimeError:
+            return False
+    return hasattr(torch, 'npu') and torch.npu.is_available()
 
 
 def is_torch_tensor(tensor):
     return isinstance(tensor, torch.Tensor)
 
 
-def recursively_apply(func, data, *args, test_type=is_torch_tensor, error_on_other_type=False, **kwargs):
+def is_ipex_available():
+    """Checks if ipex is installed."""
+
+    def get_major_and_minor_from_version(full_version):
+        return str(version.parse(full_version).major) + '.' + str(version.parse(full_version).minor)
+    _torch_version = importlib.metadata.version('torch')
+    if importlib.util.find_spec('intel_extension_for_pytorch') is None:
+        return False
+    _ipex_version = 'N/A'
+    try:
+        _ipex_version = importlib.metadata.version('intel_extension_for_pytorch')
+    except importlib.metadata.PackageNotFoundError:
+        return False
+    torch_major_and_minor = get_major_and_minor_from_version(_torch_version)
+    ipex_major_and_minor = get_major_and_minor_from_version(_ipex_version)
+    if torch_major_and_minor != ipex_major_and_minor:
+        warnings.warn(f'Intel Extension for PyTorch {ipex_major_and_minor} needs to work with PyTorch {ipex_major_and_minor}.*, but PyTorch {_torch_version} is found. Please switch to the matching version and run again.')
+        return False
+    return True
+
+
+STR_OPERATION_TO_FUNC = {'>': op.gt, '>=': op.ge, '==': op.eq, '!=': op.ne, '<=': op.le, '<': op.lt}
+
+
+def compare_versions(library_or_version: 'Union[str, Version]', operation: 'str', requirement_version: 'str'):
     """
-    Recursively apply a function on a data structure that is a nested list/tuple/dictionary of a given base type.
+    Compares a library version to some requirement using a given operation.
 
     Args:
-        func (`callable`):
-            The function to recursively apply.
-        data (nested list/tuple/dictionary of `main_type`):
-            The data on which to apply `func`
-        *args:
-            Positional arguments that will be passed to `func` when applied on the unpacked data.
-        main_type (`type`, *optional*, defaults to `torch.Tensor`):
-            The base type of the objects to which apply `func`.
-        error_on_other_type (`bool`, *optional*, defaults to `False`):
-            Whether to return an error or not if after unpacking `data`, we get on an object that is not of type
-            `main_type`. If `False`, the function will leave objects of types different than `main_type` unchanged.
-        **kwargs:
-            Keyword arguments that will be passed to `func` when applied on the unpacked data.
-
-    Returns:
-        The same data structure as `data` with `func` applied to every object of type `main_type`.
+        library_or_version (`str` or `packaging.version.Version`):
+            A library name or a version to check.
+        operation (`str`):
+            A string representation of an operator, such as `">"` or `"<="`.
+        requirement_version (`str`):
+            The version to compare the library version against
     """
-    if isinstance(data, (tuple, list)):
-        return honor_type(data, (recursively_apply(func, o, *args, test_type=test_type, error_on_other_type=error_on_other_type, **kwargs) for o in data))
-    elif isinstance(data, Mapping):
-        return type(data)({k: recursively_apply(func, v, *args, test_type=test_type, error_on_other_type=error_on_other_type, **kwargs) for k, v in data.items()})
-    elif test_type(data):
-        return func(data, *args, **kwargs)
-    elif error_on_other_type:
-        raise TypeError(f"Can't apply {func.__name__} on object of type {type(data)}, only of nested list/tuple/dicts of objects that satisfy {test_type.__name__}.")
-    return data
+    if operation not in STR_OPERATION_TO_FUNC.keys():
+        raise ValueError(f'`operation` must be one of {list(STR_OPERATION_TO_FUNC.keys())}, received {operation}')
+    operation = STR_OPERATION_TO_FUNC[operation]
+    if isinstance(library_or_version, str):
+        library_or_version = parse(importlib.metadata.version(library_or_version))
+    return operation(library_or_version, parse(requirement_version))
 
 
-def send_to_device(tensor, device, non_blocking=False):
+def is_torch_version(operation: 'str', version: 'str'):
+    """
+    Compares the current PyTorch version to a given reference with an operation.
+
+    Args:
+        operation (`str`):
+            A string representation of an operator, such as `">"` or `"<="`
+        version (`str`):
+            A string version of PyTorch
+    """
+    return compare_versions(torch_version, operation, version)
+
+
+def str_to_bool(value) ->int:
+    """
+    Converts a string representation of truth to `True` (1) or `False` (0).
+
+    True values are `y`, `yes`, `t`, `true`, `on`, and `1`; False value are `n`, `no`, `f`, `false`, `off`, and `0`;
+    """
+    value = value.lower()
+    if value in ('y', 'yes', 't', 'true', 'on', '1'):
+        return 1
+    elif value in ('n', 'no', 'f', 'false', 'off', '0'):
+        return 0
+    else:
+        raise ValueError(f'invalid truth value {value}')
+
+
+def parse_flag_from_env(key, default=False):
+    """Returns truthy value for `key` from the env if available else the default."""
+    value = os.environ.get(key, str(default))
+    return str_to_bool(value) == 1
+
+
+@lru_cache
+def is_xpu_available(check_device=False):
+    """
+    Checks if XPU acceleration is available either via `intel_extension_for_pytorch` or via stock PyTorch (>=2.4) and
+    potentially if a XPU is in the environment
+    """
+    """check if user disables it explicitly"""
+    if not parse_flag_from_env('ACCELERATE_USE_XPU', default=True):
+        return False
+    if is_ipex_available():
+        if is_torch_version('<=', '1.12'):
+            return False
+    elif is_torch_version('<=', '2.3'):
+        return False
+    if check_device:
+        try:
+            _ = torch.xpu.device_count()
+            return torch.xpu.is_available()
+        except RuntimeError:
+            return False
+    return hasattr(torch, 'xpu') and torch.xpu.is_available()
+
+
+def send_to_device(tensor, device, non_blocking=False, skip_keys=None):
     """
     Recursively sends the elements in a nested list/tuple/dictionary of tensors to a given device.
 
@@ -404,16 +649,38 @@ def send_to_device(tensor, device, non_blocking=False):
     Returns:
         The same data structure as `tensor` with all tensors sent to the proper device.
     """
-
-    def _send_to_device(t, device, non_blocking):
+    if is_torch_tensor(tensor) or hasattr(tensor, 'to'):
+        if device == 'npu':
+            device = 'npu:0'
+        if device == 'xpu':
+            device = 'xpu:0'
         try:
-            return t
+            return tensor
         except TypeError:
-            return t
-
-    def _has_to_method(t):
-        return hasattr(t, 'to')
-    return recursively_apply(_send_to_device, tensor, device, non_blocking, test_type=_has_to_method)
+            return tensor
+        except AssertionError as error:
+            if is_npu_available():
+                if isinstance(device, int):
+                    device = f'npu:{device}'
+            elif is_xpu_available():
+                if isinstance(device, int):
+                    device = f'xpu:{device}'
+            else:
+                raise error
+        try:
+            return tensor
+        except TypeError:
+            return tensor
+    elif isinstance(tensor, (tuple, list)):
+        return honor_type(tensor, (send_to_device(t, device, non_blocking=non_blocking, skip_keys=skip_keys) for t in tensor))
+    elif isinstance(tensor, Mapping):
+        if isinstance(skip_keys, str):
+            skip_keys = [skip_keys]
+        elif skip_keys is None:
+            skip_keys = []
+        return type(tensor)({k: (t if k in skip_keys else send_to_device(t, device, non_blocking=non_blocking, skip_keys=skip_keys)) for k, t in tensor.items()})
+    else:
+        return tensor
 
 
 class BertTrainStep(AbstractTrainStep):
@@ -424,17 +691,17 @@ class BertTrainStep(AbstractTrainStep):
         args (`argparse.Namespace`): Megatron-LM arguments.
     """
 
-    def __init__(self, args):
+    def __init__(self, accelerator, args):
         super().__init__('BertTrainStep')
-        self.get_batch = self.get_batch_func(args.megatron_dataset_flag)
-        self.loss_func = self.get_loss_func(args.pretraining_flag, args.num_labels)
+        self.get_batch = self.get_batch_func(accelerator, args.megatron_dataset_flag)
+        self.loss_func = self.get_loss_func(accelerator, args.pretraining_flag, args.num_labels)
         self.forward_step = self.get_forward_step_func(args.pretraining_flag, args.bert_binary_head)
         if not args.model_return_dict:
             self.model_output_class = None
         else:
             self.model_output_class = SequenceClassifierOutput
 
-    def get_batch_func(self, megatron_dataset_flag):
+    def get_batch_func(self, accelerator, megatron_dataset_flag):
 
         def get_batch_megatron(data_iterator):
             """Build the batch."""
@@ -444,7 +711,7 @@ class BertTrainStep(AbstractTrainStep):
                 data = next(data_iterator)
             else:
                 data = None
-            data_b = mpu.broadcast_data(keys, data, datatype)
+            data_b = tensor_parallel.broadcast_data(keys, data, datatype)
             tokens = data_b['text'].long()
             types = data_b['types'].long()
             sentence_order = data_b['is_random'].long()
@@ -474,12 +741,18 @@ class BertTrainStep(AbstractTrainStep):
             else:
                 sentence_order = None
             return tokens, types, sentence_order, loss_mask, lm_labels, padding_mask
+        if accelerator.state.megatron_lm_plugin.custom_get_batch_function is not None:
+            return accelerator.state.megatron_lm_plugin.custom_get_batch_function
         if megatron_dataset_flag:
+            try:
+                return get_batch
+            except ImportError:
+                pass
             return get_batch_megatron
         else:
             return get_batch_transformer
 
-    def get_loss_func(self, pretraining_flag, num_labels):
+    def get_loss_func(self, accelerator, pretraining_flag, num_labels):
 
         def loss_func_pretrain(loss_mask, sentence_order, output_tensor):
             lm_loss_, sop_logits = output_tensor
@@ -509,6 +782,8 @@ class BertTrainStep(AbstractTrainStep):
                 loss = loss_fct(logits, labels)
             averaged_losses = average_losses_across_data_parallel_group([loss])
             return loss, {'loss': averaged_losses[0]}
+        if accelerator.state.megatron_lm_plugin.custom_loss_function is not None:
+            return accelerator.state.megatron_lm_plugin.custom_loss_function
         if pretraining_flag:
             return loss_func_pretrain
         else:
@@ -538,10 +813,10 @@ class GPTTrainStep(AbstractTrainStep):
         args (`argparse.Namespace`): Megatron-LM arguments.
     """
 
-    def __init__(self, args):
+    def __init__(self, accelerator, args):
         super().__init__('GPTTrainStep')
-        self.get_batch = self.get_batch_func(args.megatron_dataset_flag)
-        self.loss_func = self.get_loss_func()
+        self.get_batch = self.get_batch_func(accelerator, args.megatron_dataset_flag)
+        self.loss_func = self.get_loss_func(accelerator)
         self.forward_step = self.get_forward_step_func()
         self.eod_token = args.padded_vocab_size - 1
         if args.vocab_file is not None:
@@ -555,7 +830,7 @@ class GPTTrainStep(AbstractTrainStep):
         else:
             self.model_output_class = CausalLMOutputWithCrossAttentions
 
-    def get_batch_func(self, megatron_dataset_flag):
+    def get_batch_func(self, accelerator, megatron_dataset_flag):
 
         def get_batch_megatron(data_iterator):
             """Generate a batch"""
@@ -565,7 +840,7 @@ class GPTTrainStep(AbstractTrainStep):
                 data = next(data_iterator)
             else:
                 data = None
-            data_b = mpu.broadcast_data(keys, data, datatype)
+            data_b = tensor_parallel.broadcast_data(keys, data, datatype)
             tokens_ = data_b['text'].long()
             labels = tokens_[:, 1:].contiguous()
             tokens = tokens_[:, :-1].contiguous()
@@ -583,12 +858,18 @@ class GPTTrainStep(AbstractTrainStep):
             tokens = tokens_[:, :-1].contiguous()
             attention_mask, loss_mask, position_ids = get_ltor_masks_and_position_ids(tokens, self.eod_token, self.reset_position_ids, self.reset_attention_mask, True)
             return tokens, labels, loss_mask, attention_mask, position_ids
+        if accelerator.state.megatron_lm_plugin.custom_get_batch_function is not None:
+            return accelerator.state.megatron_lm_plugin.custom_get_batch_function
         if megatron_dataset_flag:
+            try:
+                return get_batch
+            except ImportError:
+                pass
             return get_batch_megatron
         else:
             return get_batch_transformer
 
-    def get_loss_func(self):
+    def get_loss_func(self, accelerator):
         args = get_args()
 
         def loss_func(loss_mask, output_tensor):
@@ -598,12 +879,22 @@ class GPTTrainStep(AbstractTrainStep):
                 losses = output_tensor
             losses = losses.float()
             loss_mask = loss_mask.view(-1).float()
-            loss = torch.sum(losses.view(-1) * loss_mask) / loss_mask.sum()
+            if args.context_parallel_size > 1:
+                loss = torch.cat([torch.sum(losses.view(-1) * loss_mask).view(1), loss_mask.sum().view(1)])
+                torch.distributed.all_reduce(loss, group=mpu.get_context_parallel_group())
+                loss = loss[0] / loss[1]
+            else:
+                loss = torch.sum(losses.view(-1) * loss_mask) / loss_mask.sum()
+            if args.check_for_nan_in_loss_and_grad:
+                global_rank = torch.distributed.get_rank()
+                assert not loss.isnan(), f'Rank {global_rank}: found NaN in local forward loss calculation. Device: {torch.cuda.current_device()}, node: {os.uname()[1]}'
             averaged_loss = average_losses_across_data_parallel_group([loss])
             output_dict = {'lm loss': averaged_loss[0]}
             if args.return_logits:
                 output_dict.update({'logits': logits})
             return loss, output_dict
+        if accelerator.state.megatron_lm_plugin.custom_loss_function is not None:
+            return accelerator.state.megatron_lm_plugin.custom_loss_function
         return loss_func
 
     def get_forward_step_func(self):
@@ -624,10 +915,10 @@ class T5TrainStep(AbstractTrainStep):
         args (`argparse.Namespace`): Megatron-LM arguments.
     """
 
-    def __init__(self, args):
+    def __init__(self, accelerator, args):
         super().__init__('T5TrainStep')
-        self.get_batch = self.get_batch_func(args.megatron_dataset_flag)
-        self.loss_func = self.get_loss_func()
+        self.get_batch = self.get_batch_func(accelerator, args.megatron_dataset_flag)
+        self.loss_func = self.get_loss_func(accelerator)
         self.forward_step = self.get_forward_step_func()
         if not args.model_return_dict:
             self.model_output_class = None
@@ -657,7 +948,7 @@ class T5TrainStep(AbstractTrainStep):
         extended_attention_mask = attention_mask_bss < 0.5
         return extended_attention_mask
 
-    def get_batch_func(self, megatron_dataset_flag):
+    def get_batch_func(self, accelerator, megatron_dataset_flag):
 
         def get_batch_megatron(data_iterator):
             """Build the batch."""
@@ -667,7 +958,7 @@ class T5TrainStep(AbstractTrainStep):
                 data = next(data_iterator)
             else:
                 data = None
-            data_b = mpu.broadcast_data(keys, data, datatype)
+            data_b = tensor_parallel.broadcast_data(keys, data, datatype)
             tokens_enc = data_b['text_enc'].long()
             tokens_dec = data_b['text_dec'].long()
             labels = data_b['labels'].long()
@@ -695,12 +986,18 @@ class T5TrainStep(AbstractTrainStep):
             dec_mask = T5TrainStep.get_decoder_mask(tokens_dec.shape[1], tokens_dec.device)
             enc_dec_mask = T5TrainStep.get_enc_dec_mask(data['attention_mask'].long(), tokens_dec.shape[1], tokens_dec.device)
             return tokens_enc, tokens_dec, loss_mask, labels, enc_mask, dec_mask, enc_dec_mask
+        if accelerator.state.megatron_lm_plugin.custom_get_batch_function is not None:
+            return accelerator.state.megatron_lm_plugin.custom_get_batch_function
         if megatron_dataset_flag:
+            try:
+                return get_batch
+            except ImportError:
+                pass
             return get_batch_megatron
         else:
             return get_batch_transformer
 
-    def get_loss_func(self):
+    def get_loss_func(self, accelerator):
 
         def loss_func(loss_mask, output_tensor):
             lm_loss_ = output_tensor.float()
@@ -708,6 +1005,8 @@ class T5TrainStep(AbstractTrainStep):
             loss = lm_loss
             averaged_losses = average_losses_across_data_parallel_group([lm_loss])
             return loss, {'lm loss': averaged_losses[0]}
+        if accelerator.state.megatron_lm_plugin.custom_loss_function is not None:
+            return accelerator.state.megatron_lm_plugin.custom_loss_function
         return loss_func
 
     def get_forward_step_func(self):
@@ -732,7 +1031,7 @@ class MegatronEngine(torch.nn.Module):
     """
 
     def __init__(self, accelerator, model, optimizer, scheduler):
-        super(MegatronEngine, self).__init__()
+        super().__init__()
         self.module = model
         self.base_model = model[0]
         self.optimizer = optimizer
@@ -741,11 +1040,11 @@ class MegatronEngine(torch.nn.Module):
         if accelerator.state.megatron_lm_plugin.custom_train_step_class is not None:
             self.train_step_handler = accelerator.state.megatron_lm_plugin.custom_train_step_class(args, **accelerator.state.megatron_lm_plugin.custom_train_step_kwargs)
         elif args.model_type_name == 'bert':
-            self.train_step_handler = BertTrainStep(args)
+            self.train_step_handler = BertTrainStep(accelerator, args)
         elif args.model_type_name == 'gpt':
-            self.train_step_handler = GPTTrainStep(args)
+            self.train_step_handler = GPTTrainStep(accelerator, args)
         elif args.model_type_name == 't5':
-            self.train_step_handler = T5TrainStep(args)
+            self.train_step_handler = T5TrainStep(accelerator, args)
         else:
             raise ValueError(f'Unsupported model type: {args.model_type_name}')
         self.optimizer.skipped_iter = False
@@ -753,29 +1052,48 @@ class MegatronEngine(torch.nn.Module):
         self.eval_total_loss_dict = {}
         self.iteration = 0
         self.report_memory_flag = True
+        self.num_floating_point_operations_so_far = 0
+        self.module_config = None
         if args.tensorboard_dir is not None:
             write_args_to_tensorboard()
+
+    def get_module_config(self):
+        args = get_args()
+        config = get_model_config(self.module[0])
+        config.grad_scale_func = self.optimizer.scale_loss
+        if isinstance(self.module[0], LocalDDP) and args.overlap_grad_reduce:
+            assert config.no_sync_func is None, 'When overlap_grad_reduce is True, config.no_sync_func must be None; a custom no_sync_func is not supported when overlapping grad-reduce'
+            config.no_sync_func = [model_chunk.no_sync for model_chunk in self.module]
+            if len(self.module) == 1:
+                config.no_sync_func = config.no_sync_func[0]
+            if args.delay_grad_reduce:
+                config.grad_sync_func = [model_chunk.start_grad_sync for model_chunk in self.module]
+                if len(self.module) == 1:
+                    config.grad_sync_func = config.grad_sync_func[0]
+        if args.overlap_param_gather and args.delay_param_gather:
+            config.param_sync_func = [(lambda x: self.optimizer.finish_param_sync(model_index, x)) for model_index in range(len(self.module))]
+            if len(self.module) == 1:
+                config.param_sync_func = config.param_sync_func[0]
+        config.finalize_model_grads_func = finalize_model_grads
+        return config
 
     def train(self):
         for model_module in self.module:
             model_module.train()
+        if self.module_config is None:
+            self.module_config = self.get_module_config()
         self.log_eval_results()
 
     def eval(self):
         for model_module in self.module:
             model_module.eval()
+        if self.module_config is None:
+            self.module_config = self.get_module_config()
 
-    def train_step(self, **batch_data):
-        """
-        Training step for Megatron-LM
-
-        Args:
-            batch_data (:obj:`dict`): The batch data to train on.
-        """
+    def get_batch_data_iterator(self, batch_data):
         args = get_args()
-        timers = get_timers()
+        data_chunks = []
         if len(batch_data) > 0:
-            data_chunks = []
             if args.num_micro_batches > 1:
                 for i in range(0, args.num_micro_batches):
                     data_chunks.append({k: v[i * args.micro_batch_size:(i + 1) * args.micro_batch_size] for k, v in batch_data.items()})
@@ -785,45 +1103,19 @@ class MegatronEngine(torch.nn.Module):
             batch_data_iterator = [iter(data_chunks) for _ in range(len(self.module))] if len(batch_data) > 0 else [None] * len(self.module)
         else:
             batch_data_iterator = iter(data_chunks) if len(batch_data) > 0 else None
-        if args.DDP_impl == 'local' and args.use_contiguous_buffers_in_local_ddp:
-            for partition in self.module:
-                partition.zero_grad_buffer()
-        self.optimizer.zero_grad()
-        forward_backward_func = get_forward_backward_func()
-        losses_reduced = forward_backward_func(self.train_step_handler.forward_step, batch_data_iterator, self.module, self.optimizer, None, forward_only=False)
-        if args.empty_unused_memory_level >= 1:
-            torch.cuda.empty_cache()
-        timers('backward-reduce-model-grads').start()
-        self.optimizer.reduce_model_grads(args, timers)
-        timers('backward-reduce-model-grads').stop()
-        timers('optimizer').start()
-        update_successful, grad_norm, num_zeros_in_grad = self.optimizer.step(args, timers)
-        timers('optimizer').stop()
-        if update_successful:
-            timers('backward-gather-model-params').start()
-            self.optimizer.gather_model_params(args, timers)
-            timers('backward-gather-model-params').stop()
-        if update_successful:
-            if self.scheduler is not None:
-                increment = get_num_microbatches() * args.micro_batch_size * args.data_parallel_size
-                self.scheduler.step(increment=increment)
-            skipped_iter = 0
-        else:
-            skipped_iter = 1
-        self.optimizer.skipped_iter = not update_successful
-        if args.empty_unused_memory_level >= 2:
-            torch.cuda.empty_cache()
-        args.consumed_train_samples += mpu.get_data_parallel_world_size() * args.micro_batch_size * get_num_microbatches()
-        if mpu.is_pipeline_last_stage(ignore_virtual=True):
-            loss_reduced = {}
-            for key in losses_reduced[0]:
-                losses_reduced_for_key = [x[key] for x in losses_reduced]
-                if len(losses_reduced_for_key[0].shape) == 0:
-                    loss_reduced[key] = sum(losses_reduced_for_key) / len(losses_reduced_for_key)
-                else:
-                    loss_reduced[key] = torch.concat(losses_reduced_for_key)
-            return loss_reduced, skipped_iter, grad_norm, num_zeros_in_grad
-        return {}, skipped_iter, grad_norm, num_zeros_in_grad
+        return batch_data_iterator
+
+    def train_step(self, **batch_data):
+        """
+        Training step for Megatron-LM
+
+        Args:
+            batch_data (:obj:`dict`): The batch data to train on.
+        """
+        batch_data_iterator = self.get_batch_data_iterator(batch_data)
+        loss_reduced, skipped_iter, grad_norm, num_zeros_in_grad = train_step(forward_step_func=self.train_step_handler.forward_step, data_iterator=batch_data_iterator, model=self.module, optimizer=self.optimizer, opt_param_scheduler=self.scheduler, config=self.module_config)
+        self.optimizer.skipped_iter = skipped_iter == 1
+        return loss_reduced, skipped_iter, grad_norm, num_zeros_in_grad
 
     def eval_step(self, **batch_data):
         """
@@ -833,18 +1125,9 @@ class MegatronEngine(torch.nn.Module):
             batch_data (:obj:`dict`): The batch data to evaluate on.
         """
         args = get_args()
-        data_chunks = []
-        if args.num_micro_batches > 1:
-            for i in range(0, args.num_micro_batches):
-                data_chunks.append({k: v[i * args.micro_batch_size:(i + 1) * args.micro_batch_size] for k, v in batch_data.items()})
-        else:
-            data_chunks = [batch_data]
-        if len(self.module) > 1:
-            batch_data_iterator = [iter(data_chunks) for _ in range(len(self.module))]
-        else:
-            batch_data_iterator = iter(data_chunks)
+        batch_data_iterator = self.get_batch_data_iterator(batch_data)
         forward_backward_func = get_forward_backward_func()
-        loss_dicts = forward_backward_func(self.train_step_handler.forward_step, batch_data_iterator, self.module, optimizer=None, timers=None, forward_only=True)
+        loss_dicts = forward_backward_func(forward_step_func=self.train_step_handler.forward_step, data_iterator=batch_data_iterator, model=self.module, num_microbatches=get_num_microbatches(), seq_length=args.seq_length, micro_batch_size=args.micro_batch_size, forward_only=True)
         if args.empty_unused_memory_level >= 1:
             torch.cuda.empty_cache()
         args.consumed_valid_samples += mpu.get_data_parallel_world_size() * args.micro_batch_size * get_num_microbatches()
@@ -857,14 +1140,16 @@ class MegatronEngine(torch.nn.Module):
                 else:
                     loss_reduced[key] = torch.concat(losses_reduced_for_key)
             return loss_reduced
-        else:
-            return {}
+        return {}
 
     def forward(self, **batch_data):
         args = get_args()
         if self.module[0].training:
             loss_dict, skipped_iter, grad_norm, num_zeros_in_grad = self.train_step(**batch_data)
             self.iteration += 1
+            batch_size = mpu.get_data_parallel_world_size() * args.micro_batch_size * get_num_microbatches()
+            args.consumed_train_samples += batch_size
+            self.num_floating_point_operations_so_far += num_floating_point_operations(args, batch_size)
             if args.tensorboard_dir is not None:
                 loss_scale = self.optimizer.get_loss_scale().item()
                 params_norm = None
@@ -877,7 +1162,7 @@ class MegatronEngine(torch.nn.Module):
                 for key in loss_dict:
                     self.eval_total_loss_dict[key] = self.eval_total_loss_dict.get(key, torch.FloatTensor([0.0])) + loss_dict[key]
                     self.eval_total_loss_dict[key + '_num_iters'] = self.eval_total_loss_dict.get(key + '_num_iters', torch.FloatTensor([0.0])) + torch.FloatTensor([1.0])
-        loss = torch.tensor(0.0, device=args.local_rank)
+        loss = torch.tensor(0.0, device=torch.cuda.current_device())
         for key in loss_dict:
             if len(loss_dict[key].shape) == 0:
                 loss += loss_dict[key]
@@ -918,7 +1203,7 @@ class MegatronEngine(torch.nn.Module):
         args = get_args()
         args.save = output_dir
         torch.distributed.barrier()
-        save_checkpoint(self.iteration, self.module, self.optimizer, self.scheduler)
+        save_checkpoint(self.iteration, self.module, self.optimizer, self.scheduler, num_floating_point_operations_so_far=self.num_floating_point_operations_so_far)
         torch.distributed.barrier()
 
     def load_checkpoint(self, input_dir):
@@ -927,9 +1212,10 @@ class MegatronEngine(torch.nn.Module):
         args.consumed_train_samples = 0
         args.consumed_valid_samples = 0
         torch.distributed.barrier()
-        iteration = load_checkpoint(self.module, self.optimizer, self.scheduler)
+        iteration, num_floating_point_operations_so_far = load_checkpoint(self.module, self.optimizer, self.scheduler)
         torch.distributed.barrier()
         self.iteration = iteration
+        self.num_floating_point_operations_so_far = num_floating_point_operations_so_far
         if args.fp16 and self.iteration == 0:
             self.optimizer.reload_model_params()
 
@@ -1042,6 +1328,19 @@ class MegatronEngine(torch.nn.Module):
         return tokens
 
 
+class ModelWithTiedWeights(torch.nn.Module):
+
+    def __init__(self):
+        super().__init__()
+        self.linear1 = torch.nn.Linear(2, 4)
+        self.linear2 = torch.nn.Linear(4, 2)
+        self.linear2.weight = self.linear1.weight
+        self.linear2.bias = self.linear1.bias
+
+    def forward(self, x):
+        return self.linear2(self.linear1(x))
+
+
 class ModelForTest(nn.Module):
 
     def __init__(self):
@@ -1049,6 +1348,60 @@ class ModelForTest(nn.Module):
         self.linear1 = nn.Linear(3, 4)
         self.batchnorm = nn.BatchNorm1d(4)
         self.linear2 = nn.Linear(4, 5)
+
+    def forward(self, x):
+        return self.linear2(self.batchnorm(self.linear1(x)))
+
+
+class LinearWithNonPersistentBuffers(nn.Module):
+
+    def __init__(self, in_features: 'int', out_features: 'int', bias: 'bool'=True, device=None, dtype=None) ->None:
+        factory_kwargs = {'device': device, 'dtype': dtype}
+        super().__init__()
+        self.in_features = in_features
+        self.out_features = out_features
+        self.register_buffer('weight', torch.empty((out_features, in_features), **factory_kwargs))
+        if bias:
+            self.register_buffer('bias', torch.empty(out_features, **factory_kwargs), persistent=False)
+        else:
+            self.register_buffer('bias', None)
+
+    def forward(self, input: 'torch.Tensor') ->torch.Tensor:
+        return torch.nn.functional.linear(input, self.weight, self.bias)
+
+
+class ModelForTestNonPersistentBuffers(nn.Module):
+
+    def __init__(self):
+        super().__init__()
+        self.linear1 = LinearWithNonPersistentBuffers(3, 4)
+        self.batchnorm = nn.BatchNorm1d(4)
+        self.linear2 = LinearWithNonPersistentBuffers(4, 5)
+
+    def forward(self, x):
+        return self.linear2(self.batchnorm(self.linear1(x)))
+
+
+class ModelForTestCopy(nn.Module):
+
+    def __init__(self, id: 'int'):
+        super().__init__()
+        self.id = id
+        self.linear1 = nn.Linear(3, 4)
+        self.batchnorm = nn.BatchNorm1d(4)
+        self.linear2 = nn.Linear(4, 5)
+
+    def forward(self, x):
+        return self.linear2(self.batchnorm(self.linear1(x))), self.id
+
+
+class ModelForTestTiedWeights(nn.Module):
+
+    def __init__(self):
+        super().__init__()
+        self.linear1 = nn.Linear(4, 4)
+        self.batchnorm = nn.BatchNorm1d(4)
+        self.linear2 = nn.Linear(4, 4)
 
     def forward(self, x):
         return self.linear2(self.batchnorm(self.linear1(x)))
@@ -1092,6 +1445,27 @@ class ModelWithUnusedSubModulesForTest(nn.Module):
         return self.linear4(self.linear3(self.batchnorm(self.linear2(self.linear1(x)))))
 
 
+class NestedModelForTest(nn.Module):
+
+    def __init__(self):
+        super().__init__()
+        self.model = ModelForTest()
+
+    def forward(self, x):
+        return self.model(x)
+
+
+class ModelSeveralDtypes(nn.Module):
+
+    def __init__(self):
+        super().__init__()
+        self.register_buffer('int_param', torch.randint(high=10, size=(15, 30)))
+        self.register_parameter('float_param', torch.nn.Parameter(torch.rand(10, 5)))
+
+    def forward(self, x):
+        return x + 2
+
+
 class DummyModel(nn.Module):
     """Simple model to do y=mx+b"""
 
@@ -1106,25 +1480,31 @@ class DummyModel(nn.Module):
 
 import torch
 from torch.nn import MSELoss, ReLU
-from paritybench._paritybench_helpers import _mock_config, _mock_layer, _paritybench_base, _fails_compile
+from types import SimpleNamespace
 
 
 TESTCASES = [
-    # (nn.Module, init_args, forward_args, jit_compiles)
+    # (nn.Module, init_args, forward_args)
     (DummyModel,
      lambda: ([], {}),
-     lambda: ([torch.rand([4, 4, 4, 4])], {}),
-     True),
+     lambda: ([torch.rand([4, 4, 4, 4])], {})),
+    (LinearWithNonPersistentBuffers,
+     lambda: ([], {'in_features': 4, 'out_features': 4}),
+     lambda: ([torch.rand([4, 4, 4, 4])], {})),
+    (MockModel,
+     lambda: ([], {}),
+     lambda: ([torch.rand([4, 4, 40, 20]), torch.rand([4, 4, 40, 20])], {})),
+    (ModelForTestTiedWeights,
+     lambda: ([], {}),
+     lambda: ([torch.rand([4, 4, 4])], {})),
+    (ModelSeveralDtypes,
+     lambda: ([], {}),
+     lambda: ([torch.rand([4, 4, 4, 4])], {})),
     (ModuleWithUnusedSubModules,
      lambda: ([], {'input_dim': 4, 'output_dim': 4}),
-     lambda: ([torch.rand([4, 4, 4, 4])], {}),
-     True),
+     lambda: ([torch.rand([4, 4, 4, 4])], {})),
+    (NoiseModel,
+     lambda: ([], {}),
+     lambda: ([torch.rand([4, 4, 4, 4])], {})),
 ]
-
-class Test_huggingface_accelerate(_paritybench_base):
-    def test_000(self):
-        self._check(*TESTCASES[0])
-
-    def test_001(self):
-        self._check(*TESTCASES[1])
 

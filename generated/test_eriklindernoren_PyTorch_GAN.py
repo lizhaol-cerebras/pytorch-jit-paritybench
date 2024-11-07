@@ -62,21 +62,14 @@ wgan = _module
 wgan_div = _module
 wgan_gp = _module
 
-from paritybench._paritybench_helpers import _mock_config, patch_functional
 from unittest.mock import mock_open, MagicMock
 from torch.autograd import Function
 from torch.nn import Module
 import abc, collections, copy, enum, functools, inspect, itertools, logging, math, matplotlib, numbers, numpy, pandas, queue, random, re, scipy, sklearn, string, tensorflow, time, torch, torchaudio, torchvision, types, typing, uuid, warnings
+import operator as op
+from dataclasses import dataclass
 import numpy as np
 from torch import Tensor
-patch_functional()
-open = mock_open()
-yaml = logging = sys = argparse = MagicMock()
-ArgumentParser = argparse.ArgumentParser
-_global_config = args = argv = cfg = config = params = _mock_config()
-argparse.ArgumentParser.return_value.parse_args.return_value = _global_config
-yaml.load.return_value = _global_config
-sys.argv = _global_config
 __version__ = '1.0.0'
 xrange = range
 wraps = functools.wraps
@@ -256,12 +249,6 @@ class Decoder(nn.Module):
         self.assign_adain_params(self.mlp(style_code))
         img = self.model(content_code)
         return img
-
-
-parser = argparse.ArgumentParser()
-
-
-opt = parser.parse_args()
 
 
 class Discriminator(nn.Module):
@@ -748,88 +735,43 @@ class Classifier(nn.Module):
 
 import torch
 from torch.nn import MSELoss, ReLU
-from paritybench._paritybench_helpers import _mock_config, _mock_layer, _paritybench_base, _fails_compile
+from types import SimpleNamespace
 
 
 TESTCASES = [
-    # (nn.Module, init_args, forward_args, jit_compiles)
+    # (nn.Module, init_args, forward_args)
     (DenseResidualBlock,
      lambda: ([], {'filters': 4}),
-     lambda: ([torch.rand([4, 4, 4, 4])], {}),
-     False),
+     lambda: ([torch.rand([4, 4, 4, 4])], {})),
     (FeatureExtractor,
      lambda: ([], {}),
-     lambda: ([torch.rand([4, 3, 64, 64])], {}),
-     True),
+     lambda: ([torch.rand([4, 3, 64, 64])], {})),
     (GeneratorRRDB,
      lambda: ([], {'channels': 4}),
-     lambda: ([torch.rand([4, 4, 4, 4])], {}),
-     False),
+     lambda: ([torch.rand([4, 4, 4, 4])], {})),
     (GeneratorResNet,
      lambda: ([], {}),
-     lambda: ([torch.rand([4, 4, 64, 64]), torch.rand([4, 4, 1, 1])], {}),
-     True),
+     lambda: ([torch.rand([4, 4, 64, 64]), torch.rand([4, 4, 1, 1])], {})),
     (LayerNorm,
      lambda: ([], {'num_features': 4}),
-     lambda: ([torch.rand([4, 4, 4, 4])], {}),
-     False),
+     lambda: ([torch.rand([4, 4, 4, 4])], {})),
     (MLP,
      lambda: ([], {'input_dim': 4, 'output_dim': 4}),
-     lambda: ([torch.rand([4, 4])], {}),
-     True),
+     lambda: ([torch.rand([4, 4])], {})),
     (Reshape,
      lambda: ([], {}),
-     lambda: ([torch.rand([4])], {}),
-     False),
+     lambda: ([torch.rand([4])], {})),
     (ResidualBlock,
      lambda: ([], {'features': 4}),
-     lambda: ([torch.rand([4, 4, 4, 4])], {}),
-     True),
+     lambda: ([torch.rand([4, 4, 4, 4])], {})),
     (ResidualInResidualDenseBlock,
      lambda: ([], {'filters': 4}),
-     lambda: ([torch.rand([4, 4, 4, 4])], {}),
-     False),
+     lambda: ([torch.rand([4, 4, 4, 4])], {})),
     (StyleEncoder,
      lambda: ([], {}),
-     lambda: ([torch.rand([4, 3, 4, 4])], {}),
-     True),
+     lambda: ([torch.rand([4, 3, 4, 4])], {})),
     (UNetDown,
      lambda: ([], {'in_size': 4, 'out_size': 4}),
-     lambda: ([torch.rand([4, 4, 4, 4])], {}),
-     True),
+     lambda: ([torch.rand([4, 4, 4, 4])], {})),
 ]
-
-class Test_eriklindernoren_PyTorch_GAN(_paritybench_base):
-    def test_000(self):
-        self._check(*TESTCASES[0])
-
-    def test_001(self):
-        self._check(*TESTCASES[1])
-
-    def test_002(self):
-        self._check(*TESTCASES[2])
-
-    def test_003(self):
-        self._check(*TESTCASES[3])
-
-    def test_004(self):
-        self._check(*TESTCASES[4])
-
-    def test_005(self):
-        self._check(*TESTCASES[5])
-
-    def test_006(self):
-        self._check(*TESTCASES[6])
-
-    def test_007(self):
-        self._check(*TESTCASES[7])
-
-    def test_008(self):
-        self._check(*TESTCASES[8])
-
-    def test_009(self):
-        self._check(*TESTCASES[9])
-
-    def test_010(self):
-        self._check(*TESTCASES[10])
 

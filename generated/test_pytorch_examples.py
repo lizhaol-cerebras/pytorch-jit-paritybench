@@ -5,6 +5,20 @@ display_samples = _module
 download_mnist = _module
 convert = _module
 main = _module
+T5_training = _module
+configs = _module
+fsdp = _module
+training = _module
+model_checkpointing = _module
+checkpoint_handler = _module
+policies = _module
+activation_checkpointing_functions = _module
+mixed_precision = _module
+wrapping = _module
+summarization_dataset = _module
+utils = _module
+environment = _module
+train_utils = _module
 datautils = _module
 multigpu = _module
 multigpu_torchrun = _module
@@ -24,7 +38,11 @@ main = _module
 main = _module
 main = _module
 rnn = _module
-example = _module
+fsdp_tp_example = _module
+llama2_model = _module
+log_utils = _module
+sequence_parallel_example = _module
+tensor_parallel_example = _module
 conf = _module
 download_saved_models = _module
 neural_style = _module
@@ -44,9 +62,15 @@ replace_op = _module
 subgraph_rewriter_basic_use = _module
 wrap_output_dynamically = _module
 main = _module
+main = _module
+main = _module
+main = _module
+data = _module
+model = _module
 model = _module
 train = _module
 util = _module
+main = _module
 main = _module
 main = _module
 train = _module
@@ -55,7 +79,6 @@ main = _module
 actor_critic = _module
 reinforce = _module
 main = _module
-data = _module
 dataset = _module
 main = _module
 model = _module
@@ -68,21 +91,14 @@ generate = _module
 main = _module
 model = _module
 
-from paritybench._paritybench_helpers import _mock_config, patch_functional
 from unittest.mock import mock_open, MagicMock
 from torch.autograd import Function
 from torch.nn import Module
 import abc, collections, copy, enum, functools, inspect, itertools, logging, math, matplotlib, numbers, numpy, pandas, queue, random, re, scipy, sklearn, string, tensorflow, time, torch, torchaudio, torchvision, types, typing, uuid, warnings
+import operator as op
+from dataclasses import dataclass
 import numpy as np
 from torch import Tensor
-patch_functional()
-open = mock_open()
-yaml = logging = sys = argparse = MagicMock()
-ArgumentParser = argparse.ArgumentParser
-_global_config = args = argv = cfg = config = params = _mock_config()
-argparse.ArgumentParser.return_value.parse_args.return_value = _global_config
-yaml.load.return_value = _global_config
-sys.argv = _global_config
 __version__ = '1.0.0'
 xrange = range
 wraps = functools.wraps
@@ -124,31 +140,151 @@ import torchvision.transforms as transforms
 import torchvision.utils as vutils
 
 
-from torch.utils.data import Dataset
-
-
 import torch.nn.functional as F
 
 
-from torch.utils.data import DataLoader
+import functools
+
+
+from torch.optim.lr_scheduler import StepLR
+
+
+import torch.distributed as dist
 
 
 import torch.multiprocessing as mp
 
 
+from torch.nn.parallel import DistributedDataParallel as DDP
+
+
 from torch.utils.data.distributed import DistributedSampler
 
 
-from torch.nn.parallel import DistributedDataParallel as DDP
+from torch.distributed.fsdp import FullyShardedDataParallel as FSDP
+
+
+from torch.distributed.fsdp import CPUOffload
+
+
+from torch.distributed.fsdp import MixedPrecision
+
+
+from torch.distributed.fsdp import BackwardPrefetch
+
+
+from torch.distributed.fsdp import ShardingStrategy
+
+
+from torch.distributed.fsdp import FullStateDictConfig
+
+
+from torch.distributed.fsdp import StateDictType
+
+
+from functools import partial
+
+
+from torch.utils.data import DataLoader
+
+
+from typing import Type
+
+
+import time
+
+
+from typing import ClassVar
+
+
+from torch.distributed.fsdp.fully_sharded_data_parallel import StateDictType
+
+
+from torch.distributed.fsdp import LocalStateDictConfig
+
+
+from torch.distributed._shard.checkpoint import FileSystemReader
+
+
+from torch.distributed._shard.checkpoint import FileSystemWriter
+
+
+from torch.distributed._shard.checkpoint import save_state_dict
+
+
+from torch.distributed._shard.checkpoint import load_state_dict
+
+
+from torch.distributed.checkpoint.default_planner import DefaultSavePlanner
+
+
+from torch.distributed.checkpoint.default_planner import DefaultLoadPlanner
+
+
+import torch.distributed._shard.checkpoint as dist_cp
+
+
+from torch.distributed.algorithms._checkpoint.checkpoint_wrapper import checkpoint_wrapper
+
+
+from torch.distributed.algorithms._checkpoint.checkpoint_wrapper import CheckpointImpl
+
+
+from torch.distributed.algorithms._checkpoint.checkpoint_wrapper import apply_activation_checkpointing
+
+
+from torch.distributed.fsdp.fully_sharded_data_parallel import FullyShardedDataParallel as FSDP
+
+
+from torch.distributed.fsdp.fully_sharded_data_parallel import CPUOffload
+
+
+from torch.distributed.fsdp.fully_sharded_data_parallel import BackwardPrefetch
+
+
+from torch.distributed.fsdp.fully_sharded_data_parallel import MixedPrecision
+
+
+from torch.distributed.fsdp.wrap import transformer_auto_wrap_policy
+
+
+from torch.distributed.fsdp.wrap import size_based_auto_wrap_policy
+
+
+from torch.distributed.fsdp.wrap import enable_wrap
+
+
+from torch.distributed.fsdp.wrap import wrap
+
+
+import logging
+
+
+import re
+
+
+from itertools import chain
+
+
+from string import punctuation
+
+
+import pandas as pd
+
+
+import numpy as np
+
+
+from torch.utils.data import Dataset
+
+
+import torch.cuda.nccl as nccl
 
 
 from torch.distributed import init_process_group
 
 
 from torch.distributed import destroy_process_group
-
-
-import torch.distributed as dist
 
 
 from torch.utils.data import random_split
@@ -179,9 +315,6 @@ from torch import optim
 
 
 import torchvision
-
-
-import time
 
 
 from torch.distributed.rpc import RRef
@@ -223,13 +356,40 @@ from functools import wraps
 from torchvision.models.resnet import Bottleneck
 
 
-import numpy as np
-
-
 from itertools import count
 
 
-import re
+from torch.distributed.device_mesh import init_device_mesh
+
+
+from torch.distributed._tensor import Shard
+
+
+from torch.distributed._tensor import Replicate
+
+
+from torch.distributed.tensor.parallel import parallelize_module
+
+
+from torch.distributed.tensor.parallel import ColwiseParallel
+
+
+from torch.distributed.tensor.parallel import RowwiseParallel
+
+
+from torch.distributed.tensor.parallel import PrepareModuleInput
+
+
+from torch.distributed.tensor.parallel import SequenceParallel
+
+
+from typing import Tuple
+
+
+from torch import nn
+
+
+from torch.distributed._tensor.device_mesh import init_device_mesh
 
 
 from torch.optim import Adam
@@ -257,9 +417,6 @@ from torch.fx import Node
 
 
 from typing import Callable
-
-
-from typing import Tuple
 
 
 from typing import Union
@@ -301,13 +458,31 @@ import torch.utils.data.distributed
 import torchvision.datasets as datasets
 
 
-from torch.optim.lr_scheduler import StepLR
-
-
 from torch.utils.data import Subset
 
 
+from time import time
+
+
+from torch.nn.utils.rnn import pad_sequence
+
+
 import torch.optim as O
+
+
+from torchvision.datasets import MNIST
+
+
+from torchvision.transforms import Compose
+
+
+from torchvision.transforms import ToTensor
+
+
+from torchvision.transforms import Normalize
+
+
+from torchvision.transforms import Lambda
 
 
 from torch.utils.data.sampler import Sampler
@@ -331,22 +506,10 @@ from math import log10
 import torch.nn.init as init
 
 
-from torchvision.transforms import ToTensor
-
-
 import matplotlib
 
 
-from torch import nn
-
-
 from torchvision.utils import save_image
-
-
-parser = argparse.ArgumentParser(description='PyTorch Wikitext-2 RNN/LSTM/GRU/Transformer Language Model')
-
-
-opt = parser.parse_args()
 
 
 class Generator(nn.Module):
@@ -380,15 +543,16 @@ class Discriminator(nn.Module):
 
 
 class ToyModel(nn.Module):
+    """MLP based model"""
 
     def __init__(self):
         super(ToyModel, self).__init__()
-        self.net1 = nn.Linear(10, 32)
+        self.in_proj = nn.Linear(10, 32)
         self.relu = nn.ReLU()
-        self.net2 = nn.Linear(32, 5)
+        self.out_proj = nn.Linear(32, 5)
 
     def forward(self, x):
-        return self.net2(self.relu(self.net1(x)))
+        return self.out_proj(self.relu(self.in_proj(x)))
 
 
 class ToyMpModel(nn.Module):
@@ -426,6 +590,109 @@ class MultiheadAttentionLayer(nn.Module):
         y = self.attn(x, x, x, attn_mask=self.mask[0, 0, :seq_size, :seq_size])[0]
         y = self.resid_drop(self.c_proj(y))
         return y
+
+
+class Block(nn.Module):
+    """ an unassuming Transformer block """
+
+    def __init__(self, config: 'GPTConfig'):
+        super().__init__()
+        self.ln1 = nn.LayerNorm(config.n_embd)
+        self.ln2 = nn.LayerNorm(config.n_embd)
+        self.attn = MultiheadAttentionLayer(config)
+        self.mlp = nn.Sequential(nn.Linear(config.n_embd, 4 * config.n_embd), nn.GELU(), nn.Linear(4 * config.n_embd, config.n_embd), nn.Dropout(config.resid_pdrop))
+
+    def forward(self, x):
+        x = x + self.attn(self.ln1(x))
+        x = x + self.mlp(self.ln2(x))
+        return x
+
+
+class EmbeddingStem(nn.Module):
+
+    def __init__(self, config: 'GPTConfig', device='cpu', dtype=torch.float32):
+        super().__init__()
+        self.tok_emb = nn.Embedding(config.vocab_size, config.n_embd, device=device, dtype=dtype)
+        self.pos_emb = nn.Parameter(torch.zeros(1, config.block_size, config.n_embd, device=device, dtype=dtype))
+        self.drop = nn.Dropout(config.embd_pdrop)
+        self.block_size = config.block_size
+
+    def reset_parameters(self):
+        self.tok_emb.reset_parameters()
+
+    def forward(self, idx):
+        b, t = idx.size()
+        assert t <= self.block_size, f'Cannot forward sequence of length {t}, block size is only {self.block_size}'
+        token_embeddings = self.tok_emb(idx)
+        position_embeddings = self.pos_emb[:, :t, :]
+        return self.drop(token_embeddings + position_embeddings)
+
+
+class GPT(nn.Module):
+    """ GPT Language Model """
+
+    def __init__(self, config: 'GPTConfig'):
+        super().__init__()
+        self.block_size = config.block_size
+        config = self._set_model_config(config)
+        self.emb_stem = EmbeddingStem(config)
+        self.blocks = nn.Sequential(*[Block(config) for _ in range(config.n_layer)])
+        self.ln_f = nn.LayerNorm(config.n_embd)
+        self.head = nn.Linear(config.n_embd, config.vocab_size, bias=False)
+        self.apply(self._init_weights)
+        for pn, p in self.named_parameters():
+            if pn.endswith('c_proj.weight'):
+                p.data.normal_(mean=0.0, std=0.02 / math.sqrt(2 * config.n_layer))
+        n_params = sum(p.numel() for p in self.blocks.parameters())
+        None
+
+    def _set_model_config(self, config):
+        type_given = config.model_type is not None
+        params_given = all([config.n_layer is not None, config.n_head is not None, config.n_embd is not None])
+        if type_given and not params_given:
+            config.__dict__.update({'openai-gpt': dict(n_layer=12, n_head=12, n_embd=768), 'gpt2': dict(n_layer=12, n_head=12, n_embd=768), 'gpt2-medium': dict(n_layer=24, n_head=16, n_embd=1024), 'gpt2-large': dict(n_layer=36, n_head=20, n_embd=1280), 'gpt2-xl': dict(n_layer=48, n_head=25, n_embd=1600), 'gopher-44m': dict(n_layer=8, n_head=16, n_embd=512), 'gpt-mini': dict(n_layer=6, n_head=6, n_embd=192), 'gpt-micro': dict(n_layer=4, n_head=4, n_embd=128), 'gpt-nano': dict(n_layer=3, n_head=3, n_embd=48)}[config.model_type])
+        return config
+
+    def _init_weights(self, module):
+        if isinstance(module, (nn.Linear, nn.Embedding)):
+            module.weight.data.normal_(mean=0.0, std=0.02)
+            if isinstance(module, nn.Linear) and module.bias is not None:
+                module.bias.data.zero_()
+        elif isinstance(module, nn.LayerNorm):
+            module.bias.data.zero_()
+            module.weight.data.fill_(1.0)
+
+    def forward(self, idx, targets=None):
+        x = self.emb_stem(idx)
+        x = self.blocks(x)
+        x = self.ln_f(x)
+        logits = self.head(x)
+        loss = None
+        if targets is not None:
+            loss = F.cross_entropy(logits.view(-1, logits.size(-1)), targets.view(-1), ignore_index=-1)
+        return logits, loss
+
+    @torch.no_grad()
+    def generate(self, idx, max_new_tokens, temperature=1.0, do_sample=False, top_k=None):
+        """
+        Take a conditioning sequence of indices idx (LongTensor of shape (b,t)) and complete
+        the sequence max_new_tokens times, feeding the predictions back into the model each time.
+        Most likely you'll want to make sure to be in model.eval() mode of operation for this.
+        """
+        for _ in range(max_new_tokens):
+            idx_cond = idx if idx.size(1) <= self.block_size else idx[:, -self.block_size:]
+            logits, _ = self(idx_cond)
+            logits = logits[:, -1, :] / temperature
+            if top_k is not None:
+                v, _ = torch.topk(logits, top_k)
+                logits[logits < v[:, [-1]]] = -float('Inf')
+            probs = F.softmax(logits, dim=-1)
+            if do_sample:
+                idx_next = torch.multinomial(probs, num_samples=1)
+            else:
+                _, idx_next = torch.topk(probs, k=1, dim=-1)
+            idx = torch.cat((idx, idx_next), dim=1)
+        return idx
 
 
 class Policy(nn.Module):
@@ -744,6 +1011,364 @@ class RNNModel(nn.Module):
             return weight.new_zeros(self.nlayers, bsz, self.nhid)
 
 
+class RMSNorm(nn.Module):
+    """
+    Initialize the RMSNorm normalization layer.
+
+    Args:
+        dim (int): The dimension of the input tensor.
+        eps (float, optional): A small value added to the denominator for numerical stability. Default is 1e-6.
+
+    Attributes:
+        eps (float): A small value added to the denominator for numerical stability.
+        weight (nn.Parameter): Learnable scaling parameter.
+
+    """
+
+    def __init__(self, dim: 'int', eps: 'float'=1e-06):
+        super().__init__()
+        self.eps = eps
+        self.weight = nn.Parameter(torch.ones(dim))
+
+    def _norm(self, x: 'torch.Tensor'):
+        return x * torch.rsqrt(x.pow(2).mean(-1, keepdim=True) + self.eps)
+
+    def forward(self, x: 'torch.Tensor'):
+        output = self._norm(x.float()).type_as(x)
+        return output * self.weight
+
+    def reset_parameters(self):
+        torch.nn.init.ones_(self.weight)
+
+
+def reshape_for_broadcast(freqs_cis: 'torch.Tensor', x: 'torch.Tensor'):
+    """
+    Reshape frequency tensor for broadcasting it with another tensor.
+
+    This function reshapes the frequency tensor to have the same shape as the target tensor 'x'
+    for the purpose of broadcasting the frequency tensor during element-wise operations.
+
+    Args:
+        freqs_cis (torch.Tensor): Frequency tensor to be reshaped.
+        x (torch.Tensor): Target tensor for broadcasting compatibility.
+
+    Returns:
+        torch.Tensor: Reshaped frequency tensor.
+    """
+    ndim = x.ndim
+    assert 0 <= 1 < ndim
+    assert freqs_cis.shape == (x.shape[1], x.shape[-1])
+    shape = [(d if i == 1 or i == ndim - 1 else 1) for i, d in enumerate(x.shape)]
+    return freqs_cis.view(*shape)
+
+
+def apply_rotary_emb(xq: 'torch.Tensor', xk: 'torch.Tensor', freqs_cis: 'torch.Tensor') ->Tuple[torch.Tensor, torch.Tensor]:
+    """
+    Apply rotary embeddings to input tensors using the given frequency tensor.
+
+    This function applies rotary embeddings to the given query 'xq' and key 'xk' tensors using the provided
+    frequency tensor 'freqs_cis'. The input tensors are reshaped as complex numbers, and the frequency tensor
+    is reshaped for broadcasting compatibility. The resulting tensors contain rotary embeddings and are
+    returned as real tensors.
+
+    Args:
+        xq (torch.Tensor): Query tensor to apply rotary embeddings.
+        xk (torch.Tensor): Key tensor to apply rotary embeddings.
+        freqs_cis (torch.Tensor): Precomputed frequency tensor for complex exponentials.
+
+    Returns:
+        Tuple[torch.Tensor, torch.Tensor]: Tuple of modified query tensor and key tensor with rotary embeddings.
+    """
+    xq_ = torch.view_as_complex(xq.float().reshape(*xq.shape[:-1], -1, 2))
+    xk_ = torch.view_as_complex(xk.float().reshape(*xk.shape[:-1], -1, 2))
+    freqs_cis = reshape_for_broadcast(freqs_cis, xq_)
+    xq_out = torch.view_as_real(xq_ * freqs_cis).flatten(3)
+    xk_out = torch.view_as_real(xk_ * freqs_cis).flatten(3)
+    return xq_out.type_as(xq), xk_out.type_as(xk)
+
+
+def repeat_kv(x: 'torch.Tensor', n_rep: 'int') ->torch.Tensor:
+    """torch.repeat_interleave(x, dim=2, repeats=n_rep)"""
+    bs, slen, n_kv_heads, head_dim = x.shape
+    if n_rep == 1:
+        return x
+    return x[:, :, :, None, :].expand(bs, slen, n_kv_heads, n_rep, head_dim).reshape(bs, slen, n_kv_heads * n_rep, head_dim)
+
+
+class Attention(nn.Module):
+    """
+    Multi-head attention module.
+
+    Args:
+        model_args (ModelArgs): Model configuration arguments.
+
+    Attributes:
+        n_kv_heads (int): Number of key and value heads.
+        n_heads (int): Number of query heads.
+        n_local_kv_heads (int): Number of local key and value heads.
+        n_rep (int): Number of repetitions for local heads.
+        head_dim (int): Dimension size of each attention head.
+        wq (Linear): Linear transformation for queries.
+        wk (Linear): Linear transformation for keys.
+        wv (Linear): Linear transformation for values.
+        wo (Linear): Linear transformation for output.
+
+    """
+
+    def __init__(self, model_args: 'ModelArgs'):
+        super().__init__()
+        self.n_heads = model_args.n_heads
+        self.n_kv_heads = model_args.n_heads if model_args.n_kv_heads is None else model_args.n_kv_heads
+        self.n_rep = self.n_heads // self.n_kv_heads
+        self.head_dim = model_args.dim // model_args.n_heads
+        self.wq = nn.Linear(model_args.dim, model_args.n_heads * self.head_dim, bias=False)
+        self.wk = nn.Linear(model_args.dim, self.n_kv_heads * self.head_dim, bias=False)
+        self.wv = nn.Linear(model_args.dim, self.n_kv_heads * self.head_dim, bias=False)
+        self.wo = nn.Linear(model_args.n_heads * self.head_dim, model_args.dim, bias=False)
+
+    def init_weights(self, init_std: 'float'):
+        for linear in (self.wq, self.wk, self.wv):
+            nn.init.trunc_normal_(linear.weight, mean=0.0, std=0.02)
+        nn.init.trunc_normal_(self.wo.weight, mean=0.0, std=init_std)
+
+    def forward(self, x: 'torch.Tensor', freqs_cis: 'torch.Tensor'):
+        """
+        Forward pass of the attention module.
+
+        Args:
+            x (torch.Tensor): Input tensor.
+            freqs_cis (torch.Tensor): Precomputed frequency tensor.
+
+        Returns:
+            torch.Tensor: Output tensor after attention.
+
+        """
+        bsz, seqlen, _ = x.shape
+        xq, xk, xv = self.wq(x), self.wk(x), self.wv(x)
+        xq = xq.view(bsz, seqlen, self.n_heads, self.head_dim)
+        xk = xk.view(bsz, seqlen, self.n_kv_heads, self.head_dim)
+        xv = xv.view(bsz, seqlen, self.n_kv_heads, self.head_dim)
+        xq, xk = apply_rotary_emb(xq, xk, freqs_cis=freqs_cis)
+        keys = repeat_kv(xk, self.n_rep)
+        values = repeat_kv(xv, self.n_rep)
+        xq = xq.transpose(1, 2)
+        xk = keys.transpose(1, 2)
+        xv = values.transpose(1, 2)
+        output = F.scaled_dot_product_attention(xq, xk, xv, is_causal=True)
+        output = output.transpose(1, 2).contiguous()
+        output = output.view(bsz, seqlen, -1)
+        return self.wo(output)
+
+
+class FeedForward(nn.Module):
+    """
+    FeedForward module
+
+    Args:
+        dim (int): Input dimension.
+        hidden_dim (int): Hidden dimension of the feedforward layer.
+        multiple_of (int): Value to ensure hidden dimension is a multiple of this value.
+        ffn_dim_multiplier (Optional[float]): Custom multiplier for hidden dimension. Defaults to None.
+
+    Attributes:
+        w1 (Linear): Linear transformation for the first layer.
+        w2 (Linear): Linear transformation for the second layer.
+        w3 (Linear): Linear transformation for the third layer.
+
+    """
+
+    def __init__(self, dim: 'int', hidden_dim: 'int', multiple_of: 'int', ffn_dim_multiplier: 'Optional[float]'):
+        super().__init__()
+        hidden_dim = int(2 * hidden_dim / 3)
+        if ffn_dim_multiplier is not None:
+            hidden_dim = int(ffn_dim_multiplier * hidden_dim)
+        hidden_dim = multiple_of * ((hidden_dim + multiple_of - 1) // multiple_of)
+        self.w1 = nn.Linear(dim, hidden_dim, bias=False)
+        self.w2 = nn.Linear(hidden_dim, dim, bias=False)
+        self.w3 = nn.Linear(dim, hidden_dim, bias=False)
+
+    def forward(self, x):
+        return self.w2(F.silu(self.w1(x)) * self.w3(x))
+
+    def init_weights(self, init_std: 'float'):
+        nn.init.trunc_normal_(self.w1.weight, mean=0.0, std=0.02)
+        for linear in (self.w2, self.w3):
+            nn.init.trunc_normal_(linear.weight, mean=0.0, std=init_std)
+
+
+class TransformerBlock(nn.Module):
+    """
+    TransformerBlock Module
+
+    Args:
+        layer_id (int): Identifier for the layer.
+        model_args (ModelArgs): Model configuration arguments.
+
+    Attributes:
+        n_heads (int): Number of attention heads.
+        dim (int): Dimension size of the model.
+        head_dim (int): Dimension size of each attention head.
+        attention (Attention): Attention module.
+        feed_forward (FeedForward): FeedForward module.
+        layer_id (int): Identifier for the layer.
+        attention_norm (RMSNorm): Layer normalization for attention output.
+        ffn_norm (RMSNorm): Layer normalization for feedforward output.
+
+    """
+
+    def __init__(self, layer_id: 'int', model_args: 'ModelArgs'):
+        super().__init__()
+        self.n_heads = model_args.n_heads
+        self.dim = model_args.dim
+        self.attention = Attention(model_args)
+        self.feed_forward = FeedForward(dim=model_args.dim, hidden_dim=4 * model_args.dim, multiple_of=model_args.multiple_of, ffn_dim_multiplier=model_args.ffn_dim_multiplier)
+        self.layer_id = layer_id
+        self.num_layers = model_args.n_layers
+        self.attention_norm = RMSNorm(dim=model_args.dim, eps=model_args.norm_eps)
+        self.ffn_norm = RMSNorm(dim=model_args.dim, eps=model_args.norm_eps)
+        if model_args.depth_init:
+            self.weight_init_std = 0.02 / (2 * (self.layer_id + 1)) ** 0.5
+        else:
+            self.weight_init_std = 0.02 / (2 * self.num_layers) ** 0.5
+
+    def forward(self, x: 'torch.Tensor', freqs_cis: 'torch.Tensor'):
+        """
+        Perform a forward pass through the TransformerBlock.
+
+        Args:
+            x (torch.Tensor): Input tensor.
+            freqs_cis (torch.Tensor): Precomputed cosine and sine frequencies.
+
+        Returns:
+            torch.Tensor: Output tensor after applying attention and feedforward layers.
+
+        """
+        h = x + self.attention(self.attention_norm(x), freqs_cis)
+        out = h + self.feed_forward(self.ffn_norm(h))
+        return out
+
+    def init_weights(self):
+        for norm in (self.attention_norm, self.ffn_norm):
+            norm.reset_parameters()
+        self.attention.init_weights(self.weight_init_std)
+        self.feed_forward.init_weights(self.weight_init_std)
+
+
+def precompute_freqs_cis(dim: 'int', end: 'int', theta: 'float'=10000.0):
+    """
+    Precompute the frequency tensor for complex exponentials (cis) with given dimensions.
+
+    This function calculates a frequency tensor with complex exponentials using the given dimension 'dim'
+    and the end index 'end'. The 'theta' parameter scales the frequencies.
+    The returned tensor contains complex values in complex64 data type.
+
+    Args:
+        dim (int): Dimension of the frequency tensor.
+        end (int): End index for precomputing frequencies.
+        theta (float, optional): Scaling factor for frequency computation. Defaults to 10000.0.
+
+    Returns:
+        torch.Tensor: Precomputed frequency tensor with complex exponentials.
+    """
+    freqs = 1.0 / theta ** (torch.arange(0, dim, 2)[:dim // 2].float() / dim)
+    t = torch.arange(end, device=freqs.device)
+    freqs = torch.outer(t, freqs).float()
+    freqs_cis = torch.polar(torch.ones_like(freqs), freqs)
+    return freqs_cis
+
+
+class Transformer(nn.Module):
+    """
+    Transformer Module
+
+    Args:
+        model_args (ModelArgs): Model configuration arguments.
+
+    Attributes:
+        model_args (ModelArgs): Model configuration arguments.
+        vocab_size (int): Vocabulary size.
+        n_layers (int): Number of layers in the model.
+        tok_embeddings (ParallelEmbedding): Token embeddings.
+        layers (torch.nn.ModuleList): List of Transformer blocks.
+        norm (RMSNorm): Layer normalization for the model output.
+        output (ColumnParallelLinear): Linear layer for final output.
+        freqs_cis (torch.Tensor): Precomputed cosine and sine frequencies.
+
+    """
+
+    def __init__(self, model_args: 'ModelArgs'):
+        super().__init__()
+        self.model_args = model_args
+        self.vocab_size = model_args.vocab_size
+        self.n_layers = model_args.n_layers
+        self.model_dim = model_args.dim
+        self.tok_embeddings = nn.Embedding(model_args.vocab_size, model_args.dim)
+        self.register_buffer('freqs_cis', precompute_freqs_cis(model_args.dim // model_args.n_heads, model_args.max_seq_len * 2))
+        self.layers = torch.nn.ModuleList()
+        for layer_id in range(model_args.n_layers):
+            self.layers.append(TransformerBlock(layer_id, model_args))
+        self.norm = RMSNorm(dim=model_args.dim, eps=model_args.norm_eps)
+        self.output = nn.Linear(model_args.dim, model_args.vocab_size, bias=False)
+        self.init_weights()
+
+    def init_weights(self):
+        """
+        [Note: On ``init_weights`` vs. ``reset_parameters``]
+        Modules may define ``reset_parameters`` to initialize parameter values.
+        ``reset_parameters`` is meant to only initialize directly owned
+        parameters/buffers, not those of their child modules, and it can be
+        used to give the initial values for these tensors.
+        Separately, users may want custom initialization for their modules,
+        different from that in ``reset_parameters``. For this, we define
+        ``init_weights``. We only call it in the constructor of this
+        ``Transformer`` root module to avoid reinitializing tensors.
+        """
+        with torch.device(self.freqs_cis.device):
+            self.freqs_cis = precompute_freqs_cis(self.model_args.dim // self.model_args.n_heads, self.model_args.max_seq_len * 2)
+        nn.init.normal_(self.tok_embeddings.weight)
+        for layer in self.layers:
+            layer.init_weights()
+        self.norm.reset_parameters()
+        final_out_std = self.model_args.dim ** -0.5
+        cutoff_factor = 3
+        nn.init.trunc_normal_(self.output.weight, mean=0.0, std=final_out_std, a=-cutoff_factor * final_out_std, b=cutoff_factor * final_out_std)
+
+    def forward(self, tokens: 'torch.Tensor'):
+        """
+        Perform a forward pass through the Transformer model.
+
+        Args:
+            tokens (torch.Tensor): Input token indices.
+
+        Returns:
+            torch.Tensor: Output logits after applying the Transformer model.
+
+        """
+        _bsz, seqlen = tokens.shape
+        h = self.tok_embeddings(tokens)
+        self.freqs_cis = self.freqs_cis
+        freqs_cis = self.freqs_cis[0:seqlen]
+        for layer in self.layers:
+            h = layer(h, freqs_cis)
+        h = self.norm(h)
+        output = self.output(h).float()
+        return output
+
+    @classmethod
+    def from_model_args(cls, model_args: 'ModelArgs') ->'Transformer':
+        """
+        Initialize a Transformer model from a ModelArgs object.
+
+        Args:
+            model_args (ModelArgs): Model configuration arguments.
+
+        Returns:
+            Transformer: Transformer model.
+
+        """
+        return cls(model_args)
+
+
 class ConvLayer(torch.nn.Module):
 
     def __init__(self, in_channels, out_channels, kernel_size, stride):
@@ -844,7 +1469,7 @@ class Vgg16(torch.nn.Module):
 
     def __init__(self, requires_grad=False):
         super(Vgg16, self).__init__()
-        vgg_pretrained_features = models.vgg16(pretrained=True).features
+        vgg_pretrained_features = models.vgg16(weights=models.VGG16_Weights.IMAGENET1K_V1).features
         self.slice1 = torch.nn.Sequential()
         self.slice2 = torch.nn.Sequential()
         self.slice3 = torch.nn.Sequential()
@@ -914,6 +1539,295 @@ class Foo(torch.nn.Module):
             return torch.relu(x)
 
 
+class GraphAttentionLayer(nn.Module):
+    """
+    Graph Attention Layer (GAT) as described in the paper `"Graph Attention Networks" <https://arxiv.org/pdf/1710.10903.pdf>`.
+
+        This operation can be mathematically described as:
+
+            e_ij = a(W h_i, W h_j)
+            α_ij = softmax_j(e_ij) = exp(e_ij) / Σ_k(exp(e_ik))     
+            h_i' = σ(Σ_j(α_ij W h_j))
+            
+            where h_i and h_j are the feature vectors of nodes i and j respectively, W is a learnable weight matrix,
+            a is an attention mechanism that computes the attention coefficients e_ij, and σ is an activation function.
+
+    """
+
+    def __init__(self, in_features: 'int', out_features: 'int', n_heads: 'int', concat: 'bool'=False, dropout: 'float'=0.4, leaky_relu_slope: 'float'=0.2):
+        super(GraphAttentionLayer, self).__init__()
+        self.n_heads = n_heads
+        self.concat = concat
+        self.dropout = dropout
+        if concat:
+            self.out_features = out_features
+            assert out_features % n_heads == 0
+            self.n_hidden = out_features // n_heads
+        else:
+            self.n_hidden = out_features
+        self.W = nn.Parameter(torch.empty(size=(in_features, self.n_hidden * n_heads)))
+        self.a = nn.Parameter(torch.empty(size=(n_heads, 2 * self.n_hidden, 1)))
+        self.leakyrelu = nn.LeakyReLU(leaky_relu_slope)
+        self.softmax = nn.Softmax(dim=1)
+        self.reset_parameters()
+
+    def reset_parameters(self):
+        """
+        Reinitialize learnable parameters.
+        """
+        nn.init.xavier_normal_(self.W)
+        nn.init.xavier_normal_(self.a)
+
+    def _get_attention_scores(self, h_transformed: 'torch.Tensor'):
+        """calculates the attention scores e_ij for all pairs of nodes (i, j) in the graph
+        in vectorized parallel form. for each pair of source and target nodes (i, j),
+        the attention score e_ij is computed as follows:
+
+            e_ij = LeakyReLU(a^T [Wh_i || Wh_j]) 
+
+            where || denotes the concatenation operation, and a and W are the learnable parameters.
+
+        Args:
+            h_transformed (torch.Tensor): Transformed feature matrix with shape (n_nodes, n_heads, n_hidden),
+                where n_nodes is the number of nodes and out_features is the number of output features per node.
+
+        Returns:
+            torch.Tensor: Attention score matrix with shape (n_heads, n_nodes, n_nodes), where n_nodes is the number of nodes.
+        """
+        source_scores = torch.matmul(h_transformed, self.a[:, :self.n_hidden, :])
+        target_scores = torch.matmul(h_transformed, self.a[:, self.n_hidden:, :])
+        e = source_scores + target_scores.mT
+        return self.leakyrelu(e)
+
+    def forward(self, h: 'torch.Tensor', adj_mat: 'torch.Tensor'):
+        """
+        Performs a graph attention layer operation.
+
+        Args:
+            h (torch.Tensor): Input tensor representing node features.
+            adj_mat (torch.Tensor): Adjacency matrix representing graph structure.
+
+        Returns:
+            torch.Tensor: Output tensor after the graph convolution operation.
+        """
+        n_nodes = h.shape[0]
+        h_transformed = torch.mm(h, self.W)
+        h_transformed = F.dropout(h_transformed, self.dropout, training=self.training)
+        h_transformed = h_transformed.view(n_nodes, self.n_heads, self.n_hidden).permute(1, 0, 2)
+        e = self._get_attention_scores(h_transformed)
+        connectivity_mask = -9e+16 * torch.ones_like(e)
+        e = torch.where(adj_mat > 0, e, connectivity_mask)
+        attention = F.softmax(e, dim=-1)
+        attention = F.dropout(attention, self.dropout, training=self.training)
+        h_prime = torch.matmul(attention, h_transformed)
+        if self.concat:
+            h_prime = h_prime.permute(1, 0, 2).contiguous().view(n_nodes, self.out_features)
+        else:
+            h_prime = h_prime.mean(dim=0)
+        return h_prime
+
+
+class GAT(nn.Module):
+    """
+    Graph Attention Network (GAT) as described in the paper `"Graph Attention Networks" <https://arxiv.org/pdf/1710.10903.pdf>`.
+    Consists of a 2-layer stack of Graph Attention Layers (GATs). The fist GAT Layer is followed by an ELU activation.
+    And the second (final) layer is a GAT layer with a single attention head and softmax activation function. 
+    """
+
+    def __init__(self, in_features, n_hidden, n_heads, num_classes, concat=False, dropout=0.4, leaky_relu_slope=0.2):
+        """ Initializes the GAT model. 
+
+        Args:
+            in_features (int): number of input features per node.
+            n_hidden (int): output size of the first Graph Attention Layer.
+            n_heads (int): number of attention heads in the first Graph Attention Layer.
+            num_classes (int): number of classes to predict for each node.
+            concat (bool, optional): Wether to concatinate attention heads or take an average over them for the
+                output of the first Graph Attention Layer. Defaults to False.
+            dropout (float, optional): dropout rate. Defaults to 0.4.
+            leaky_relu_slope (float, optional): alpha (slope) of the leaky relu activation. Defaults to 0.2.
+        """
+        super(GAT, self).__init__()
+        self.gat1 = GraphAttentionLayer(in_features=in_features, out_features=n_hidden, n_heads=n_heads, concat=concat, dropout=dropout, leaky_relu_slope=leaky_relu_slope)
+        self.gat2 = GraphAttentionLayer(in_features=n_hidden, out_features=num_classes, n_heads=1, concat=False, dropout=dropout, leaky_relu_slope=leaky_relu_slope)
+
+    def forward(self, input_tensor: 'torch.Tensor', adj_mat: 'torch.Tensor'):
+        """
+        Performs a forward pass through the network.
+
+        Args:
+            input_tensor (torch.Tensor): Input tensor representing node features.
+            adj_mat (torch.Tensor): Adjacency matrix representing graph structure.
+
+        Returns:
+            torch.Tensor: Output tensor after the forward pass.
+        """
+        x = self.gat1(input_tensor, adj_mat)
+        x = F.elu(x)
+        x = self.gat2(x, adj_mat)
+        return F.log_softmax(x, dim=1)
+
+
+class GraphConv(nn.Module):
+    """
+        Graph Convolutional Layer described in "Semi-Supervised Classification with Graph Convolutional Networks".
+
+        Given an input feature representation for each node in a graph, the Graph Convolutional Layer aims to aggregate
+        information from the node's neighborhood to update its own representation. This is achieved by applying a graph
+        convolutional operation that combines the features of a node with the features of its neighboring nodes.
+
+        Mathematically, the Graph Convolutional Layer can be described as follows:
+
+            H' = f(D^(-1/2) * A * D^(-1/2) * H * W)
+
+        where:
+            H: Input feature matrix with shape (N, F_in), where N is the number of nodes and F_in is the number of 
+                input features per node.
+            A: Adjacency matrix of the graph with shape (N, N), representing the relationships between nodes.
+            W: Learnable weight matrix with shape (F_in, F_out), where F_out is the number of output features per node.
+            D: The degree matrix.
+    """
+
+    def __init__(self, input_dim, output_dim, use_bias=False):
+        super(GraphConv, self).__init__()
+        self.kernel = nn.Parameter(torch.Tensor(input_dim, output_dim))
+        nn.init.xavier_normal_(self.kernel)
+        self.bias = None
+        if use_bias:
+            self.bias = nn.Parameter(torch.Tensor(output_dim))
+            nn.init.zeros_(self.bias)
+
+    def forward(self, input_tensor, adj_mat):
+        """
+        Performs a graph convolution operation.
+
+        Args:
+            input_tensor (torch.Tensor): Input tensor representing node features.
+            adj_mat (torch.Tensor): Normalized adjacency matrix representing graph structure.
+
+        Returns:
+            torch.Tensor: Output tensor after the graph convolution operation.
+        """
+        support = torch.mm(input_tensor, self.kernel)
+        output = torch.spmm(adj_mat, support)
+        if self.bias is not None:
+            output = output + self.bias
+        return output
+
+
+class GCN(nn.Module):
+    """
+    Graph Convolutional Network (GCN) as described in the paper `"Semi-Supervised Classification with Graph 
+    Convolutional Networks" <https://arxiv.org/pdf/1609.02907.pdf>`.
+
+    The Graph Convolutional Network is a deep learning architecture designed for semi-supervised node 
+    classification tasks on graph-structured data. It leverages the graph structure to learn node representations 
+    by propagating information through the graph using graph convolutional layers.
+
+    The original implementation consists of two stacked graph convolutional layers. The ReLU activation function is 
+    applied to the hidden representations, and the Softmax activation function is applied to the output representations.
+    """
+
+    def __init__(self, input_dim, hidden_dim, output_dim, use_bias=True, dropout_p=0.1):
+        super(GCN, self).__init__()
+        self.gc1 = GraphConv(input_dim, hidden_dim, use_bias=use_bias)
+        self.gc2 = GraphConv(hidden_dim, output_dim, use_bias=use_bias)
+        self.dropout = nn.Dropout(dropout_p)
+
+    def forward(self, input_tensor, adj_mat):
+        """
+        Performs forward pass of the Graph Convolutional Network (GCN).
+
+        Args:
+            input_tensor (torch.Tensor): Input node feature matrix with shape (N, input_dim), where N is the number of nodes
+                and input_dim is the number of input features per node.
+            adj_mat (torch.Tensor): Normalized adjacency matrix of the graph with shape (N, N), representing the relationships between
+                nodes.
+
+        Returns:
+            torch.Tensor: Output tensor with shape (N, output_dim), representing the predicted class probabilities for each node.
+        """
+        x = self.gc1(input_tensor, adj_mat)
+        x = F.relu(x)
+        x = self.dropout(x)
+        x = self.gc2(x, adj_mat)
+        return F.log_softmax(x, dim=1)
+
+
+class PositionalEncoding(nn.Module):
+    """Inject some information about the relative or absolute position of the tokens in the sequence.
+        The positional encodings have the same dimension as the embeddings, so that the two can be summed.
+        Here, we use sine and cosine functions of different frequencies.
+    .. math:
+        \\text{PosEncoder}(pos, 2i) = sin(pos/10000^(2i/d_model))
+        \\text{PosEncoder}(pos, 2i+1) = cos(pos/10000^(2i/d_model))
+        \\text{where pos is the word position and i is the embed idx)
+    Args:
+        d_model: the embed dim (required).
+        dropout: the dropout value (default=0.1).
+        max_len: the max. length of the incoming sequence (default=5000).
+    Examples:
+        >>> pos_encoder = PositionalEncoding(d_model)
+    """
+
+    def __init__(self, d_model, dropout=0.1, max_len=5000):
+        super(PositionalEncoding, self).__init__()
+        self.dropout = nn.Dropout(p=dropout)
+        pe = torch.zeros(max_len, d_model)
+        position = torch.arange(0, max_len, dtype=torch.float).unsqueeze(1)
+        div_term = torch.exp(torch.arange(0, d_model, 2).float() * (-math.log(10000.0) / d_model))
+        pe[:, 0::2] = torch.sin(position * div_term)
+        pe[:, 1::2] = torch.cos(position * div_term)
+        pe = pe.unsqueeze(0).transpose(0, 1)
+        self.register_buffer('pe', pe)
+
+    def forward(self, x):
+        """Inputs of forward function
+        Args:
+            x: the sequence fed to the positional encoder model (required).
+        Shape:
+            x: [sequence length, batch size, embed dim]
+            output: [sequence length, batch size, embed dim]
+        Examples:
+            >>> output = pos_encoder(x)
+        """
+        x = x + self.pe[:x.size(0), :]
+        return self.dropout(x)
+
+
+class Translator(nn.Module):
+
+    def __init__(self, num_encoder_layers, num_decoder_layers, embed_size, num_heads, src_vocab_size, tgt_vocab_size, dim_feedforward, dropout):
+        super(Translator, self).__init__()
+        self.src_embedding = nn.Embedding(src_vocab_size, embed_size)
+        self.tgt_embedding = nn.Embedding(tgt_vocab_size, embed_size)
+        self.pos_enc = PositionalEncoding(embed_size, dropout)
+        self.transformer = nn.Transformer(d_model=embed_size, nhead=num_heads, num_encoder_layers=num_encoder_layers, num_decoder_layers=num_decoder_layers, dim_feedforward=dim_feedforward, dropout=dropout)
+        self.ff = nn.Linear(embed_size, tgt_vocab_size)
+        self._init_weights()
+
+    def _init_weights(self):
+        for p in self.parameters():
+            if p.dim() > 1:
+                nn.init.xavier_uniform_(p)
+
+    def forward(self, src, trg, src_mask, tgt_mask, src_padding_mask, tgt_padding_mask, memory_key_padding_mask):
+        src_emb = self.pos_enc(self.src_embedding(src))
+        tgt_emb = self.pos_enc(self.tgt_embedding(trg))
+        outs = self.transformer(src_emb, tgt_emb, src_mask, tgt_mask, None, src_padding_mask, tgt_padding_mask, memory_key_padding_mask)
+        return self.ff(outs)
+
+    def encode(self, src, src_mask):
+        embed = self.src_embedding(src)
+        pos_enc = self.pos_enc(embed)
+        return self.transformer.encoder(pos_enc, src_mask)
+
+    def decode(self, tgt, memory, tgt_mask):
+        embed = self.tgt_embedding(tgt)
+        pos_enc = self.pos_enc(embed)
+        return self.transformer.decoder(pos_enc, memory, tgt_mask)
+
+
 class Bottle(nn.Module):
 
     def forward(self, input):
@@ -976,6 +1890,32 @@ class SNLIClassifier(nn.Module):
         return scores
 
 
+class Layer(nn.Linear):
+
+    def __init__(self, in_features, out_features, bias=True, device=None, dtype=None):
+        super().__init__(in_features, out_features, bias, device, dtype)
+        self.relu = torch.nn.ReLU()
+        self.opt = Adam(self.parameters(), lr=args.lr)
+        self.threshold = args.threshold
+        self.num_epochs = args.epochs
+
+    def forward(self, x):
+        x_direction = x / (x.norm(2, 1, keepdim=True) + 0.0001)
+        return self.relu(torch.mm(x_direction, self.weight.T) + self.bias.unsqueeze(0))
+
+    def train(self, x_pos, x_neg):
+        for i in range(self.num_epochs):
+            g_pos = self.forward(x_pos).pow(2).mean(1)
+            g_neg = self.forward(x_neg).pow(2).mean(1)
+            loss = torch.log1p(torch.exp(torch.cat([-g_pos + self.threshold, g_neg - self.threshold]))).mean()
+            self.opt.zero_grad()
+            loss.backward()
+            self.opt.step()
+            if i % args.log_interval == 0:
+                None
+        return self.forward(x_pos).detach(), self.forward(x_neg).detach()
+
+
 class SiameseNetwork(nn.Module):
     """
         Siamese network for image similarity estimation.
@@ -990,7 +1930,7 @@ class SiameseNetwork(nn.Module):
 
     def __init__(self):
         super(SiameseNetwork, self).__init__()
-        self.resnet = torchvision.models.resnet18(pretrained=False)
+        self.resnet = torchvision.models.resnet18(weights=None)
         self.resnet.conv1 = nn.Conv2d(1, 64, kernel_size=(7, 7), stride=(2, 2), padding=(3, 3), bias=False)
         self.fc_in_features = self.resnet.fc.in_features
         self.resnet = torch.nn.Sequential(*list(self.resnet.children())[:-1])
@@ -1001,7 +1941,7 @@ class SiameseNetwork(nn.Module):
 
     def init_weights(self, m):
         if isinstance(m, nn.Linear):
-            torch.nn.init.xavier_uniform(m.weight)
+            torch.nn.init.xavier_uniform_(m.weight)
             m.bias.data.fill_(0.01)
 
     def forward_once(self, x):
@@ -1075,75 +2015,25 @@ class VAE(nn.Module):
         return self.decode(z), mu, logvar
 
 
-class PositionalEncoding(nn.Module):
-    """Inject some information about the relative or absolute position of the tokens in the sequence.
-        The positional encodings have the same dimension as the embeddings, so that the two can be summed.
-        Here, we use sine and cosine functions of different frequencies.
-    .. math:
-        \\text{PosEncoder}(pos, 2i) = sin(pos/10000^(2i/d_model))
-        \\text{PosEncoder}(pos, 2i+1) = cos(pos/10000^(2i/d_model))
-        \\text{where pos is the word position and i is the embed idx)
-    Args:
-        d_model: the embed dim (required).
-        dropout: the dropout value (default=0.1).
-        max_len: the max. length of the incoming sequence (default=5000).
-    Examples:
-        >>> pos_encoder = PositionalEncoding(d_model)
-    """
-
-    def __init__(self, d_model, dropout=0.1, max_len=5000):
-        super(PositionalEncoding, self).__init__()
-        self.dropout = nn.Dropout(p=dropout)
-        pe = torch.zeros(max_len, d_model)
-        position = torch.arange(0, max_len, dtype=torch.float).unsqueeze(1)
-        div_term = torch.exp(torch.arange(0, d_model, 2).float() * (-math.log(10000.0) / d_model))
-        pe[:, 0::2] = torch.sin(position * div_term)
-        pe[:, 1::2] = torch.cos(position * div_term)
-        pe = pe.unsqueeze(0).transpose(0, 1)
-        self.register_buffer('pe', pe)
-
-    def forward(self, x):
-        """Inputs of forward function
-        Args:
-            x: the sequence fed to the positional encoder model (required).
-        Shape:
-            x: [sequence length, batch size, embed dim]
-            output: [sequence length, batch size, embed dim]
-        Examples:
-            >>> output = pos_encoder(x)
-        """
-        x = x + self.pe[:x.size(0), :]
-        return self.dropout(x)
-
-
-class TransformerModel(nn.Module):
+class TransformerModel(nn.Transformer):
     """Container module with an encoder, a recurrent or transformer module, and a decoder."""
 
     def __init__(self, ntoken, ninp, nhead, nhid, nlayers, dropout=0.5):
-        super(TransformerModel, self).__init__()
-        try:
-            from torch.nn import TransformerEncoder
-            from torch.nn import TransformerEncoderLayer
-        except BaseException as e:
-            raise ImportError('TransformerEncoder module does not exist in PyTorch 1.1 or lower.') from e
+        super(TransformerModel, self).__init__(d_model=ninp, nhead=nhead, dim_feedforward=nhid, num_encoder_layers=nlayers)
         self.model_type = 'Transformer'
         self.src_mask = None
         self.pos_encoder = PositionalEncoding(ninp, dropout)
-        encoder_layers = TransformerEncoderLayer(ninp, nhead, nhid, dropout)
-        self.transformer_encoder = TransformerEncoder(encoder_layers, nlayers)
-        self.encoder = nn.Embedding(ntoken, ninp)
+        self.input_emb = nn.Embedding(ntoken, ninp)
         self.ninp = ninp
         self.decoder = nn.Linear(ninp, ntoken)
         self.init_weights()
 
     def _generate_square_subsequent_mask(self, sz):
-        mask = (torch.triu(torch.ones(sz, sz)) == 1).transpose(0, 1)
-        mask = mask.float().masked_fill(mask == 0, float('-inf')).masked_fill(mask == 1, float(0.0))
-        return mask
+        return torch.log(torch.tril(torch.ones(sz, sz)))
 
     def init_weights(self):
         initrange = 0.1
-        nn.init.uniform_(self.encoder.weight, -initrange, initrange)
+        nn.init.uniform_(self.input_emb.weight, -initrange, initrange)
         nn.init.zeros_(self.decoder.bias)
         nn.init.uniform_(self.decoder.weight, -initrange, initrange)
 
@@ -1155,139 +2045,91 @@ class TransformerModel(nn.Module):
                 self.src_mask = mask
         else:
             self.src_mask = None
-        src = self.encoder(src) * math.sqrt(self.ninp)
+        src = self.input_emb(src) * math.sqrt(self.ninp)
         src = self.pos_encoder(src)
-        output = self.transformer_encoder(src, self.src_mask)
+        output = self.encoder(src, mask=self.src_mask)
         output = self.decoder(output)
         return F.log_softmax(output, dim=-1)
 
 
 import torch
 from torch.nn import MSELoss, ReLU
-from paritybench._paritybench_helpers import _mock_config, _mock_layer, _paritybench_base, _fails_compile
+from types import SimpleNamespace
 
 
 TESTCASES = [
-    # (nn.Module, init_args, forward_args, jit_compiles)
+    # (nn.Module, init_args, forward_args)
+    (Block,
+     lambda: ([], {'config': SimpleNamespace(n_embd=4, n_head=4, resid_pdrop=0.5, block_size=4, attn_pdrop=4)}),
+     lambda: ([torch.rand([4, 4, 4])], {})),
     (ConvLayer,
      lambda: ([], {'in_channels': 4, 'out_channels': 4, 'kernel_size': 4, 'stride': 1}),
-     lambda: ([torch.rand([4, 4, 4, 4])], {}),
-     True),
+     lambda: ([torch.rand([4, 4, 4, 4])], {})),
     (Decoder,
      lambda: ([], {'ntoken': 4, 'nhid': 4, 'dropout': 0.5}),
-     lambda: ([torch.rand([4, 4, 4, 4])], {}),
-     True),
+     lambda: ([torch.rand([4, 4, 4, 4])], {})),
+    (FeedForward,
+     lambda: ([], {'dim': 4, 'hidden_dim': 4, 'multiple_of': 4, 'ffn_dim_multiplier': 4}),
+     lambda: ([torch.rand([4, 4, 4, 4])], {})),
     (Foo,
      lambda: ([], {}),
-     lambda: ([torch.rand([4, 4, 4, 4])], {}),
-     True),
+     lambda: ([torch.rand([4, 4, 4, 4])], {})),
+    (GAT,
+     lambda: ([], {'in_features': 4, 'n_hidden': 4, 'n_heads': 4, 'num_classes': 4}),
+     lambda: ([torch.rand([4, 4]), torch.rand([4, 4])], {})),
+    (GCN,
+     lambda: ([], {'input_dim': 4, 'hidden_dim': 4, 'output_dim': 4}),
+     lambda: ([torch.rand([4, 4]), torch.rand([4, 4])], {})),
+    (GraphAttentionLayer,
+     lambda: ([], {'in_features': 4, 'out_features': 4, 'n_heads': 4}),
+     lambda: ([torch.rand([4, 4]), torch.rand([4, 4])], {})),
+    (GraphConv,
+     lambda: ([], {'input_dim': 4, 'output_dim': 4}),
+     lambda: ([torch.rand([4, 4]), torch.rand([4, 4])], {})),
     (Linear,
      lambda: ([], {'in_features': 4, 'out_features': 4}),
-     lambda: ([torch.rand([4, 4])], {}),
-     False),
+     lambda: ([torch.rand([4, 4])], {})),
     (M,
      lambda: ([], {}),
-     lambda: ([torch.rand([4, 4, 4, 4]), torch.rand([4, 4, 4, 4])], {}),
-     True),
+     lambda: ([torch.rand([4, 4, 4, 4]), torch.rand([4, 4, 4, 4])], {})),
     (M1,
      lambda: ([], {}),
-     lambda: ([torch.rand([4, 4, 4, 4])], {}),
-     True),
+     lambda: ([torch.rand([4, 4, 4, 4])], {})),
     (M2,
      lambda: ([], {}),
-     lambda: ([torch.rand([4, 4, 4, 4]), torch.rand([4, 4, 4, 4])], {}),
-     True),
+     lambda: ([torch.rand([4, 4, 4, 4]), torch.rand([4, 4, 4, 4])], {})),
     (MultiheadAttentionLayer,
-     lambda: ([], {'config': _mock_config(n_embd=4, n_head=4, resid_pdrop=0.5, block_size=4, attn_pdrop=4)}),
-     lambda: ([torch.rand([4, 4, 4])], {}),
-     False),
+     lambda: ([], {'config': SimpleNamespace(n_embd=4, n_head=4, resid_pdrop=0.5, block_size=4, attn_pdrop=4)}),
+     lambda: ([torch.rand([4, 4, 4])], {})),
     (MyElementwiseModule,
      lambda: ([], {}),
-     lambda: ([torch.rand([4, 4, 4, 4]), torch.rand([4, 4, 4, 4])], {}),
-     True),
+     lambda: ([torch.rand([4, 4, 4, 4]), torch.rand([4, 4, 4, 4])], {})),
     (Policy,
      lambda: ([], {}),
-     lambda: ([torch.rand([4, 4, 4, 4])], {}),
-     True),
+     lambda: ([torch.rand([4, 4, 4, 4])], {})),
     (PositionalEncoding,
      lambda: ([], {'d_model': 4}),
-     lambda: ([torch.rand([4, 4, 4, 4])], {}),
-     True),
+     lambda: ([torch.rand([4, 4, 4, 4])], {})),
+    (RMSNorm,
+     lambda: ([], {'dim': 4}),
+     lambda: ([torch.rand([4, 4, 4, 4])], {})),
     (ResidualBlock,
      lambda: ([], {'channels': 4}),
-     lambda: ([torch.rand([4, 4, 4, 4])], {}),
-     True),
+     lambda: ([torch.rand([4, 4, 4, 4])], {})),
     (SiameseNetwork,
      lambda: ([], {}),
-     lambda: ([torch.rand([4, 1, 64, 64]), torch.rand([4, 1, 64, 64])], {}),
-     True),
+     lambda: ([torch.rand([4, 1, 64, 64]), torch.rand([4, 1, 64, 64])], {})),
     (TransformerNet,
      lambda: ([], {}),
-     lambda: ([torch.rand([4, 3, 64, 64])], {}),
-     False),
+     lambda: ([torch.rand([4, 3, 64, 64])], {})),
     (UpsampleConvLayer,
      lambda: ([], {'in_channels': 4, 'out_channels': 4, 'kernel_size': 4, 'stride': 1}),
-     lambda: ([torch.rand([4, 4, 4, 4])], {}),
-     False),
+     lambda: ([torch.rand([4, 4, 4, 4])], {})),
     (VAE,
      lambda: ([], {}),
-     lambda: ([torch.rand([4, 784])], {}),
-     True),
+     lambda: ([torch.rand([4, 784])], {})),
     (Vgg16,
      lambda: ([], {}),
-     lambda: ([torch.rand([4, 3, 64, 64])], {}),
-     False),
+     lambda: ([torch.rand([4, 3, 64, 64])], {})),
 ]
-
-class Test_pytorch_examples(_paritybench_base):
-    def test_000(self):
-        self._check(*TESTCASES[0])
-
-    def test_001(self):
-        self._check(*TESTCASES[1])
-
-    def test_002(self):
-        self._check(*TESTCASES[2])
-
-    def test_003(self):
-        self._check(*TESTCASES[3])
-
-    def test_004(self):
-        self._check(*TESTCASES[4])
-
-    def test_005(self):
-        self._check(*TESTCASES[5])
-
-    def test_006(self):
-        self._check(*TESTCASES[6])
-
-    def test_007(self):
-        self._check(*TESTCASES[7])
-
-    def test_008(self):
-        self._check(*TESTCASES[8])
-
-    def test_009(self):
-        self._check(*TESTCASES[9])
-
-    def test_010(self):
-        self._check(*TESTCASES[10])
-
-    def test_011(self):
-        self._check(*TESTCASES[11])
-
-    def test_012(self):
-        self._check(*TESTCASES[12])
-
-    def test_013(self):
-        self._check(*TESTCASES[13])
-
-    def test_014(self):
-        self._check(*TESTCASES[14])
-
-    def test_015(self):
-        self._check(*TESTCASES[15])
-
-    def test_016(self):
-        self._check(*TESTCASES[16])
 

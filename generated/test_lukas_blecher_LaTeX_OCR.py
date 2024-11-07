@@ -38,21 +38,14 @@ train_resizer = _module
 utils = _module
 setup = _module
 
-from paritybench._paritybench_helpers import _mock_config, patch_functional
 from unittest.mock import mock_open, MagicMock
 from torch.autograd import Function
 from torch.nn import Module
 import abc, collections, copy, enum, functools, inspect, itertools, logging, math, matplotlib, numbers, numpy, pandas, queue, random, re, scipy, sklearn, string, tensorflow, time, torch, torchaudio, torchvision, types, typing, uuid, warnings
+import operator as op
+from dataclasses import dataclass
 import numpy as np
 from torch import Tensor
-patch_functional()
-open = mock_open()
-yaml = logging = sys = argparse = MagicMock()
-ArgumentParser = argparse.ArgumentParser
-_global_config = args = argv = cfg = config = params = _mock_config()
-argparse.ArgumentParser.return_value.parse_args.return_value = _global_config
-yaml.load.return_value = _global_config
-sys.argv = _global_config
 __version__ = '1.0.0'
 xrange = range
 wraps = functools.wraps
@@ -94,9 +87,6 @@ from torch.nn.utils.rnn import pad_sequence
 from collections import defaultdict
 
 
-from torchtext.data import metrics
-
-
 import torch.nn as nn
 
 
@@ -120,7 +110,7 @@ class Model(nn.Module):
         self.decoder = decoder
         self.args = args
 
-    def data_parallel(self, x: torch.Tensor, device_ids, output_device=None, **kwargs):
+    def data_parallel(self, x: 'torch.Tensor', device_ids, output_device=None, **kwargs):
         if not device_ids or len(device_ids) == 1:
             return self(x, **kwargs)
         if output_device is None:
@@ -133,13 +123,13 @@ class Model(nn.Module):
         outputs = nn.parallel.parallel_apply(replicas, inputs, kwargs)
         return nn.parallel.gather(outputs, output_device).mean()
 
-    def forward(self, x: torch.Tensor, tgt_seq: torch.Tensor, **kwargs):
+    def forward(self, x: 'torch.Tensor', tgt_seq: 'torch.Tensor', **kwargs):
         encoded = self.encoder(x)
         out = self.decoder(tgt_seq, context=encoded, **kwargs)
         return out
 
     @torch.no_grad()
-    def generate(self, x: torch.Tensor, temperature: float=0.25):
+    def generate(self, x: 'torch.Tensor', temperature: 'float'=0.25):
         return self.decoder.generate(torch.LongTensor([self.args.bos_token] * len(x))[:, None], self.args.max_seq_len, eos_token=self.args.eos_token, context=self.encoder(x), temperature=temperature)
 
 

@@ -30,21 +30,14 @@ train = _module
 train_config = _module
 train_loss = _module
 
-from paritybench._paritybench_helpers import _mock_config, patch_functional
 from unittest.mock import mock_open, MagicMock
 from torch.autograd import Function
 from torch.nn import Module
 import abc, collections, copy, enum, functools, inspect, itertools, logging, math, matplotlib, numbers, numpy, pandas, queue, random, re, scipy, sklearn, string, tensorflow, time, torch, torchaudio, torchvision, types, typing, uuid, warnings
+import operator as op
+from dataclasses import dataclass
 import numpy as np
 from torch import Tensor
-patch_functional()
-open = mock_open()
-yaml = logging = sys = argparse = MagicMock()
-ArgumentParser = argparse.ArgumentParser
-_global_config = args = argv = cfg = config = params = _mock_config()
-argparse.ArgumentParser.return_value.parse_args.return_value = _global_config
-yaml.load.return_value = _global_config
-sys.argv = _global_config
 __version__ = '1.0.0'
 xrange = range
 wraps = functools.wraps
@@ -170,7 +163,7 @@ class AvgPool(nn.Module):
 
 class ConvGRU(nn.Module):
 
-    def __init__(self, channels: int, kernel_size: int=3, padding: int=1):
+    def __init__(self, channels: 'int', kernel_size: 'int'=3, padding: 'int'=1):
         super().__init__()
         self.channels = channels
         self.ih = nn.Sequential(nn.Conv2d(channels * 2, channels * 2, kernel_size, padding=padding), nn.Sigmoid())
@@ -190,7 +183,7 @@ class ConvGRU(nn.Module):
         o = torch.stack(o, dim=1)
         return o, h
 
-    def forward(self, x, h: Optional[Tensor]):
+    def forward(self, x, h: 'Optional[Tensor]'):
         if h is None:
             h = torch.zeros((x.size(0), x.size(-3), x.size(-2), x.size(-1)), device=x.device, dtype=x.dtype)
         if x.ndim == 5:
@@ -206,7 +199,7 @@ class BottleneckBlock(nn.Module):
         self.channels = channels
         self.gru = ConvGRU(channels // 2)
 
-    def forward(self, x, r: Optional[Tensor]):
+    def forward(self, x, r: 'Optional[Tensor]'):
         a, b = x.split(self.channels // 2, dim=-3)
         b, r = self.gru(b, r)
         x = torch.cat([a, b], dim=-3)
@@ -254,7 +247,7 @@ class UpsamplingBlock(nn.Module):
         self.conv = nn.Sequential(nn.Conv2d(in_channels + skip_channels + src_channels, out_channels, 3, 1, 1, bias=False), nn.BatchNorm2d(out_channels), nn.ReLU(True))
         self.gru = ConvGRU(out_channels // 2)
 
-    def forward_single_frame(self, x, f, s, r: Optional[Tensor]):
+    def forward_single_frame(self, x, f, s, r: 'Optional[Tensor]'):
         x = self.upsample(x)
         x = x[:, :, :s.size(2), :s.size(3)]
         x = torch.cat([x, f, s], dim=1)
@@ -264,7 +257,7 @@ class UpsamplingBlock(nn.Module):
         x = torch.cat([a, b], dim=1)
         return x, r
 
-    def forward_time_series(self, x, f, s, r: Optional[Tensor]):
+    def forward_time_series(self, x, f, s, r: 'Optional[Tensor]'):
         B, T, _, H, W = s.shape
         x = x.flatten(0, 1)
         f = f.flatten(0, 1)
@@ -279,7 +272,7 @@ class UpsamplingBlock(nn.Module):
         x = torch.cat([a, b], dim=2)
         return x, r
 
-    def forward(self, x, f, s, r: Optional[Tensor]):
+    def forward(self, x, f, s, r: 'Optional[Tensor]'):
         if x.ndim == 5:
             return self.forward_time_series(x, f, s, r)
         else:
@@ -297,7 +290,7 @@ class RecurrentDecoder(nn.Module):
         self.decode1 = UpsamplingBlock(decoder_channels[1], feature_channels[0], 3, decoder_channels[2])
         self.decode0 = OutputBlock(decoder_channels[2], 3, decoder_channels[3])
 
-    def forward(self, s0: Tensor, f1: Tensor, f2: Tensor, f3: Tensor, f4: Tensor, r1: Optional[Tensor], r2: Optional[Tensor], r3: Optional[Tensor], r4: Optional[Tensor]):
+    def forward(self, s0: 'Tensor', f1: 'Tensor', f2: 'Tensor', f3: 'Tensor', f4: 'Tensor', r1: 'Optional[Tensor]', r2: 'Optional[Tensor]', r3: 'Optional[Tensor]', r4: 'Optional[Tensor]'):
         s1, s2, s3 = self.avgpool(s0)
         x4, r4 = self.decode4(f4, r4)
         x3, r3 = self.decode3(x4, f3, s3, r3)
@@ -383,7 +376,7 @@ class BoxFilter(nn.Module):
 
 class FastGuidedFilter(nn.Module):
 
-    def __init__(self, r: int, eps: float=1e-05):
+    def __init__(self, r: 'int', eps: 'float'=1e-05):
         super().__init__()
         self.r = r
         self.eps = eps
@@ -451,7 +444,7 @@ class LRASPP(nn.Module):
 
 class MobileNetV3LargeEncoder(MobileNetV3):
 
-    def __init__(self, pretrained: bool=False):
+    def __init__(self, pretrained: 'bool'=False):
         super().__init__(inverted_residual_setting=[InvertedResidualConfig(16, 3, 16, 16, False, 'RE', 1, 1, 1), InvertedResidualConfig(16, 3, 64, 24, False, 'RE', 2, 1, 1), InvertedResidualConfig(24, 3, 72, 24, False, 'RE', 1, 1, 1), InvertedResidualConfig(24, 5, 72, 40, True, 'RE', 2, 1, 1), InvertedResidualConfig(40, 5, 120, 40, True, 'RE', 1, 1, 1), InvertedResidualConfig(40, 5, 120, 40, True, 'RE', 1, 1, 1), InvertedResidualConfig(40, 3, 240, 80, False, 'HS', 2, 1, 1), InvertedResidualConfig(80, 3, 200, 80, False, 'HS', 1, 1, 1), InvertedResidualConfig(80, 3, 184, 80, False, 'HS', 1, 1, 1), InvertedResidualConfig(80, 3, 184, 80, False, 'HS', 1, 1, 1), InvertedResidualConfig(80, 3, 480, 112, True, 'HS', 1, 1, 1), InvertedResidualConfig(112, 3, 672, 112, True, 'HS', 1, 1, 1), InvertedResidualConfig(112, 5, 672, 160, True, 'HS', 2, 2, 1), InvertedResidualConfig(160, 5, 960, 160, True, 'HS', 1, 2, 1), InvertedResidualConfig(160, 5, 960, 160, True, 'HS', 1, 2, 1)], last_channel=1280)
         if pretrained:
             self.load_state_dict(torch.hub.load_state_dict_from_url('https://download.pytorch.org/models/mobilenet_v3_large-8738ca79.pth'))
@@ -498,7 +491,7 @@ class MobileNetV3LargeEncoder(MobileNetV3):
 
 class ResNet50Encoder(ResNet):
 
-    def __init__(self, pretrained: bool=False):
+    def __init__(self, pretrained: 'bool'=False):
         super().__init__(block=Bottleneck, layers=[3, 4, 6, 3], replace_stride_with_dilation=[False, False, True], norm_layer=None)
         if pretrained:
             self.load_state_dict(torch.hub.load_state_dict_from_url('https://download.pytorch.org/models/resnet50-0676ba61.pth'))
@@ -535,7 +528,7 @@ class ResNet50Encoder(ResNet):
 
 class MattingNetwork(nn.Module):
 
-    def __init__(self, variant: str='mobilenetv3', refiner: str='deep_guided_filter', pretrained_backbone: bool=False):
+    def __init__(self, variant: 'str'='mobilenetv3', refiner: 'str'='deep_guided_filter', pretrained_backbone: 'bool'=False):
         super().__init__()
         assert variant in ['mobilenetv3', 'resnet50']
         assert refiner in ['fast_guided_filter', 'deep_guided_filter']
@@ -554,7 +547,7 @@ class MattingNetwork(nn.Module):
         else:
             self.refiner = FastGuidedFilterRefiner()
 
-    def forward(self, src: Tensor, r1: Optional[Tensor]=None, r2: Optional[Tensor]=None, r3: Optional[Tensor]=None, r4: Optional[Tensor]=None, downsample_ratio: float=1, segmentation_pass: bool=False):
+    def forward(self, src: 'Tensor', r1: 'Optional[Tensor]'=None, r2: 'Optional[Tensor]'=None, r3: 'Optional[Tensor]'=None, r4: 'Optional[Tensor]'=None, downsample_ratio: 'float'=1, segmentation_pass: 'bool'=False):
         if downsample_ratio != 1:
             src_sm = self._interpolate(src, scale_factor=downsample_ratio)
         else:
@@ -574,7 +567,7 @@ class MattingNetwork(nn.Module):
             seg = self.project_seg(hid)
             return [seg, *rec]
 
-    def _interpolate(self, x: Tensor, scale_factor: float):
+    def _interpolate(self, x: 'Tensor', scale_factor: 'float'):
         if x.ndim == 5:
             B, T = x.shape[:2]
             x = F.interpolate(x.flatten(0, 1), scale_factor=scale_factor, mode='bilinear', align_corners=False, recompute_scale_factor=False)
@@ -586,95 +579,40 @@ class MattingNetwork(nn.Module):
 
 import torch
 from torch.nn import MSELoss, ReLU
-from paritybench._paritybench_helpers import _mock_config, _mock_layer, _paritybench_base, _fails_compile
+from types import SimpleNamespace
 
 
 TESTCASES = [
-    # (nn.Module, init_args, forward_args, jit_compiles)
+    # (nn.Module, init_args, forward_args)
     (AvgPool,
      lambda: ([], {}),
-     lambda: ([torch.rand([4, 4, 4, 4])], {}),
-     True),
-    (BottleneckBlock,
-     lambda: ([], {'channels': 4}),
-     lambda: ([torch.rand([4, 4, 4, 4]), torch.rand([4, 2, 4, 4])], {}),
-     True),
+     lambda: ([torch.rand([4, 4, 4, 4])], {})),
     (BoxFilter,
      lambda: ([], {'r': 4}),
-     lambda: ([torch.rand([4, 4, 4, 4])], {}),
-     True),
+     lambda: ([torch.rand([4, 4, 4, 4])], {})),
     (ConvGRU,
      lambda: ([], {'channels': 4}),
-     lambda: ([torch.rand([4, 4, 4, 4]), torch.rand([4, 4, 4, 4])], {}),
-     True),
+     lambda: ([torch.rand([4, 4, 4, 4]), torch.rand([4, 4, 4, 4])], {})),
     (FastGuidedFilter,
      lambda: ([], {'r': 4}),
-     lambda: ([torch.rand([4, 4, 4, 4]), torch.rand([4, 4, 4, 4]), torch.rand([4, 4, 4, 4])], {}),
-     True),
+     lambda: ([torch.rand([4, 4, 4, 4]), torch.rand([4, 4, 4, 4]), torch.rand([4, 4, 4, 4])], {})),
     (LRASPP,
      lambda: ([], {'in_channels': 4, 'out_channels': 4}),
-     lambda: ([torch.rand([4, 4, 4, 4])], {}),
-     True),
+     lambda: ([torch.rand([4, 4, 4, 4])], {})),
     (MattingNetwork,
      lambda: ([], {}),
-     lambda: ([torch.rand([4, 3, 4, 4])], {}),
-     True),
+     lambda: ([torch.rand([4, 3, 4, 4])], {})),
     (MobileNetV3LargeEncoder,
      lambda: ([], {}),
-     lambda: ([torch.rand([4, 3, 4, 4])], {}),
-     True),
+     lambda: ([torch.rand([4, 3, 4, 4])], {})),
     (OutputBlock,
      lambda: ([], {'in_channels': 4, 'src_channels': 4, 'out_channels': 4}),
-     lambda: ([torch.rand([4, 4, 4, 4]), torch.rand([4, 4, 4, 4])], {}),
-     True),
+     lambda: ([torch.rand([4, 4, 4, 4]), torch.rand([4, 4, 4, 4])], {})),
     (Projection,
      lambda: ([], {'in_channels': 4, 'out_channels': 4}),
-     lambda: ([torch.rand([4, 4, 4, 4])], {}),
-     True),
+     lambda: ([torch.rand([4, 4, 4, 4])], {})),
     (ResNet50Encoder,
      lambda: ([], {}),
-     lambda: ([torch.rand([4, 3, 64, 64])], {}),
-     True),
-    (UpsamplingBlock,
-     lambda: ([], {'in_channels': 4, 'skip_channels': 4, 'src_channels': 4, 'out_channels': 4}),
-     lambda: ([torch.rand([4, 4, 4, 4]), torch.rand([4, 4, 4, 4]), torch.rand([4, 4, 4, 4]), torch.rand([4, 2, 4, 4])], {}),
-     True),
+     lambda: ([torch.rand([4, 3, 64, 64])], {})),
 ]
-
-class Test_PeterL1n_RobustVideoMatting(_paritybench_base):
-    def test_000(self):
-        self._check(*TESTCASES[0])
-
-    def test_001(self):
-        self._check(*TESTCASES[1])
-
-    def test_002(self):
-        self._check(*TESTCASES[2])
-
-    def test_003(self):
-        self._check(*TESTCASES[3])
-
-    def test_004(self):
-        self._check(*TESTCASES[4])
-
-    def test_005(self):
-        self._check(*TESTCASES[5])
-
-    def test_006(self):
-        self._check(*TESTCASES[6])
-
-    def test_007(self):
-        self._check(*TESTCASES[7])
-
-    def test_008(self):
-        self._check(*TESTCASES[8])
-
-    def test_009(self):
-        self._check(*TESTCASES[9])
-
-    def test_010(self):
-        self._check(*TESTCASES[10])
-
-    def test_011(self):
-        self._check(*TESTCASES[11])
 

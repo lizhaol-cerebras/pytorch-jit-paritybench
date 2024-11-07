@@ -64,6 +64,7 @@ PatchConvnet = _module
 ShuffleTransformer = _module
 TnT = _module
 VOLO = _module
+convnextv2 = _module
 resnet = _module
 resnext = _module
 swin_transformer = _module
@@ -86,21 +87,14 @@ mobileone = _module
 repvgg = _module
 setup = _module
 
-from paritybench._paritybench_helpers import _mock_config, patch_functional
 from unittest.mock import mock_open, MagicMock
 from torch.autograd import Function
 from torch.nn import Module
 import abc, collections, copy, enum, functools, inspect, itertools, logging, math, matplotlib, numbers, numpy, pandas, queue, random, re, scipy, sklearn, string, tensorflow, time, torch, torchaudio, torchvision, types, typing, uuid, warnings
+import operator as op
+from dataclasses import dataclass
 import numpy as np
 from torch import Tensor
-patch_functional()
-open = mock_open()
-yaml = logging = sys = argparse = MagicMock()
-ArgumentParser = argparse.ArgumentParser
-_global_config = args = argv = cfg = config = params = _mock_config()
-argparse.ArgumentParser.return_value.parse_args.return_value = _global_config
-yaml.load.return_value = _global_config
-sys.argv = _global_config
 __version__ = '1.0.0'
 xrange = range
 wraps = functools.wraps
@@ -1353,7 +1347,7 @@ class CrossFormerBlock(nn.Module):
         return flops
 
 
-def bhwc_to_bchw(x: torch.Tensor) ->torch.Tensor:
+def bhwc_to_bchw(x: 'torch.Tensor') ->torch.Tensor:
     """Permutes a tensor from the shape (B, H, W, C) to (B, C, H, W). """
     return x.permute(0, 3, 1, 2)
 
@@ -1365,12 +1359,12 @@ class PatchMerging(nn.Module):
         norm_layer (Type[nn.Module]): Type of normalization layer to be utilized.
     """
 
-    def __init__(self, dim: int, norm_layer: Type[nn.Module]=nn.LayerNorm) ->None:
+    def __init__(self, dim: 'int', norm_layer: 'Type[nn.Module]'=nn.LayerNorm) ->None:
         super(PatchMerging, self).__init__()
         self.norm = norm_layer(4 * dim)
         self.reduction = nn.Linear(in_features=4 * dim, out_features=2 * dim, bias=False)
 
-    def forward(self, x: torch.Tensor) ->torch.Tensor:
+    def forward(self, x: 'torch.Tensor') ->torch.Tensor:
         """ Forward pass.
         Args:
             x (torch.Tensor): Input tensor of the shape [B, C, H, W]
@@ -2350,7 +2344,7 @@ class WindowAttention(nn.Module):
         self.proj_drop = nn.Dropout(proj_drop)
         self.softmax = nn.Softmax(dim=-1)
 
-    def forward(self, x, mask: Optional[torch.Tensor]=None):
+    def forward(self, x, mask: 'Optional[torch.Tensor]'=None):
         """
         Args:
             x: input features with shape of (num_windows*B, N, C)
@@ -2475,7 +2469,7 @@ class GlobalAttention(nn.Module):
         return flops
 
 
-def window_partition(x, window_size: Tuple[int, int]):
+def window_partition(x, window_size: 'Tuple[int, int]'):
     """
     Args:
         x: (B, H, W, C)
@@ -2567,13 +2561,13 @@ class WindowMultiHeadAttention(nn.Module):
         sequential_attn (bool): If true sequential self-attention is performed
     """
 
-    def __init__(self, dim: int, num_heads: int, window_size: Tuple[int, int], drop_attn: float=0.0, drop_proj: float=0.0, meta_hidden_dim: int=384, sequential_attn: bool=False) ->None:
+    def __init__(self, dim: 'int', num_heads: 'int', window_size: 'Tuple[int, int]', drop_attn: 'float'=0.0, drop_proj: 'float'=0.0, meta_hidden_dim: 'int'=384, sequential_attn: 'bool'=False) ->None:
         super(WindowMultiHeadAttention, self).__init__()
         assert dim % num_heads == 0, 'The number of input features (in_features) are not divisible by the number of heads (num_heads).'
-        self.in_features: int = dim
-        self.window_size: Tuple[int, int] = window_size
-        self.num_heads: int = num_heads
-        self.sequential_attn: bool = sequential_attn
+        self.in_features: 'int' = dim
+        self.window_size: 'Tuple[int, int]' = window_size
+        self.num_heads: 'int' = num_heads
+        self.sequential_attn: 'bool' = sequential_attn
         self.qkv = nn.Linear(in_features=dim, out_features=dim * 3, bias=True)
         self.attn_drop = nn.Dropout(drop_attn)
         self.proj = nn.Linear(in_features=dim, out_features=dim, bias=True)
@@ -2591,13 +2585,13 @@ class WindowMultiHeadAttention(nn.Module):
         relative_coordinates_log = torch.sign(relative_coordinates) * torch.log(1.0 + relative_coordinates.abs())
         self.register_buffer('relative_coordinates_log', relative_coordinates_log, persistent=False)
 
-    def update_input_size(self, new_window_size: int, **kwargs: Any) ->None:
+    def update_input_size(self, new_window_size: 'int', **kwargs: Any) ->None:
         """Method updates the window size and so the pair-wise relative positions
         Args:
             new_window_size (int): New window size
             kwargs (Any): Unused
         """
-        self.window_size: int = new_window_size
+        self.window_size: 'int' = new_window_size
         self._make_pair_wise_relative_positions()
 
     def _relative_positional_encodings(self) ->torch.Tensor:
@@ -2612,12 +2606,12 @@ class WindowMultiHeadAttention(nn.Module):
         relative_position_bias = relative_position_bias.unsqueeze(0)
         return relative_position_bias
 
-    def _forward_sequential(self, x: torch.Tensor, mask: Optional[torch.Tensor]=None) ->torch.Tensor:
+    def _forward_sequential(self, x: 'torch.Tensor', mask: 'Optional[torch.Tensor]'=None) ->torch.Tensor:
         """
         """
         assert False, 'not implemented'
 
-    def _forward_batch(self, x: torch.Tensor, mask: Optional[torch.Tensor]=None) ->torch.Tensor:
+    def _forward_batch(self, x: 'torch.Tensor', mask: 'Optional[torch.Tensor]'=None) ->torch.Tensor:
         """This function performs standard (non-sequential) scaled cosine self-attention.
         """
         Bw, L, C = x.shape
@@ -2628,7 +2622,7 @@ class WindowMultiHeadAttention(nn.Module):
         attn = attn * logit_scale
         attn = attn + self._relative_positional_encodings()
         if mask is not None:
-            num_win: int = mask.shape[0]
+            num_win: 'int' = mask.shape[0]
             attn = attn.view(Bw // num_win, num_win, self.num_heads, L, L)
             attn = attn + mask.unsqueeze(1).unsqueeze(0)
             attn = attn.view(-1, self.num_heads, L, L)
@@ -2639,7 +2633,7 @@ class WindowMultiHeadAttention(nn.Module):
         x = self.proj_drop(x)
         return x
 
-    def forward(self, x: torch.Tensor, mask: Optional[torch.Tensor]=None) ->torch.Tensor:
+    def forward(self, x: 'torch.Tensor', mask: 'Optional[torch.Tensor]'=None) ->torch.Tensor:
         """ Forward pass.
         Args:
             x (torch.Tensor): Input tensor of the shape (B * windows, N, C)
@@ -2670,14 +2664,14 @@ class SwinTransformerBlock(nn.Module):
         norm_layer (Type[nn.Module]): Type of normalization layer to be utilized
     """
 
-    def __init__(self, dim: int, num_heads: int, feat_size: Tuple[int, int], window_size: Tuple[int, int], shift_size: Tuple[int, int]=(0, 0), mlp_ratio: float=4.0, init_values: Optional[float]=0, drop: float=0.0, drop_attn: float=0.0, drop_path: float=0.0, extra_norm: bool=False, sequential_attn: bool=False, norm_layer: Type[nn.Module]=nn.LayerNorm) ->None:
+    def __init__(self, dim: 'int', num_heads: 'int', feat_size: 'Tuple[int, int]', window_size: 'Tuple[int, int]', shift_size: 'Tuple[int, int]'=(0, 0), mlp_ratio: 'float'=4.0, init_values: 'Optional[float]'=0, drop: 'float'=0.0, drop_attn: 'float'=0.0, drop_path: 'float'=0.0, extra_norm: 'bool'=False, sequential_attn: 'bool'=False, norm_layer: 'Type[nn.Module]'=nn.LayerNorm) ->None:
         super(SwinTransformerBlock, self).__init__()
-        self.dim: int = dim
-        self.feat_size: Tuple[int, int] = feat_size
-        self.target_shift_size: Tuple[int, int] = to_2tuple(shift_size)
+        self.dim: 'int' = dim
+        self.feat_size: 'Tuple[int, int]' = feat_size
+        self.target_shift_size: 'Tuple[int, int]' = to_2tuple(shift_size)
         self.window_size, self.shift_size = self._calc_window_shift(to_2tuple(window_size))
         self.window_area = self.window_size[0] * self.window_size[1]
-        self.init_values: Optional[float] = init_values
+        self.init_values: 'Optional[float]' = init_values
         self.attn = WindowMultiHeadAttention(dim=dim, num_heads=num_heads, window_size=self.window_size, drop_attn=drop_attn, drop_proj=drop, sequential_attn=sequential_attn)
         self.norm1 = norm_layer(dim)
         self.drop_path1 = DropPath(drop_prob=drop_path) if drop_path > 0.0 else nn.Identity()
@@ -2716,13 +2710,13 @@ class SwinTransformerBlock(nn.Module):
             nn.init.constant_(self.norm1.weight, self.init_values)
             nn.init.constant_(self.norm2.weight, self.init_values)
 
-    def update_input_size(self, new_window_size: Tuple[int, int], new_feat_size: Tuple[int, int]) ->None:
+    def update_input_size(self, new_window_size: 'Tuple[int, int]', new_feat_size: 'Tuple[int, int]') ->None:
         """Method updates the image resolution to be processed and window size and so the pair-wise relative positions.
         Args:
             new_window_size (int): New window size
             new_feat_size (Tuple[int, int]): New input resolution
         """
-        self.feat_size: Tuple[int, int] = new_feat_size
+        self.feat_size: 'Tuple[int, int]' = new_feat_size
         self.window_size, self.shift_size = self._calc_window_shift(to_2tuple(new_window_size))
         self.window_area = self.window_size[0] * self.window_size[1]
         self.attn.update_input_size(new_window_size=self.window_size)
@@ -2733,7 +2727,7 @@ class SwinTransformerBlock(nn.Module):
         B, L, C = x.shape
         x = x.view(B, H, W, C)
         sh, sw = self.shift_size
-        do_shift: bool = any(self.shift_size)
+        do_shift: 'bool' = any(self.shift_size)
         if do_shift:
             x = torch.roll(x, shifts=(-sh, -sw), dims=(1, 2))
         x_windows = window_partition(x, self.window_size)
@@ -2746,7 +2740,7 @@ class SwinTransformerBlock(nn.Module):
         x = x.view(B, L, C)
         return x
 
-    def forward(self, x: torch.Tensor) ->torch.Tensor:
+    def forward(self, x: 'torch.Tensor') ->torch.Tensor:
         """Forward pass.
         Args:
             x (torch.Tensor): Input tensor of the shape [B, C, H, W]
@@ -4807,7 +4801,7 @@ class STE(nn.Module):
     output: Tensor (b, c, h, w)
     """
 
-    def __init__(self, planes: int, mlp_dim: int, head_num: int, dropout: float, patch_size: int, relative: bool, qkv_bias: bool, pre_norm: bool, **kwargs):
+    def __init__(self, planes: 'int', mlp_dim: 'int', head_num: 'int', dropout: 'float', patch_size: 'int', relative: 'bool', qkv_bias: 'bool', pre_norm: 'bool', **kwargs):
         super(STE, self).__init__()
         self.patch_size = patch_size
         self.pre_norm = pre_norm
@@ -4845,7 +4839,7 @@ class ConTBlock(nn.Module):
     Build a ConTBlock
     """
 
-    def __init__(self, planes: int, out_planes: int, mlp_dim: int, head_num: int, dropout: float, patch_size: List[int], downsample: nn.Module=None, stride: int=1, last_dropout: float=0.3, **kwargs):
+    def __init__(self, planes: 'int', out_planes: 'int', mlp_dim: 'int', head_num: 'int', dropout: 'float', patch_size: 'List[int]', downsample: 'nn.Module'=None, stride: 'int'=1, last_dropout: 'float'=0.3, **kwargs):
         super(ConTBlock, self).__init__()
         self.downsample = downsample
         self.identity = nn.Identity()
@@ -4878,7 +4872,7 @@ class ConTNet(nn.Module):
     Build a ConTNet backbone
     """
 
-    def __init__(self, block, layers: List[int], mlp_dim: List[int], head_num: List[int], dropout: List[float], in_channels: int=3, inplanes: int=64, num_classes: int=1000, init_weights: bool=True, first_embedding: bool=False, tweak_C: bool=False, **kwargs):
+    def __init__(self, block, layers: 'List[int]', mlp_dim: 'List[int]', head_num: 'List[int]', dropout: 'List[float]', in_channels: 'int'=3, inplanes: 'int'=64, num_classes: 'int'=1000, init_weights: 'bool'=True, first_embedding: 'bool'=False, tweak_C: 'bool'=False, **kwargs):
         """
         Args:
             block: ConT Block
@@ -4924,7 +4918,7 @@ class ConTNet(nn.Module):
         if init_weights:
             self._initialize_weights()
 
-    def _make_layer(self, planes: int, blocks: int, stride: int, mlp_dim: int, head_num: int, dropout: float, patch_size: List[int], use_avgdown: bool=False, **kwargs):
+    def _make_layer(self, planes: 'int', blocks: 'int', stride: 'int', mlp_dim: 'int', head_num: 'int', dropout: 'float', patch_size: 'List[int]', use_avgdown: 'bool'=False, **kwargs):
         layers = OrderedDict()
         for i in range(0, blocks - 1):
             layers[f'{self.block.__name__}{i}'] = self.block(planes, planes, mlp_dim, head_num, dropout, patch_size, **kwargs)
@@ -6253,10 +6247,10 @@ class DistilledPoolingTransformer(PoolingTransformer):
 
 class Learned_Aggregation_Layer(nn.Module):
 
-    def __init__(self, dim: int, num_heads: int=1, qkv_bias: bool=False, qk_scale: Optional[float]=None, attn_drop: float=0.0, proj_drop: float=0.0):
+    def __init__(self, dim: 'int', num_heads: 'int'=1, qkv_bias: 'bool'=False, qk_scale: 'Optional[float]'=None, attn_drop: 'float'=0.0, proj_drop: 'float'=0.0):
         super().__init__()
         self.num_heads = num_heads
-        head_dim: int = dim // num_heads
+        head_dim: 'int' = dim // num_heads
         self.scale = qk_scale or head_dim ** -0.5
         self.q = nn.Linear(dim, dim, bias=qkv_bias)
         self.k = nn.Linear(dim, dim, bias=qkv_bias)
@@ -6266,7 +6260,7 @@ class Learned_Aggregation_Layer(nn.Module):
         self.proj = nn.Linear(dim, dim)
         self.proj_drop = nn.Dropout(proj_drop)
 
-    def forward(self, x: torch.Tensor) ->torch.Tensor:
+    def forward(self, x: 'torch.Tensor') ->torch.Tensor:
         B, N, C = x.shape
         q = self.q(x[:, 0]).unsqueeze(1).reshape(B, 1, self.num_heads, C // self.num_heads).permute(0, 2, 1, 3)
         k = self.k(x).reshape(B, N, self.num_heads, C // self.num_heads).permute(0, 2, 1, 3)
@@ -6284,10 +6278,10 @@ class Learned_Aggregation_Layer(nn.Module):
 
 class Learned_Aggregation_Layer_multi(nn.Module):
 
-    def __init__(self, dim: int, num_heads: int=8, qkv_bias: bool=False, qk_scale: Optional[float]=None, attn_drop: float=0.0, proj_drop: float=0.0, num_classes: int=1000):
+    def __init__(self, dim: 'int', num_heads: 'int'=8, qkv_bias: 'bool'=False, qk_scale: 'Optional[float]'=None, attn_drop: 'float'=0.0, proj_drop: 'float'=0.0, num_classes: 'int'=1000):
         super().__init__()
         self.num_heads = num_heads
-        head_dim: int = dim // num_heads
+        head_dim: 'int' = dim // num_heads
         self.scale = qk_scale or head_dim ** -0.5
         self.q = nn.Linear(dim, dim, bias=qkv_bias)
         self.k = nn.Linear(dim, dim, bias=qkv_bias)
@@ -6297,7 +6291,7 @@ class Learned_Aggregation_Layer_multi(nn.Module):
         self.proj_drop = nn.Dropout(proj_drop)
         self.num_classes = num_classes
 
-    def forward(self, x: torch.Tensor) ->torch.Tensor:
+    def forward(self, x: 'torch.Tensor') ->torch.Tensor:
         B, N, C = x.shape
         q = self.q(x[:, :self.num_classes]).reshape(B, self.num_classes, self.num_heads, C // self.num_heads).permute(0, 2, 1, 3)
         k = self.k(x[:, self.num_classes:]).reshape(B, N - self.num_classes, self.num_heads, C // self.num_heads).permute(0, 2, 1, 3)
@@ -6314,7 +6308,7 @@ class Learned_Aggregation_Layer_multi(nn.Module):
 
 class Layer_scale_init_Block_only_token(nn.Module):
 
-    def __init__(self, dim: int, num_heads: int, mlp_ratio: float=4.0, qkv_bias: bool=False, qk_scale: Optional[float]=None, drop: float=0.0, attn_drop: float=0.0, drop_path: float=0.0, act_layer: nn.Module=nn.GELU, norm_layer=nn.LayerNorm, Attention_block=Learned_Aggregation_Layer, Mlp_block=Mlp, init_values: float=0.0001):
+    def __init__(self, dim: 'int', num_heads: 'int', mlp_ratio: 'float'=4.0, qkv_bias: 'bool'=False, qk_scale: 'Optional[float]'=None, drop: 'float'=0.0, attn_drop: 'float'=0.0, drop_path: 'float'=0.0, act_layer: 'nn.Module'=nn.GELU, norm_layer=nn.LayerNorm, Attention_block=Learned_Aggregation_Layer, Mlp_block=Mlp, init_values: 'float'=0.0001):
         super().__init__()
         self.norm1 = norm_layer(dim)
         self.attn = Attention_block(dim, num_heads=num_heads, qkv_bias=qkv_bias, qk_scale=qk_scale, attn_drop=attn_drop, proj_drop=drop)
@@ -6325,7 +6319,7 @@ class Layer_scale_init_Block_only_token(nn.Module):
         self.gamma_1 = nn.Parameter(init_values * torch.ones(dim), requires_grad=True)
         self.gamma_2 = nn.Parameter(init_values * torch.ones(dim), requires_grad=True)
 
-    def forward(self, x: torch.Tensor, x_cls: torch.Tensor) ->torch.Tensor:
+    def forward(self, x: 'torch.Tensor', x_cls: 'torch.Tensor') ->torch.Tensor:
         u = torch.cat((x_cls, x), dim=1)
         x_cls = x_cls + self.drop_path(self.gamma_1 * self.attn(self.norm1(u)))
         x_cls = x_cls + self.drop_path(self.gamma_2 * self.mlp(self.norm2(x_cls)))
@@ -6334,11 +6328,11 @@ class Layer_scale_init_Block_only_token(nn.Module):
 
 class Conv_blocks_se(nn.Module):
 
-    def __init__(self, dim: int):
+    def __init__(self, dim: 'int'):
         super().__init__()
         self.qkv_pos = nn.Sequential(nn.Conv2d(dim, dim, kernel_size=1), nn.GELU(), nn.Conv2d(dim, dim, groups=dim, kernel_size=3, padding=1, stride=1, bias=True), nn.GELU(), SqueezeExcite(dim, rd_ratio=0.25), nn.Conv2d(dim, dim, kernel_size=1))
 
-    def forward(self, x: torch.Tensor) ->torch.Tensor:
+    def forward(self, x: 'torch.Tensor') ->torch.Tensor:
         B, N, C = x.shape
         H = W = int(N ** 0.5)
         x = x.transpose(-1, -2)
@@ -6351,18 +6345,18 @@ class Conv_blocks_se(nn.Module):
 
 class Layer_scale_init_Block(nn.Module):
 
-    def __init__(self, dim: int, drop_path: float=0.0, act_layer: nn.Module=nn.GELU, norm_layer=nn.LayerNorm, Attention_block=None, init_values: float=0.0001):
+    def __init__(self, dim: 'int', drop_path: 'float'=0.0, act_layer: 'nn.Module'=nn.GELU, norm_layer=nn.LayerNorm, Attention_block=None, init_values: 'float'=0.0001):
         super().__init__()
         self.norm1 = norm_layer(dim)
         self.attn = Attention_block(dim)
         self.drop_path = DropPath(drop_path) if drop_path > 0.0 else nn.Identity()
         self.gamma_1 = nn.Parameter(init_values * torch.ones(dim), requires_grad=True)
 
-    def forward(self, x: torch.Tensor) ->torch.Tensor:
+    def forward(self, x: 'torch.Tensor') ->torch.Tensor:
         return x + self.drop_path(self.gamma_1 * self.attn(self.norm1(x)))
 
 
-def conv3x3(in_planes: int, out_planes: int, stride: int=1) ->nn.Sequential:
+def conv3x3(in_planes: 'int', out_planes: 'int', stride: 'int'=1) ->nn.Sequential:
     """3x3 convolution with padding"""
     return nn.Sequential(nn.Conv2d(in_planes, out_planes, kernel_size=3, stride=stride, padding=1, bias=False))
 
@@ -6370,7 +6364,7 @@ def conv3x3(in_planes: int, out_planes: int, stride: int=1) ->nn.Sequential:
 class ConvStem(nn.Module):
     """Image to Patch Embedding"""
 
-    def __init__(self, img_size: int=224, patch_size: int=16, in_chans: int=3, embed_dim: int=768):
+    def __init__(self, img_size: 'int'=224, patch_size: 'int'=16, in_chans: 'int'=3, embed_dim: 'int'=768):
         super().__init__()
         img_size = to_2tuple(img_size)
         patch_size = to_2tuple(patch_size)
@@ -6380,7 +6374,7 @@ class ConvStem(nn.Module):
         self.num_patches = num_patches
         self.proj = nn.Sequential(conv3x3(in_chans, embed_dim // 8, 2), nn.GELU(), conv3x3(embed_dim // 8, embed_dim // 4, 2), nn.GELU(), conv3x3(embed_dim // 4, embed_dim // 2, 2), nn.GELU(), conv3x3(embed_dim // 2, embed_dim, 2))
 
-    def forward(self, x: torch.Tensor, padding_size: Optional[int]=None) ->torch.Tensor:
+    def forward(self, x: 'torch.Tensor', padding_size: 'Optional[int]'=None) ->torch.Tensor:
         B, C, H, W = x.shape
         x = self.proj(x).flatten(2).transpose(1, 2)
         return x
@@ -6388,7 +6382,7 @@ class ConvStem(nn.Module):
 
 class PatchConvnet(nn.Module):
 
-    def __init__(self, img_size: int=224, patch_size: int=16, in_chans: int=3, num_classes: int=1000, embed_dim: int=768, depth: int=12, num_heads: int=1, qkv_bias: bool=False, qk_scale: Optional[float]=None, drop_rate: float=0.0, attn_drop_rate: float=0.0, drop_path_rate: float=0.0, norm_layer=nn.LayerNorm, global_pool: Optional[str]=None, block_layers=Layer_scale_init_Block, block_layers_token=Layer_scale_init_Block_only_token, Patch_layer=ConvStem, act_layer: nn.Module=nn.GELU, Attention_block=Conv_blocks_se, dpr_constant: bool=True, init_scale: float=0.0001, Attention_block_token_only=Learned_Aggregation_Layer, Mlp_block_token_only=Mlp, depth_token_only: int=1, mlp_ratio_clstk: float=3.0, multiclass: bool=False):
+    def __init__(self, img_size: 'int'=224, patch_size: 'int'=16, in_chans: 'int'=3, num_classes: 'int'=1000, embed_dim: 'int'=768, depth: 'int'=12, num_heads: 'int'=1, qkv_bias: 'bool'=False, qk_scale: 'Optional[float]'=None, drop_rate: 'float'=0.0, attn_drop_rate: 'float'=0.0, drop_path_rate: 'float'=0.0, norm_layer=nn.LayerNorm, global_pool: 'Optional[str]'=None, block_layers=Layer_scale_init_Block, block_layers_token=Layer_scale_init_Block_only_token, Patch_layer=ConvStem, act_layer: 'nn.Module'=nn.GELU, Attention_block=Conv_blocks_se, dpr_constant: 'bool'=True, init_scale: 'float'=0.0001, Attention_block_token_only=Learned_Aggregation_Layer, Mlp_block_token_only=Mlp, depth_token_only: 'int'=1, mlp_ratio_clstk: 'float'=3.0, multiclass: 'bool'=False):
         super().__init__()
         self.multiclass = multiclass
         self.patch_size = patch_size
@@ -6412,7 +6406,7 @@ class PatchConvnet(nn.Module):
             self.head = nn.Linear(int(embed_dim), num_classes) if num_classes > 0 else nn.Identity()
         else:
             self.head = nn.ModuleList([nn.Linear(int(embed_dim), 1) for _ in range(num_classes)])
-        self.rescale: float = 0.02
+        self.rescale: 'float' = 0.02
         trunc_normal_(self.cls_token, std=self.rescale)
         self.apply(self._init_weights)
 
@@ -6435,11 +6429,11 @@ class PatchConvnet(nn.Module):
     def get_num_layers(self):
         return len(self.blocks)
 
-    def reset_classifier(self, num_classes: int, global_pool: str=''):
+    def reset_classifier(self, num_classes: 'int', global_pool: 'str'=''):
         self.num_classes = num_classes
         self.head = nn.Linear(self.embed_dim, num_classes) if num_classes > 0 else nn.Identity()
 
-    def forward_features(self, x: torch.Tensor) ->torch.Tensor:
+    def forward_features(self, x: 'torch.Tensor') ->torch.Tensor:
         B = x.shape[0]
         x = self.patch_embed(x)
         cls_tokens = self.cls_token.expand(B, -1, -1)
@@ -6454,7 +6448,7 @@ class PatchConvnet(nn.Module):
         else:
             return x[:, :self.num_classes].reshape(B, self.num_classes, -1)
 
-    def forward(self, x: torch.Tensor) ->torch.Tensor:
+    def forward(self, x: 'torch.Tensor') ->torch.Tensor:
         B = x.shape[0]
         x = self.forward_features(x)
         if not self.multiclass:
@@ -6935,6 +6929,72 @@ class VOLO(nn.Module):
         return x_cls, x_aux, (bbx1, bby1, bbx2, bby2)
 
 
+class GRN(nn.Module):
+    """ GRN (Global Response Normalization) layer
+    """
+
+    def __init__(self, dim):
+        super().__init__()
+        self.gamma = nn.Parameter(torch.zeros(1, 1, 1, dim))
+        self.beta = nn.Parameter(torch.zeros(1, 1, 1, dim))
+
+    def forward(self, x):
+        Gx = torch.norm(x, p=2, dim=(1, 2), keepdim=True)
+        Nx = Gx / (Gx.mean(dim=-1, keepdim=True) + 1e-06)
+        return self.gamma * (x * Nx) + self.beta + x
+
+
+class ConvNeXtV2(nn.Module):
+    """ ConvNeXt V2
+        
+    Args:
+        in_chans (int): Number of input image channels. Default: 3
+        num_classes (int): Number of classes for classification head. Default: 1000
+        depths (tuple(int)): Number of blocks at each stage. Default: [3, 3, 9, 3]
+        dims (int): Feature dimension at each stage. Default: [96, 192, 384, 768]
+        drop_path_rate (float): Stochastic depth rate. Default: 0.
+        head_init_scale (float): Init scaling value for classifier weights and biases. Default: 1.
+    """
+
+    def __init__(self, in_chans=3, num_classes=1000, depths=[3, 3, 9, 3], dims=[96, 192, 384, 768], drop_path_rate=0.0, head_init_scale=1.0):
+        super().__init__()
+        self.depths = depths
+        self.downsample_layers = nn.ModuleList()
+        stem = nn.Sequential(nn.Conv2d(in_chans, dims[0], kernel_size=4, stride=4), LayerNorm(dims[0], eps=1e-06, data_format='channels_first'))
+        self.downsample_layers.append(stem)
+        for i in range(3):
+            downsample_layer = nn.Sequential(LayerNorm(dims[i], eps=1e-06, data_format='channels_first'), nn.Conv2d(dims[i], dims[i + 1], kernel_size=2, stride=2))
+            self.downsample_layers.append(downsample_layer)
+        self.stages = nn.ModuleList()
+        dp_rates = [x.item() for x in torch.linspace(0, drop_path_rate, sum(depths))]
+        cur = 0
+        for i in range(4):
+            stage = nn.Sequential(*[Block(dim=dims[i], drop_path=dp_rates[cur + j]) for j in range(depths[i])])
+            self.stages.append(stage)
+            cur += depths[i]
+        self.norm = nn.LayerNorm(dims[-1], eps=1e-06)
+        self.head = nn.Linear(dims[-1], num_classes)
+        self.apply(self._init_weights)
+        self.head.weight.data.mul_(head_init_scale)
+        self.head.bias.data.mul_(head_init_scale)
+
+    def _init_weights(self, m):
+        if isinstance(m, (nn.Conv2d, nn.Linear)):
+            trunc_normal_(m.weight, std=0.02)
+            nn.init.constant_(m.bias, 0)
+
+    def forward_features(self, x):
+        for i in range(4):
+            x = self.downsample_layers[i](x)
+            x = self.stages[i](x)
+        return self.norm(x.mean([-2, -1]))
+
+    def forward(self, x):
+        x = self.forward_features(x)
+        x = self.head(x)
+        return x
+
+
 class BottleNeck(nn.Module):
     expansion = 2
 
@@ -7143,7 +7203,7 @@ class SwinTransformer(nn.Module):
         x = self.norm(x)
         return x
 
-    def forward_head(self, x, pre_logits: bool=False):
+    def forward_head(self, x, pre_logits: 'bool'=False):
         if self.global_pool == 'avg':
             x = x.mean(dim=1)
         return x if pre_logits else self.head(x)
@@ -7251,7 +7311,7 @@ class SwinTransformerV2(nn.Module):
         x = self.norm(x)
         return x
 
-    def forward_head(self, x, pre_logits: bool=False):
+    def forward_head(self, x, pre_logits: 'bool'=False):
         if self.global_pool == 'avg':
             x = x.mean(dim=1)
         return x if pre_logits else self.head(x)
@@ -7262,7 +7322,7 @@ class SwinTransformerV2(nn.Module):
         return x
 
 
-def bchw_to_bhwc(x: torch.Tensor) ->torch.Tensor:
+def bchw_to_bhwc(x: 'torch.Tensor') ->torch.Tensor:
     """Permutes a tensor from the shape (B, C, H, W) to (B, H, W, C). """
     return x.permute(0, 2, 3, 1)
 
@@ -7286,11 +7346,11 @@ class SwinTransformerStage(nn.Module):
         sequential_attn (bool): If true sequential self-attention is performed
     """
 
-    def __init__(self, embed_dim: int, depth: int, downscale: bool, num_heads: int, feat_size: Tuple[int, int], window_size: Tuple[int, int], mlp_ratio: float=4.0, init_values: Optional[float]=0.0, drop: float=0.0, drop_attn: float=0.0, drop_path: Union[List[float], float]=0.0, norm_layer: Type[nn.Module]=nn.LayerNorm, extra_norm_period: int=0, extra_norm_stage: bool=False, sequential_attn: bool=False) ->None:
+    def __init__(self, embed_dim: 'int', depth: 'int', downscale: 'bool', num_heads: 'int', feat_size: 'Tuple[int, int]', window_size: 'Tuple[int, int]', mlp_ratio: 'float'=4.0, init_values: 'Optional[float]'=0.0, drop: 'float'=0.0, drop_attn: 'float'=0.0, drop_path: 'Union[List[float], float]'=0.0, norm_layer: 'Type[nn.Module]'=nn.LayerNorm, extra_norm_period: 'int'=0, extra_norm_stage: 'bool'=False, sequential_attn: 'bool'=False) ->None:
         super(SwinTransformerStage, self).__init__()
-        self.downscale: bool = downscale
-        self.grad_checkpointing: bool = False
-        self.feat_size: Tuple[int, int] = (feat_size[0] // 2, feat_size[1] // 2) if downscale else feat_size
+        self.downscale: 'bool' = downscale
+        self.grad_checkpointing: 'bool' = False
+        self.feat_size: 'Tuple[int, int]' = (feat_size[0] // 2, feat_size[1] // 2) if downscale else feat_size
         self.downsample = PatchMerging(embed_dim, norm_layer=norm_layer) if downscale else nn.Identity()
 
         def _extra_norm(index):
@@ -7301,17 +7361,17 @@ class SwinTransformerStage(nn.Module):
         embed_dim = embed_dim * 2 if downscale else embed_dim
         self.blocks = nn.Sequential(*[SwinTransformerBlock(dim=embed_dim, num_heads=num_heads, feat_size=self.feat_size, window_size=window_size, shift_size=tuple([(0 if index % 2 == 0 else w // 2) for w in window_size]), mlp_ratio=mlp_ratio, init_values=init_values, drop=drop, drop_attn=drop_attn, drop_path=drop_path[index] if isinstance(drop_path, list) else drop_path, extra_norm=_extra_norm(index), sequential_attn=sequential_attn, norm_layer=norm_layer) for index in range(depth)])
 
-    def update_input_size(self, new_window_size: int, new_feat_size: Tuple[int, int]) ->None:
+    def update_input_size(self, new_window_size: 'int', new_feat_size: 'Tuple[int, int]') ->None:
         """Method updates the resolution to utilize and the window size and so the pair-wise relative positions.
         Args:
             new_window_size (int): New window size
             new_feat_size (Tuple[int, int]): New input resolution
         """
-        self.feat_size: Tuple[int, int] = (new_feat_size[0] // 2, new_feat_size[1] // 2) if self.downscale else new_feat_size
+        self.feat_size: 'Tuple[int, int]' = (new_feat_size[0] // 2, new_feat_size[1] // 2) if self.downscale else new_feat_size
         for block in self.blocks:
             block.update_input_size(new_window_size=new_window_size, new_feat_size=self.feat_size)
 
-    def forward(self, x: torch.Tensor) ->torch.Tensor:
+    def forward(self, x: 'torch.Tensor') ->torch.Tensor:
         """Forward pass.
         Args:
             x (torch.Tensor): Input tensor of the shape [B, C, H, W] or [B, L, C]
@@ -7331,7 +7391,7 @@ class SwinTransformerStage(nn.Module):
         return x
 
 
-def init_weights(module: nn.Module, name: str=''):
+def init_weights(module: 'nn.Module', name: 'str'=''):
     if isinstance(module, nn.Linear):
         if 'qkv' in name:
             val = math.sqrt(6.0 / float(module.weight.shape[0] // 3 + module.weight.shape[1]))
@@ -7370,29 +7430,29 @@ class SwinTransformerV2Cr(nn.Module):
         sequential_attn (bool): If true sequential self-attention is performed. Default: False
     """
 
-    def __init__(self, img_size: Tuple[int, int]=(224, 224), patch_size: int=4, window_size: Optional[int]=None, img_window_ratio: int=32, in_chans: int=3, num_classes: int=1000, embed_dim: int=96, depths: Tuple[int, ...]=(2, 2, 6, 2), num_heads: Tuple[int, ...]=(3, 6, 12, 24), mlp_ratio: float=4.0, init_values: Optional[float]=0.0, drop_rate: float=0.0, attn_drop_rate: float=0.0, drop_path_rate: float=0.0, norm_layer: Type[nn.Module]=nn.LayerNorm, extra_norm_period: int=0, extra_norm_stage: bool=False, sequential_attn: bool=False, global_pool: str='avg', weight_init='skip', **kwargs: Any) ->None:
+    def __init__(self, img_size: 'Tuple[int, int]'=(224, 224), patch_size: 'int'=4, window_size: 'Optional[int]'=None, img_window_ratio: 'int'=32, in_chans: 'int'=3, num_classes: 'int'=1000, embed_dim: 'int'=96, depths: 'Tuple[int, ...]'=(2, 2, 6, 2), num_heads: 'Tuple[int, ...]'=(3, 6, 12, 24), mlp_ratio: 'float'=4.0, init_values: 'Optional[float]'=0.0, drop_rate: 'float'=0.0, attn_drop_rate: 'float'=0.0, drop_path_rate: 'float'=0.0, norm_layer: 'Type[nn.Module]'=nn.LayerNorm, extra_norm_period: 'int'=0, extra_norm_stage: 'bool'=False, sequential_attn: 'bool'=False, global_pool: 'str'='avg', weight_init='skip', **kwargs: Any) ->None:
         super(SwinTransformerV2Cr, self).__init__()
         img_size = to_2tuple(img_size)
         window_size = tuple([(s // img_window_ratio) for s in img_size]) if window_size is None else to_2tuple(window_size)
-        self.num_classes: int = num_classes
-        self.patch_size: int = patch_size
-        self.img_size: Tuple[int, int] = img_size
-        self.window_size: int = window_size
-        self.num_features: int = int(embed_dim * 2 ** (len(depths) - 1))
+        self.num_classes: 'int' = num_classes
+        self.patch_size: 'int' = patch_size
+        self.img_size: 'Tuple[int, int]' = img_size
+        self.window_size: 'int' = window_size
+        self.num_features: 'int' = int(embed_dim * 2 ** (len(depths) - 1))
         self.patch_embed = PatchEmbed(img_size=img_size, patch_size=patch_size, in_chans=in_chans, embed_dim=embed_dim, norm_layer=norm_layer)
-        patch_grid_size: Tuple[int, int] = self.patch_embed.grid_size
+        patch_grid_size: 'Tuple[int, int]' = self.patch_embed.grid_size
         drop_path_rate = torch.linspace(0.0, drop_path_rate, sum(depths)).tolist()
         stages = []
         for index, (depth, num_heads) in enumerate(zip(depths, num_heads)):
             stage_scale = 2 ** max(index - 1, 0)
             stages.append(SwinTransformerStage(embed_dim=embed_dim * stage_scale, depth=depth, downscale=index != 0, feat_size=(patch_grid_size[0] // stage_scale, patch_grid_size[1] // stage_scale), num_heads=num_heads, window_size=window_size, mlp_ratio=mlp_ratio, init_values=init_values, drop=drop_rate, drop_attn=attn_drop_rate, drop_path=drop_path_rate[sum(depths[:index]):sum(depths[:index + 1])], extra_norm_period=extra_norm_period, extra_norm_stage=extra_norm_stage or index + 1 == len(depths), sequential_attn=sequential_attn, norm_layer=norm_layer))
         self.stages = nn.Sequential(*stages)
-        self.global_pool: str = global_pool
+        self.global_pool: 'str' = global_pool
         self.head = nn.Linear(self.num_features, num_classes) if num_classes else nn.Identity()
         if weight_init != 'skip':
             named_apply(init_weights, self)
 
-    def update_input_size(self, new_img_size: Optional[Tuple[int, int]]=None, new_window_size: Optional[int]=None, img_window_ratio: int=32) ->None:
+    def update_input_size(self, new_img_size: 'Optional[Tuple[int, int]]'=None, new_window_size: 'Optional[int]'=None, img_window_ratio: 'int'=32) ->None:
         """Method updates the image resolution to be processed and window size and so the pair-wise relative positions.
         Args:
             new_window_size (Optional[int]): New window size, if None based on new_img_size // window_div
@@ -7427,28 +7487,28 @@ class SwinTransformerV2Cr(nn.Module):
         """
         return self.head
 
-    def reset_classifier(self, num_classes: int, global_pool: Optional[str]=None) ->None:
+    def reset_classifier(self, num_classes: 'int', global_pool: 'Optional[str]'=None) ->None:
         """Method results the classification head
         Args:
             num_classes (int): Number of classes to be predicted
             global_pool (str): Unused
         """
-        self.num_classes: int = num_classes
+        self.num_classes: 'int' = num_classes
         if global_pool is not None:
             self.global_pool = global_pool
         self.head = nn.Linear(self.num_features, num_classes) if num_classes > 0 else nn.Identity()
 
-    def forward_features(self, x: torch.Tensor) ->torch.Tensor:
+    def forward_features(self, x: 'torch.Tensor') ->torch.Tensor:
         x = self.patch_embed(x)
         x = self.stages(x)
         return x
 
-    def forward_head(self, x, pre_logits: bool=False):
+    def forward_head(self, x, pre_logits: 'bool'=False):
         if self.global_pool == 'avg':
             x = x.mean(dim=(2, 3))
         return x if pre_logits else self.head(x)
 
-    def forward(self, x: torch.Tensor) ->torch.Tensor:
+    def forward(self, x: 'torch.Tensor') ->torch.Tensor:
         x = self.forward_features(x)
         x = self.forward_head(x)
         return x
@@ -7611,6 +7671,96 @@ class gnconv(nn.Module):
         for i in range(self.order - 1):
             x = self.pws[i](x) * dw_list[i + 1]
         x = self.proj_out(x)
+        return x
+
+
+class Block(nn.Module):
+    """ HorNet block
+    """
+
+    def __init__(self, dim, drop_path=0.0, layer_scale_init_value=1e-06, gnconv=gnconv):
+        super().__init__()
+        self.norm1 = LayerNorm(dim, eps=1e-06, data_format='channels_first')
+        self.gnconv = gnconv(dim)
+        self.norm2 = LayerNorm(dim, eps=1e-06)
+        self.pwconv1 = nn.Linear(dim, 4 * dim)
+        self.act = nn.GELU()
+        self.pwconv2 = nn.Linear(4 * dim, dim)
+        self.gamma1 = nn.Parameter(layer_scale_init_value * torch.ones(dim), requires_grad=True) if layer_scale_init_value > 0 else None
+        self.gamma2 = nn.Parameter(layer_scale_init_value * torch.ones(dim), requires_grad=True) if layer_scale_init_value > 0 else None
+        self.drop_path = DropPath(drop_path) if drop_path > 0.0 else nn.Identity()
+
+    def forward(self, x):
+        B, C, H, W = x.shape
+        if self.gamma1 is not None:
+            gamma1 = self.gamma1.view(C, 1, 1)
+        else:
+            gamma1 = 1
+        x = x + self.drop_path(gamma1 * self.gnconv(self.norm1(x)))
+        input = x
+        x = x.permute(0, 2, 3, 1)
+        x = self.norm2(x)
+        x = self.pwconv1(x)
+        x = self.act(x)
+        x = self.pwconv2(x)
+        if self.gamma2 is not None:
+            x = self.gamma2 * x
+        x = x.permute(0, 3, 1, 2)
+        x = input + self.drop_path(x)
+        return x
+
+
+class HorNet(nn.Module):
+
+    def __init__(self, in_chans=3, num_classes=1000, depths=[3, 3, 9, 3], base_dim=96, drop_path_rate=0.0, layer_scale_init_value=1e-06, head_init_scale=1.0, gnconv=gnconv, block=Block, uniform_init=False, **kwargs):
+        super().__init__()
+        dims = [base_dim, base_dim * 2, base_dim * 4, base_dim * 8]
+        self.downsample_layers = nn.ModuleList()
+        stem = nn.Sequential(nn.Conv2d(in_chans, dims[0], kernel_size=4, stride=4), LayerNorm(dims[0], eps=1e-06, data_format='channels_first'))
+        self.downsample_layers.append(stem)
+        for i in range(3):
+            downsample_layer = nn.Sequential(LayerNorm(dims[i], eps=1e-06, data_format='channels_first'), nn.Conv2d(dims[i], dims[i + 1], kernel_size=2, stride=2))
+            self.downsample_layers.append(downsample_layer)
+        self.stages = nn.ModuleList()
+        dp_rates = [x.item() for x in torch.linspace(0, drop_path_rate, sum(depths))]
+        if not isinstance(gnconv, list):
+            gnconv = [gnconv, gnconv, gnconv, gnconv]
+        else:
+            gnconv = gnconv
+            assert len(gnconv) == 4
+        cur = 0
+        for i in range(4):
+            stage = nn.Sequential(*[block(dim=dims[i], drop_path=dp_rates[cur + j], layer_scale_init_value=layer_scale_init_value, gnconv=gnconv[i]) for j in range(depths[i])])
+            self.stages.append(stage)
+            cur += depths[i]
+        self.norm = nn.LayerNorm(dims[-1], eps=1e-06)
+        self.head = nn.Linear(dims[-1], num_classes)
+        self.uniform_init = uniform_init
+        self.apply(self._init_weights)
+        self.head.weight.data.mul_(head_init_scale)
+        self.head.bias.data.mul_(head_init_scale)
+
+    def _init_weights(self, m):
+        if not self.uniform_init:
+            if isinstance(m, (nn.Conv2d, nn.Linear)):
+                trunc_normal_(m.weight, std=0.02)
+                if hasattr(m, 'bias') and m.bias is not None:
+                    nn.init.constant_(m.bias, 0)
+        elif isinstance(m, (nn.Conv2d, nn.Linear)):
+            nn.init.xavier_uniform_(m.weight)
+            if hasattr(m, 'bias') and m.bias is not None:
+                nn.init.constant_(m.bias, 0)
+
+    def forward_features(self, x):
+        for i in range(4):
+            x = self.downsample_layers[i](x)
+            for j, blk in enumerate(self.stages[i]):
+                x = blk(x)
+        return self.norm(x.mean([-2, -1]))
+
+    def forward(self, x):
+        x = self.forward_features(x)
+        x = self.head(x)
         return x
 
 
@@ -8209,578 +8359,262 @@ class RepBlock(nn.Module):
 
 import torch
 from torch.nn import MSELoss, ReLU
-from paritybench._paritybench_helpers import _mock_config, _mock_layer, _paritybench_base, _fails_compile
+from types import SimpleNamespace
 
 
 TESTCASES = [
-    # (nn.Module, init_args, forward_args, jit_compiles)
+    # (nn.Module, init_args, forward_args)
     (ACNet,
      lambda: ([], {'input_channel': 4, 'output_channel': 4}),
-     lambda: ([torch.rand([4, 4, 4, 4])], {}),
-     False),
+     lambda: ([torch.rand([4, 4, 4, 4])], {})),
     (ACmix,
      lambda: ([], {'in_planes': 4, 'out_planes': 4}),
-     lambda: ([torch.rand([4, 4, 4, 4])], {}),
-     False),
+     lambda: ([torch.rand([4, 4, 4, 4])], {})),
     (Affine,
      lambda: ([], {'channel': 4}),
-     lambda: ([torch.rand([4, 4, 4, 4])], {}),
-     True),
+     lambda: ([torch.rand([4, 4, 4, 4])], {})),
     (AttentionGate,
      lambda: ([], {}),
-     lambda: ([torch.rand([4, 4, 4, 4])], {}),
-     True),
+     lambda: ([torch.rand([4, 4, 4, 4])], {})),
     (AxialPositionalEmbedding,
      lambda: ([], {'dim': 4, 'shape': [4, 4]}),
-     lambda: ([torch.rand([4, 4, 4, 4])], {}),
-     False),
+     lambda: ([torch.rand([4, 4, 4, 4])], {})),
     (BasicConv,
      lambda: ([], {'in_planes': 4, 'out_planes': 4, 'kernel_size': 4}),
-     lambda: ([torch.rand([4, 4, 4, 4])], {}),
-     True),
+     lambda: ([torch.rand([4, 4, 4, 4])], {})),
     (CBAMBlock,
      lambda: ([], {}),
-     lambda: ([torch.rand([4, 512, 4, 4])], {}),
-     True),
+     lambda: ([torch.rand([4, 512, 4, 4])], {})),
     (CBlock,
      lambda: ([], {'dim': 4, 'num_heads': 4}),
-     lambda: ([torch.rand([4, 4, 4, 4])], {}),
-     True),
+     lambda: ([torch.rand([4, 4, 4, 4])], {})),
     (CMlp,
      lambda: ([], {'in_features': 4}),
-     lambda: ([torch.rand([4, 4, 4, 4])], {}),
-     True),
+     lambda: ([torch.rand([4, 4, 4, 4])], {})),
     (ChanLayerNorm,
      lambda: ([], {'dim': 4}),
-     lambda: ([torch.rand([4, 4, 4, 4])], {}),
-     True),
+     lambda: ([torch.rand([4, 4, 4, 4])], {})),
     (ChannelAttentionModule,
      lambda: ([], {}),
-     lambda: ([torch.rand([4, 512, 1, 49])], {}),
-     False),
+     lambda: ([torch.rand([4, 512, 1, 49])], {})),
     (ClassBlock,
      lambda: ([], {'dim': 4, 'num_heads': 4}),
-     lambda: ([torch.rand([4, 4, 4])], {}),
-     True),
+     lambda: ([torch.rand([4, 4, 4])], {})),
     (CoAtNet,
      lambda: ([], {'in_ch': 4, 'image_size': 4}),
-     lambda: ([torch.rand([4, 4, 64, 64])], {}),
-     False),
+     lambda: ([torch.rand([4, 4, 64, 64])], {})),
     (CoTAttention,
      lambda: ([], {}),
-     lambda: ([torch.rand([4, 512, 64, 64])], {}),
-     True),
+     lambda: ([torch.rand([4, 512, 64, 64])], {})),
     (ConvBN,
      lambda: ([], {'in_planes': 4, 'out_planes': 4, 'kernel_size': 4}),
-     lambda: ([torch.rand([4, 4, 4, 4])], {}),
-     True),
+     lambda: ([torch.rand([4, 4, 4, 4])], {})),
+    (ConvNeXtV2,
+     lambda: ([], {}),
+     lambda: ([torch.rand([4, 3, 64, 64])], {})),
     (CoordAtt,
      lambda: ([], {'inp': 4, 'oup': 4}),
-     lambda: ([torch.rand([4, 4, 4, 4])], {}),
-     False),
+     lambda: ([torch.rand([4, 4, 4, 4])], {})),
     (CrossAttentionBlock,
      lambda: ([], {'dim': 4, 'num_heads': 4}),
-     lambda: ([torch.rand([4, 4, 4])], {}),
-     True),
+     lambda: ([torch.rand([4, 4, 4])], {})),
     (DAModule,
      lambda: ([], {}),
-     lambda: ([torch.rand([4, 512, 1, 49])], {}),
-     False),
+     lambda: ([torch.rand([4, 512, 1, 49])], {})),
     (Depth_Pointwise_Conv1d,
      lambda: ([], {'in_ch': 4, 'out_ch': 4, 'k': 4}),
-     lambda: ([torch.rand([4, 4])], {}),
-     True),
+     lambda: ([torch.rand([4, 4])], {})),
     (DepthwiseSeparableConvolution,
      lambda: ([], {'in_ch': 4, 'out_ch': 4}),
-     lambda: ([torch.rand([4, 4, 4, 4])], {}),
-     True),
+     lambda: ([torch.rand([4, 4, 4, 4])], {})),
     (Deterministic,
-     lambda: ([], {'net': _mock_layer()}),
-     lambda: ([], {'input': torch.rand([4, 4])}),
-     False),
+     lambda: ([], {'net': torch.nn.ReLU()}),
+     lambda: ([], {'input': torch.rand([4, 4])})),
     (DoubleAttention,
      lambda: ([], {'in_channels': 4, 'c_m': 4, 'c_n': 4}),
-     lambda: ([torch.rand([4, 4, 4, 4])], {}),
-     True),
+     lambda: ([torch.rand([4, 4, 4, 4])], {})),
     (Downsample,
      lambda: ([], {'in_embed_dim': 4, 'out_embed_dim': 4, 'patch_size': 4}),
-     lambda: ([torch.rand([4, 4, 4, 4])], {}),
-     True),
+     lambda: ([torch.rand([4, 4, 4, 4])], {})),
     (ECAAttention,
      lambda: ([], {}),
-     lambda: ([torch.rand([4, 4, 4, 4])], {}),
-     True),
+     lambda: ([torch.rand([4, 4, 4, 4])], {})),
     (ExternalAttention,
      lambda: ([], {'d_model': 4}),
-     lambda: ([torch.rand([4, 4, 4, 4])], {}),
-     True),
+     lambda: ([torch.rand([4, 4, 4, 4])], {})),
     (FeedForward,
      lambda: ([], {'dim': 4, 'mlp_dim': 4, 'dropout': 0.5}),
-     lambda: ([torch.rand([4, 4, 4, 4])], {}),
-     True),
+     lambda: ([torch.rand([4, 4, 4, 4])], {})),
     (Flat,
      lambda: ([], {}),
-     lambda: ([torch.rand([4, 4, 4, 4])], {}),
-     True),
+     lambda: ([torch.rand([4, 4, 4, 4])], {})),
     (Flatten,
      lambda: ([], {}),
-     lambda: ([torch.rand([4, 4, 4, 4])], {}),
-     True),
+     lambda: ([torch.rand([4, 4, 4, 4])], {})),
+    (GRN,
+     lambda: ([], {'dim': 4}),
+     lambda: ([torch.rand([4, 4, 4, 4])], {})),
     (GlobalLocalFilter,
      lambda: ([], {'dim': 4}),
-     lambda: ([torch.rand([4, 4, 4, 4])], {}),
-     False),
+     lambda: ([torch.rand([4, 4, 4, 4])], {})),
+    (HorNet,
+     lambda: ([], {}),
+     lambda: ([torch.rand([4, 3, 64, 64])], {})),
     (Identity,
      lambda: ([], {}),
-     lambda: ([torch.rand([4, 4, 4, 4])], {}),
-     True),
+     lambda: ([torch.rand([4, 4, 4, 4])], {})),
     (Image2Tokens,
      lambda: ([], {}),
-     lambda: ([torch.rand([4, 3, 64, 64])], {}),
-     True),
+     lambda: ([torch.rand([4, 3, 64, 64])], {})),
     (InvertedResidual,
      lambda: ([], {'in_dim': 4}),
-     lambda: ([torch.rand([4, 4, 4, 4])], {}),
-     True),
+     lambda: ([torch.rand([4, 4, 4, 4])], {})),
     (LayerNorm,
      lambda: ([], {'normalized_shape': 4}),
-     lambda: ([torch.rand([4, 4, 4, 4])], {}),
-     True),
+     lambda: ([torch.rand([4, 4, 4, 4])], {})),
     (LayerScale_Block,
      lambda: ([], {'dim': 4, 'num_heads': 4}),
-     lambda: ([torch.rand([4, 4, 4])], {}),
-     True),
+     lambda: ([torch.rand([4, 4, 4])], {})),
     (LayerScale_Block_CA,
      lambda: ([], {'dim': 4, 'num_heads': 4}),
-     lambda: ([torch.rand([4, 4, 4]), torch.rand([4, 4, 4])], {}),
-     True),
+     lambda: ([torch.rand([4, 4, 4]), torch.rand([4, 4, 4])], {})),
     (Layer_scale_init_Block_only_token,
      lambda: ([], {'dim': 4, 'num_heads': 4}),
-     lambda: ([torch.rand([4, 4, 4]), torch.rand([4, 4, 4])], {}),
-     True),
+     lambda: ([torch.rand([4, 4, 4]), torch.rand([4, 4, 4])], {})),
     (Learned_Aggregation_Layer,
      lambda: ([], {'dim': 4}),
-     lambda: ([torch.rand([4, 4, 4])], {}),
-     True),
+     lambda: ([torch.rand([4, 4, 4])], {})),
     (LinearMlp,
      lambda: ([], {'in_features': 4}),
-     lambda: ([torch.rand([4, 4, 4, 4])], {}),
-     True),
+     lambda: ([torch.rand([4, 4, 4, 4])], {})),
     (MBConvBlock,
      lambda: ([], {'ksize': 4, 'input_filters': 4, 'output_filters': 4}),
-     lambda: ([torch.rand([4, 4, 4, 4])], {}),
-     False),
+     lambda: ([torch.rand([4, 4, 4, 4])], {})),
     (MLP,
      lambda: ([], {'planes': 4, 'mlp_dim': 4, 'dropout': 0.5}),
-     lambda: ([torch.rand([4, 4, 4, 4])], {}),
-     True),
+     lambda: ([torch.rand([4, 4, 4, 4])], {})),
     (MUSEAttention,
      lambda: ([], {'d_model': 4, 'd_k': 4, 'd_v': 4, 'h': 4}),
-     lambda: ([torch.rand([4, 4, 4]), torch.rand([4, 4, 4]), torch.rand([4, 4, 4])], {}),
-     False),
+     lambda: ([torch.rand([4, 4, 4]), torch.rand([4, 4, 4]), torch.rand([4, 4, 4])], {})),
     (MV2Block,
      lambda: ([], {'inp': 4, 'out': 4}),
-     lambda: ([torch.rand([4, 4, 4, 4])], {}),
-     True),
+     lambda: ([torch.rand([4, 4, 4, 4])], {})),
     (MemoryEfficientSwish,
      lambda: ([], {}),
-     lambda: ([torch.rand([4, 4, 4, 4])], {}),
-     False),
+     lambda: ([torch.rand([4, 4, 4, 4])], {})),
     (Meta4D,
      lambda: ([], {'dim': 4}),
-     lambda: ([torch.rand([4, 4, 4, 4])], {}),
-     True),
+     lambda: ([torch.rand([4, 4, 4, 4])], {})),
     (MixBlock,
      lambda: ([], {'dim': 4, 'num_heads': 4}),
-     lambda: ([torch.rand([4, 4, 4, 4])], {}),
-     True),
+     lambda: ([torch.rand([4, 4, 4, 4])], {})),
     (Mlp,
      lambda: ([], {'in_features': 4}),
-     lambda: ([torch.rand([4, 4, 4, 4])], {}),
-     True),
+     lambda: ([torch.rand([4, 4, 4, 4])], {})),
     (MlpBlock,
      lambda: ([], {'input_dim': 4}),
-     lambda: ([torch.rand([4, 4, 4, 4])], {}),
-     True),
+     lambda: ([torch.rand([4, 4, 4, 4])], {})),
     (MobileViTv2Attention,
      lambda: ([], {'d_model': 4}),
-     lambda: ([torch.rand([4, 4, 4, 4])], {}),
-     True),
+     lambda: ([torch.rand([4, 4, 4, 4])], {})),
     (OutlookAttention,
      lambda: ([], {'dim': 4, 'num_heads': 4}),
-     lambda: ([torch.rand([4, 4, 4, 4])], {}),
-     True),
+     lambda: ([torch.rand([4, 4, 4, 4])], {})),
     (PSA,
      lambda: ([], {}),
-     lambda: ([torch.rand([4, 512, 4, 4])], {}),
-     False),
+     lambda: ([torch.rand([4, 512, 4, 4])], {})),
     (ParNetAttention,
      lambda: ([], {}),
-     lambda: ([torch.rand([4, 512, 64, 64])], {}),
-     True),
+     lambda: ([torch.rand([4, 512, 64, 64])], {})),
     (ParallelPolarizedSelfAttention,
      lambda: ([], {}),
-     lambda: ([torch.rand([4, 512, 64, 64])], {}),
-     True),
+     lambda: ([torch.rand([4, 512, 64, 64])], {})),
     (PatchEmbed,
      lambda: ([], {}),
-     lambda: ([torch.rand([4, 3, 64, 64])], {}),
-     True),
+     lambda: ([torch.rand([4, 3, 64, 64])], {})),
     (PatchEmbedding,
      lambda: ([], {}),
-     lambda: ([torch.rand([4, 3, 64, 64])], {}),
-     True),
+     lambda: ([torch.rand([4, 3, 64, 64])], {})),
     (PatchMerging,
      lambda: ([], {'dim': 4}),
-     lambda: ([torch.rand([4, 4, 4, 4])], {}),
-     True),
+     lambda: ([torch.rand([4, 4, 4, 4])], {})),
     (PermutatorBlock,
      lambda: ([], {'dim': 4, 'segment_dim': 4}),
-     lambda: ([torch.rand([4, 4, 4, 4])], {}),
-     True),
+     lambda: ([torch.rand([4, 4, 4, 4])], {})),
     (Pooling,
      lambda: ([], {}),
-     lambda: ([torch.rand([4, 4, 4, 4])], {}),
-     True),
+     lambda: ([torch.rand([4, 4, 4, 4])], {})),
     (PositionAttentionModule,
      lambda: ([], {}),
-     lambda: ([torch.rand([4, 512, 64, 64])], {}),
-     False),
+     lambda: ([torch.rand([4, 512, 64, 64])], {})),
     (PreAffinePostLayerScale,
-     lambda: ([], {'dim': 4, 'depth': 1, 'fn': _mock_layer()}),
-     lambda: ([torch.rand([4, 4, 4, 4])], {}),
-     True),
+     lambda: ([], {'dim': 4, 'depth': 1, 'fn': torch.nn.ReLU()}),
+     lambda: ([torch.rand([4, 4, 4, 4])], {})),
     (PreNorm,
-     lambda: ([], {'dim': 4, 'fn': _mock_layer()}),
-     lambda: ([torch.rand([4, 4, 4, 4])], {}),
-     False),
+     lambda: ([], {'dim': 4, 'fn': torch.nn.ReLU()}),
+     lambda: ([torch.rand([4, 4, 4, 4])], {})),
     (RepBlock,
      lambda: ([], {'input_channel': 4, 'output_channel': 4}),
-     lambda: ([torch.rand([4, 4, 4, 4])], {}),
-     False),
+     lambda: ([torch.rand([4, 4, 4, 4])], {})),
     (RepMLP,
      lambda: ([], {'C': 4, 'O': 4, 'H': 4, 'W': 4, 'h': 4, 'w': 4}),
-     lambda: ([torch.rand([4, 4, 4, 4])], {}),
-     False),
+     lambda: ([torch.rand([4, 4, 4, 4])], {})),
     (Residual,
-     lambda: ([], {'fn': _mock_layer()}),
-     lambda: ([torch.rand([4, 4, 4, 4])], {}),
-     True),
+     lambda: ([], {'fn': torch.nn.ReLU()}),
+     lambda: ([torch.rand([4, 4, 4, 4])], {})),
     (ResidualAttention,
      lambda: ([], {}),
-     lambda: ([torch.rand([4, 512, 64, 64])], {}),
-     True),
+     lambda: ([torch.rand([4, 512, 64, 64])], {})),
     (SE,
      lambda: ([], {'dim': 4}),
-     lambda: ([torch.rand([4, 4, 4, 4])], {}),
-     True),
+     lambda: ([torch.rand([4, 4, 4, 4])], {})),
     (SKAttention,
      lambda: ([], {}),
-     lambda: ([torch.rand([4, 512, 64, 64])], {}),
-     False),
+     lambda: ([torch.rand([4, 512, 64, 64])], {})),
     (ScaledDotProductAttention,
      lambda: ([], {'d_model': 4, 'd_k': 4, 'd_v': 4, 'h': 4}),
-     lambda: ([torch.rand([4, 4, 4]), torch.rand([4, 4, 4]), torch.rand([4, 4, 4])], {}),
-     False),
+     lambda: ([torch.rand([4, 4, 4]), torch.rand([4, 4, 4]), torch.rand([4, 4, 4])], {})),
     (SelfAttention,
      lambda: ([], {'dim': 4, 'heads': 4}),
-     lambda: ([torch.rand([4, 4, 4])], {}),
-     False),
+     lambda: ([torch.rand([4, 4, 4])], {})),
     (SequentialPolarizedSelfAttention,
      lambda: ([], {}),
-     lambda: ([torch.rand([4, 512, 64, 64])], {}),
-     True),
+     lambda: ([torch.rand([4, 512, 64, 64])], {})),
     (SimAM,
      lambda: ([], {}),
-     lambda: ([torch.rand([4, 4, 4, 4])], {}),
-     True),
+     lambda: ([torch.rand([4, 4, 4, 4])], {})),
     (SimplifiedScaledDotProductAttention,
      lambda: ([], {'d_model': 4, 'h': 4}),
-     lambda: ([torch.rand([4, 4, 4, 1]), torch.rand([4, 4, 4, 1]), torch.rand([4, 4, 4, 1])], {}),
-     False),
+     lambda: ([torch.rand([4, 4, 4, 1]), torch.rand([4, 4, 4, 1]), torch.rand([4, 4, 4, 1])], {})),
     (SpatialAttention,
      lambda: ([], {}),
-     lambda: ([torch.rand([4, 4, 4, 4])], {}),
-     True),
+     lambda: ([torch.rand([4, 4, 4, 4])], {})),
     (SpatialGroupEnhance,
      lambda: ([], {'groups': 1}),
-     lambda: ([torch.rand([4, 4, 4, 4])], {}),
-     True),
+     lambda: ([torch.rand([4, 4, 4, 4])], {})),
     (TransformerMLPWithConv,
      lambda: ([], {'channels': 4, 'expansion': 4, 'drop': 0.5}),
-     lambda: ([torch.rand([4, 4, 4, 4])], {}),
-     True),
+     lambda: ([torch.rand([4, 4, 4, 4])], {})),
     (TripletAttention,
      lambda: ([], {}),
-     lambda: ([torch.rand([4, 4, 4, 4])], {}),
-     True),
+     lambda: ([torch.rand([4, 4, 4, 4])], {})),
     (UFOAttention,
      lambda: ([], {'d_model': 4, 'd_k': 4, 'd_v': 4, 'h': 4}),
-     lambda: ([torch.rand([4, 4, 4]), torch.rand([4, 4, 4]), torch.rand([4, 4, 4])], {}),
-     True),
+     lambda: ([torch.rand([4, 4, 4]), torch.rand([4, 4, 4]), torch.rand([4, 4, 4])], {})),
     (ZPool,
      lambda: ([], {}),
-     lambda: ([torch.rand([4, 4, 4, 4])], {}),
-     True),
+     lambda: ([torch.rand([4, 4, 4, 4])], {})),
     (conv_embedding,
      lambda: ([], {'in_channels': 4, 'out_channels': 4, 'patch_size': 4, 'stride': 1, 'padding': 4}),
-     lambda: ([torch.rand([4, 4, 4, 4])], {}),
-     True),
+     lambda: ([torch.rand([4, 4, 4, 4])], {})),
     (conv_head_pooling,
      lambda: ([], {'in_feature': 4, 'out_feature': 4, 'stride': 1}),
-     lambda: ([torch.rand([4, 4, 4, 4]), torch.rand([4, 4, 4, 4])], {}),
-     True),
+     lambda: ([torch.rand([4, 4, 4, 4]), torch.rand([4, 4, 4, 4])], {})),
     (h_sigmoid,
      lambda: ([], {}),
-     lambda: ([torch.rand([4, 4, 4, 4])], {}),
-     True),
+     lambda: ([torch.rand([4, 4, 4, 4])], {})),
     (h_swish,
      lambda: ([], {}),
-     lambda: ([torch.rand([4, 4, 4, 4])], {}),
-     True),
+     lambda: ([torch.rand([4, 4, 4, 4])], {})),
 ]
-
-class Test_xmu_xiaoma666_External_Attention_pytorch(_paritybench_base):
-    def test_000(self):
-        self._check(*TESTCASES[0])
-
-    def test_001(self):
-        self._check(*TESTCASES[1])
-
-    def test_002(self):
-        self._check(*TESTCASES[2])
-
-    def test_003(self):
-        self._check(*TESTCASES[3])
-
-    def test_004(self):
-        self._check(*TESTCASES[4])
-
-    def test_005(self):
-        self._check(*TESTCASES[5])
-
-    def test_006(self):
-        self._check(*TESTCASES[6])
-
-    def test_007(self):
-        self._check(*TESTCASES[7])
-
-    def test_008(self):
-        self._check(*TESTCASES[8])
-
-    def test_009(self):
-        self._check(*TESTCASES[9])
-
-    def test_010(self):
-        self._check(*TESTCASES[10])
-
-    def test_011(self):
-        self._check(*TESTCASES[11])
-
-    def test_012(self):
-        self._check(*TESTCASES[12])
-
-    def test_013(self):
-        self._check(*TESTCASES[13])
-
-    def test_014(self):
-        self._check(*TESTCASES[14])
-
-    def test_015(self):
-        self._check(*TESTCASES[15])
-
-    def test_016(self):
-        self._check(*TESTCASES[16])
-
-    def test_017(self):
-        self._check(*TESTCASES[17])
-
-    def test_018(self):
-        self._check(*TESTCASES[18])
-
-    def test_019(self):
-        self._check(*TESTCASES[19])
-
-    def test_020(self):
-        self._check(*TESTCASES[20])
-
-    def test_021(self):
-        self._check(*TESTCASES[21])
-
-    def test_022(self):
-        self._check(*TESTCASES[22])
-
-    def test_023(self):
-        self._check(*TESTCASES[23])
-
-    def test_024(self):
-        self._check(*TESTCASES[24])
-
-    def test_025(self):
-        self._check(*TESTCASES[25])
-
-    def test_026(self):
-        self._check(*TESTCASES[26])
-
-    def test_027(self):
-        self._check(*TESTCASES[27])
-
-    def test_028(self):
-        self._check(*TESTCASES[28])
-
-    def test_029(self):
-        self._check(*TESTCASES[29])
-
-    def test_030(self):
-        self._check(*TESTCASES[30])
-
-    def test_031(self):
-        self._check(*TESTCASES[31])
-
-    def test_032(self):
-        self._check(*TESTCASES[32])
-
-    def test_033(self):
-        self._check(*TESTCASES[33])
-
-    def test_034(self):
-        self._check(*TESTCASES[34])
-
-    def test_035(self):
-        self._check(*TESTCASES[35])
-
-    def test_036(self):
-        self._check(*TESTCASES[36])
-
-    def test_037(self):
-        self._check(*TESTCASES[37])
-
-    def test_038(self):
-        self._check(*TESTCASES[38])
-
-    def test_039(self):
-        self._check(*TESTCASES[39])
-
-    def test_040(self):
-        self._check(*TESTCASES[40])
-
-    def test_041(self):
-        self._check(*TESTCASES[41])
-
-    def test_042(self):
-        self._check(*TESTCASES[42])
-
-    def test_043(self):
-        self._check(*TESTCASES[43])
-
-    def test_044(self):
-        self._check(*TESTCASES[44])
-
-    def test_045(self):
-        self._check(*TESTCASES[45])
-
-    def test_046(self):
-        self._check(*TESTCASES[46])
-
-    def test_047(self):
-        self._check(*TESTCASES[47])
-
-    def test_048(self):
-        self._check(*TESTCASES[48])
-
-    def test_049(self):
-        self._check(*TESTCASES[49])
-
-    def test_050(self):
-        self._check(*TESTCASES[50])
-
-    def test_051(self):
-        self._check(*TESTCASES[51])
-
-    def test_052(self):
-        self._check(*TESTCASES[52])
-
-    def test_053(self):
-        self._check(*TESTCASES[53])
-
-    def test_054(self):
-        self._check(*TESTCASES[54])
-
-    def test_055(self):
-        self._check(*TESTCASES[55])
-
-    def test_056(self):
-        self._check(*TESTCASES[56])
-
-    def test_057(self):
-        self._check(*TESTCASES[57])
-
-    def test_058(self):
-        self._check(*TESTCASES[58])
-
-    def test_059(self):
-        self._check(*TESTCASES[59])
-
-    def test_060(self):
-        self._check(*TESTCASES[60])
-
-    def test_061(self):
-        self._check(*TESTCASES[61])
-
-    def test_062(self):
-        self._check(*TESTCASES[62])
-
-    def test_063(self):
-        self._check(*TESTCASES[63])
-
-    def test_064(self):
-        self._check(*TESTCASES[64])
-
-    def test_065(self):
-        self._check(*TESTCASES[65])
-
-    def test_066(self):
-        self._check(*TESTCASES[66])
-
-    def test_067(self):
-        self._check(*TESTCASES[67])
-
-    def test_068(self):
-        self._check(*TESTCASES[68])
-
-    def test_069(self):
-        self._check(*TESTCASES[69])
-
-    def test_070(self):
-        self._check(*TESTCASES[70])
-
-    def test_071(self):
-        self._check(*TESTCASES[71])
-
-    def test_072(self):
-        self._check(*TESTCASES[72])
-
-    def test_073(self):
-        self._check(*TESTCASES[73])
-
-    def test_074(self):
-        self._check(*TESTCASES[74])
-
-    def test_075(self):
-        self._check(*TESTCASES[75])
-
-    def test_076(self):
-        self._check(*TESTCASES[76])
-
-    def test_077(self):
-        self._check(*TESTCASES[77])
-
-    def test_078(self):
-        self._check(*TESTCASES[78])
-
-    def test_079(self):
-        self._check(*TESTCASES[79])
-
-    def test_080(self):
-        self._check(*TESTCASES[80])
 

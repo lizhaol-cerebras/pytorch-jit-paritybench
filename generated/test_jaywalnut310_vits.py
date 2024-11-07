@@ -19,21 +19,14 @@ train_ms = _module
 transforms = _module
 utils = _module
 
-from paritybench._paritybench_helpers import _mock_config, patch_functional
 from unittest.mock import mock_open, MagicMock
 from torch.autograd import Function
 from torch.nn import Module
 import abc, collections, copy, enum, functools, inspect, itertools, logging, math, matplotlib, numbers, numpy, pandas, queue, random, re, scipy, sklearn, string, tensorflow, time, torch, torchaudio, torchvision, types, typing, uuid, warnings
+import operator as op
+from dataclasses import dataclass
 import numpy as np
 from torch import Tensor
-patch_functional()
-open = mock_open()
-yaml = logging = sys = argparse = MagicMock()
-ArgumentParser = argparse.ArgumentParser
-_global_config = args = argv = cfg = config = params = _mock_config()
-argparse.ArgumentParser.return_value.parse_args.return_value = _global_config
-yaml.load.return_value = _global_config
-sys.argv = _global_config
 __version__ = '1.0.0'
 xrange = range
 wraps = functools.wraps
@@ -1252,88 +1245,43 @@ class ConvFlow(nn.Module):
 
 import torch
 from torch.nn import MSELoss, ReLU
-from paritybench._paritybench_helpers import _mock_config, _mock_layer, _paritybench_base, _fails_compile
+from types import SimpleNamespace
 
 
 TESTCASES = [
-    # (nn.Module, init_args, forward_args, jit_compiles)
+    # (nn.Module, init_args, forward_args)
     (DDSConv,
      lambda: ([], {'channels': 4, 'kernel_size': 4, 'n_layers': 1}),
-     lambda: ([torch.rand([4, 4, 2]), torch.rand([4, 4, 2])], {}),
-     False),
+     lambda: ([torch.rand([4, 4, 2]), torch.rand([4, 4, 2])], {})),
     (DiscriminatorP,
      lambda: ([], {'period': 4}),
-     lambda: ([torch.rand([4, 1, 4])], {}),
-     False),
+     lambda: ([torch.rand([4, 1, 4])], {})),
     (DiscriminatorS,
      lambda: ([], {}),
-     lambda: ([torch.rand([4, 1, 64])], {}),
-     False),
+     lambda: ([torch.rand([4, 1, 64])], {})),
     (ElementwiseAffine,
      lambda: ([], {'channels': 4}),
-     lambda: ([torch.rand([4, 4, 4, 4]), torch.rand([4, 4, 4, 4])], {}),
-     False),
+     lambda: ([torch.rand([4, 4, 4, 4]), torch.rand([4, 4, 4, 4])], {})),
     (Flip,
      lambda: ([], {}),
-     lambda: ([torch.rand([4, 4, 4, 4])], {}),
-     False),
+     lambda: ([torch.rand([4, 4, 4, 4])], {})),
     (LayerNorm,
      lambda: ([], {'channels': 4}),
-     lambda: ([torch.rand([4, 4, 4, 4])], {}),
-     True),
+     lambda: ([torch.rand([4, 4, 4, 4])], {})),
     (Log,
      lambda: ([], {}),
-     lambda: ([torch.rand([4, 4, 4, 4]), torch.rand([4, 4, 4, 4])], {}),
-     False),
+     lambda: ([torch.rand([4, 4, 4, 4]), torch.rand([4, 4, 4, 4])], {})),
     (MultiHeadAttention,
      lambda: ([], {'channels': 4, 'out_channels': 4, 'n_heads': 4}),
-     lambda: ([torch.rand([4, 4, 4]), torch.rand([4, 4, 4])], {}),
-     False),
+     lambda: ([torch.rand([4, 4, 4]), torch.rand([4, 4, 4])], {})),
     (MultiPeriodDiscriminator,
      lambda: ([], {}),
-     lambda: ([torch.rand([4, 1, 64]), torch.rand([4, 1, 64])], {}),
-     False),
+     lambda: ([torch.rand([4, 1, 64]), torch.rand([4, 1, 64])], {})),
     (ResBlock1,
      lambda: ([], {'channels': 4}),
-     lambda: ([torch.rand([4, 4])], {}),
-     False),
+     lambda: ([torch.rand([4, 4])], {})),
     (ResBlock2,
      lambda: ([], {'channels': 4}),
-     lambda: ([torch.rand([4, 4])], {}),
-     False),
+     lambda: ([torch.rand([4, 4])], {})),
 ]
-
-class Test_jaywalnut310_vits(_paritybench_base):
-    def test_000(self):
-        self._check(*TESTCASES[0])
-
-    def test_001(self):
-        self._check(*TESTCASES[1])
-
-    def test_002(self):
-        self._check(*TESTCASES[2])
-
-    def test_003(self):
-        self._check(*TESTCASES[3])
-
-    def test_004(self):
-        self._check(*TESTCASES[4])
-
-    def test_005(self):
-        self._check(*TESTCASES[5])
-
-    def test_006(self):
-        self._check(*TESTCASES[6])
-
-    def test_007(self):
-        self._check(*TESTCASES[7])
-
-    def test_008(self):
-        self._check(*TESTCASES[8])
-
-    def test_009(self):
-        self._check(*TESTCASES[9])
-
-    def test_010(self):
-        self._check(*TESTCASES[10])
 

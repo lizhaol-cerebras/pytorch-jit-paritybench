@@ -57,14 +57,11 @@ plugin_mesh_pb2 = _module
 plugin_pr_curve_pb2 = _module
 plugin_text_pb2 = _module
 resource_handle_pb2 = _module
-step_stats_pb2 = _module
 summary_pb2 = _module
 tensor_pb2 = _module
 tensor_shape_pb2 = _module
 types_pb2 = _module
 versions_pb2 = _module
-proto_graph = _module
-pytorch_graph = _module
 record_writer = _module
 summary = _module
 torchvis = _module
@@ -97,21 +94,14 @@ test_utils = _module
 test_visdom = _module
 test_writer = _module
 
-from paritybench._paritybench_helpers import _mock_config, patch_functional
 from unittest.mock import mock_open, MagicMock
 from torch.autograd import Function
 from torch.nn import Module
 import abc, collections, copy, enum, functools, inspect, itertools, logging, math, matplotlib, numbers, numpy, pandas, queue, random, re, scipy, sklearn, string, tensorflow, time, torch, torchaudio, torchvision, types, typing, uuid, warnings
+import operator as op
+from dataclasses import dataclass
 import numpy as np
 from torch import Tensor
-patch_functional()
-open = mock_open()
-yaml = logging = sys = argparse = MagicMock()
-ArgumentParser = argparse.ArgumentParser
-_global_config = args = argv = cfg = config = params = _mock_config()
-argparse.ArgumentParser.return_value.parse_args.return_value = _global_config
-yaml.load.return_value = _global_config
-sys.argv = _global_config
 __version__ = '1.0.0'
 xrange = range
 wraps = functools.wraps
@@ -165,16 +155,13 @@ from torchvision import transforms
 import time
 
 
-import logging
-
-
-from collections import OrderedDict
-
-
 import math
 
 
 import numpy
+
+
+import logging
 
 
 from typing import Union
@@ -399,25 +386,16 @@ class Net(nn.Module):
 
 import torch
 from torch.nn import MSELoss, ReLU
-from paritybench._paritybench_helpers import _mock_config, _mock_layer, _paritybench_base, _fails_compile
+from types import SimpleNamespace
 
 
 TESTCASES = [
-    # (nn.Module, init_args, forward_args, jit_compiles)
+    # (nn.Module, init_args, forward_args)
     (BasicBlock,
      lambda: ([], {'inplanes': 4, 'planes': 4}),
-     lambda: ([torch.rand([4, 4, 4, 4])], {}),
-     True),
+     lambda: ([torch.rand([4, 4, 4, 4])], {})),
     (SimpleModel,
      lambda: ([], {}),
-     lambda: ([torch.rand([4, 4, 4, 4])], {}),
-     True),
+     lambda: ([torch.rand([4, 4, 4, 4])], {})),
 ]
-
-class Test_lanpa_tensorboardX(_paritybench_base):
-    def test_000(self):
-        self._check(*TESTCASES[0])
-
-    def test_001(self):
-        self._check(*TESTCASES[1])
 

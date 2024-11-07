@@ -51,21 +51,14 @@ text_cvae = _module
 text_vamp = _module
 utils = _module
 
-from paritybench._paritybench_helpers import _mock_config, patch_functional
 from unittest.mock import mock_open, MagicMock
 from torch.autograd import Function
 from torch.nn import Module
 import abc, collections, copy, enum, functools, inspect, itertools, logging, math, matplotlib, numbers, numpy, pandas, queue, random, re, scipy, sklearn, string, tensorflow, time, torch, torchaudio, torchvision, types, typing, uuid, warnings
+import operator as op
+from dataclasses import dataclass
 import numpy as np
 from torch import Tensor
-patch_functional()
-open = mock_open()
-yaml = logging = sys = argparse = MagicMock()
-ArgumentParser = argparse.ArgumentParser
-_global_config = args = argv = cfg = config = params = _mock_config()
-argparse.ArgumentParser.return_value.parse_args.return_value = _global_config
-yaml.load.return_value = _global_config
-sys.argv = _global_config
 __version__ = '1.0.0'
 xrange = range
 wraps = functools.wraps
@@ -175,16 +168,16 @@ class BaseVAE(nn.Module):
     def __init__(self) ->None:
         super(BaseVAE, self).__init__()
 
-    def encode(self, input: Tensor) ->List[Tensor]:
+    def encode(self, input: 'Tensor') ->List[Tensor]:
         raise NotImplementedError
 
-    def decode(self, input: Tensor) ->Any:
+    def decode(self, input: 'Tensor') ->Any:
         raise NotImplementedError
 
-    def sample(self, batch_size: int, current_device: int, **kwargs) ->Tensor:
+    def sample(self, batch_size: 'int', current_device: 'int', **kwargs) ->Tensor:
         raise NotImplementedError
 
-    def generate(self, x: Tensor, **kwargs) ->Tensor:
+    def generate(self, x: 'Tensor', **kwargs) ->Tensor:
         raise NotImplementedError
 
     @abstractmethod
@@ -199,7 +192,7 @@ class BaseVAE(nn.Module):
 class BetaVAE(BaseVAE):
     num_iter = 0
 
-    def __init__(self, in_channels: int, latent_dim: int, hidden_dims: List=None, beta: int=4, gamma: float=1000.0, max_capacity: int=25, Capacity_max_iter: int=100000.0, loss_type: str='B', **kwargs) ->None:
+    def __init__(self, in_channels: 'int', latent_dim: 'int', hidden_dims: 'List'=None, beta: 'int'=4, gamma: 'float'=1000.0, max_capacity: 'int'=25, Capacity_max_iter: 'int'=100000.0, loss_type: 'str'='B', **kwargs) ->None:
         super(BetaVAE, self).__init__()
         self.latent_dim = latent_dim
         self.beta = beta
@@ -224,7 +217,7 @@ class BetaVAE(BaseVAE):
         self.decoder = nn.Sequential(*modules)
         self.final_layer = nn.Sequential(nn.ConvTranspose2d(hidden_dims[-1], hidden_dims[-1], kernel_size=3, stride=2, padding=1, output_padding=1), nn.BatchNorm2d(hidden_dims[-1]), nn.LeakyReLU(), nn.Conv2d(hidden_dims[-1], out_channels=3, kernel_size=3, padding=1), nn.Tanh())
 
-    def encode(self, input: Tensor) ->List[Tensor]:
+    def encode(self, input: 'Tensor') ->List[Tensor]:
         """
         Encodes the input by passing through the encoder network
         and returns the latent codes.
@@ -237,14 +230,14 @@ class BetaVAE(BaseVAE):
         log_var = self.fc_var(result)
         return [mu, log_var]
 
-    def decode(self, z: Tensor) ->Tensor:
+    def decode(self, z: 'Tensor') ->Tensor:
         result = self.decoder_input(z)
         result = result.view(-1, 512, 2, 2)
         result = self.decoder(result)
         result = self.final_layer(result)
         return result
 
-    def reparameterize(self, mu: Tensor, logvar: Tensor) ->Tensor:
+    def reparameterize(self, mu: 'Tensor', logvar: 'Tensor') ->Tensor:
         """
         Will a single z be enough ti compute the expectation
         for the loss??
@@ -256,7 +249,7 @@ class BetaVAE(BaseVAE):
         eps = torch.randn_like(std)
         return eps * std + mu
 
-    def forward(self, input: Tensor, **kwargs) ->Tensor:
+    def forward(self, input: 'Tensor', **kwargs) ->Tensor:
         mu, log_var = self.encode(input)
         z = self.reparameterize(mu, log_var)
         return [self.decode(z), input, mu, log_var]
@@ -280,7 +273,7 @@ class BetaVAE(BaseVAE):
             raise ValueError('Undefined loss type.')
         return {'loss': loss, 'Reconstruction_Loss': recons_loss, 'KLD': kld_loss}
 
-    def sample(self, num_samples: int, current_device: int, **kwargs) ->Tensor:
+    def sample(self, num_samples: 'int', current_device: 'int', **kwargs) ->Tensor:
         """
         Samples from the latent space and return the corresponding
         image space map.
@@ -293,7 +286,7 @@ class BetaVAE(BaseVAE):
         samples = self.decode(z)
         return samples
 
-    def generate(self, x: Tensor, **kwargs) ->Tensor:
+    def generate(self, x: 'Tensor', **kwargs) ->Tensor:
         """
         Given an input image x, returns the reconstructed image
         :param x: (Tensor) [B x C x H x W]
@@ -305,7 +298,7 @@ class BetaVAE(BaseVAE):
 class BetaTCVAE(BaseVAE):
     num_iter = 0
 
-    def __init__(self, in_channels: int, latent_dim: int, hidden_dims: List=None, anneal_steps: int=200, alpha: float=1.0, beta: float=6.0, gamma: float=1.0, **kwargs) ->None:
+    def __init__(self, in_channels: 'int', latent_dim: 'int', hidden_dims: 'List'=None, anneal_steps: 'int'=200, alpha: 'float'=1.0, beta: 'float'=6.0, gamma: 'float'=1.0, **kwargs) ->None:
         super(BetaTCVAE, self).__init__()
         self.latent_dim = latent_dim
         self.anneal_steps = anneal_steps
@@ -330,7 +323,7 @@ class BetaTCVAE(BaseVAE):
         self.decoder = nn.Sequential(*modules)
         self.final_layer = nn.Sequential(nn.ConvTranspose2d(hidden_dims[-1], hidden_dims[-1], kernel_size=3, stride=2, padding=1, output_padding=1), nn.LeakyReLU(), nn.Conv2d(hidden_dims[-1], out_channels=3, kernel_size=3, padding=1), nn.Tanh())
 
-    def encode(self, input: Tensor) ->List[Tensor]:
+    def encode(self, input: 'Tensor') ->List[Tensor]:
         """
         Encodes the input by passing through the encoder network
         and returns the latent codes.
@@ -344,7 +337,7 @@ class BetaTCVAE(BaseVAE):
         log_var = self.fc_var(result)
         return [mu, log_var]
 
-    def decode(self, z: Tensor) ->Tensor:
+    def decode(self, z: 'Tensor') ->Tensor:
         """
         Maps the given latent codes
         onto the image space.
@@ -357,7 +350,7 @@ class BetaTCVAE(BaseVAE):
         result = self.final_layer(result)
         return result
 
-    def reparameterize(self, mu: Tensor, logvar: Tensor) ->Tensor:
+    def reparameterize(self, mu: 'Tensor', logvar: 'Tensor') ->Tensor:
         """
         Reparameterization trick to sample from N(mu, var) from
         N(0,1).
@@ -369,12 +362,12 @@ class BetaTCVAE(BaseVAE):
         eps = torch.randn_like(std)
         return eps * std + mu
 
-    def forward(self, input: Tensor, **kwargs) ->List[Tensor]:
+    def forward(self, input: 'Tensor', **kwargs) ->List[Tensor]:
         mu, log_var = self.encode(input)
         z = self.reparameterize(mu, log_var)
         return [self.decode(z), input, mu, log_var, z]
 
-    def log_density_gaussian(self, x: Tensor, mu: Tensor, logvar: Tensor):
+    def log_density_gaussian(self, x: 'Tensor', mu: 'Tensor', logvar: 'Tensor'):
         """
         Computes the log pdf of the Gaussian with parameters mu and logvar at x
         :param x: (Tensor) Point at whichGaussian PDF is to be evaluated
@@ -427,7 +420,7 @@ class BetaTCVAE(BaseVAE):
         loss = recons_loss / batch_size + self.alpha * mi_loss + weight * (self.beta * tc_loss + anneal_rate * self.gamma * kld_loss)
         return {'loss': loss, 'Reconstruction_Loss': recons_loss, 'KLD': kld_loss, 'TC_Loss': tc_loss, 'MI_Loss': mi_loss}
 
-    def sample(self, num_samples: int, current_device: int, **kwargs) ->Tensor:
+    def sample(self, num_samples: 'int', current_device: 'int', **kwargs) ->Tensor:
         """
         Samples from the latent space and return the corresponding
         image space map.
@@ -440,7 +433,7 @@ class BetaTCVAE(BaseVAE):
         samples = self.decode(z)
         return samples
 
-    def generate(self, x: Tensor, **kwargs) ->Tensor:
+    def generate(self, x: 'Tensor', **kwargs) ->Tensor:
         """
         Given an input image x, returns the reconstructed image
         :param x: (Tensor) [B x C x H x W]
@@ -451,7 +444,7 @@ class BetaTCVAE(BaseVAE):
 
 class CategoricalVAE(BaseVAE):
 
-    def __init__(self, in_channels: int, latent_dim: int, categorical_dim: int=40, hidden_dims: List=None, temperature: float=0.5, anneal_rate: float=3e-05, anneal_interval: int=100, alpha: float=30.0, **kwargs) ->None:
+    def __init__(self, in_channels: 'int', latent_dim: 'int', categorical_dim: 'int'=40, hidden_dims: 'List'=None, temperature: 'float'=0.5, anneal_rate: 'float'=3e-05, anneal_interval: 'int'=100, alpha: 'float'=30.0, **kwargs) ->None:
         super(CategoricalVAE, self).__init__()
         self.latent_dim = latent_dim
         self.categorical_dim = categorical_dim
@@ -477,7 +470,7 @@ class CategoricalVAE(BaseVAE):
         self.final_layer = nn.Sequential(nn.ConvTranspose2d(hidden_dims[-1], hidden_dims[-1], kernel_size=3, stride=2, padding=1, output_padding=1), nn.BatchNorm2d(hidden_dims[-1]), nn.LeakyReLU(), nn.Conv2d(hidden_dims[-1], out_channels=3, kernel_size=3, padding=1), nn.Tanh())
         self.sampling_dist = torch.distributions.OneHotCategorical(1.0 / categorical_dim * torch.ones((self.categorical_dim, 1)))
 
-    def encode(self, input: Tensor) ->List[Tensor]:
+    def encode(self, input: 'Tensor') ->List[Tensor]:
         """
         Encodes the input by passing through the encoder network
         and returns the latent codes.
@@ -490,7 +483,7 @@ class CategoricalVAE(BaseVAE):
         z = z.view(-1, self.latent_dim, self.categorical_dim)
         return [z]
 
-    def decode(self, z: Tensor) ->Tensor:
+    def decode(self, z: 'Tensor') ->Tensor:
         """
         Maps the given latent codes
         onto the image space.
@@ -503,7 +496,7 @@ class CategoricalVAE(BaseVAE):
         result = self.final_layer(result)
         return result
 
-    def reparameterize(self, z: Tensor, eps: float=1e-07) ->Tensor:
+    def reparameterize(self, z: 'Tensor', eps: 'float'=1e-07) ->Tensor:
         """
         Gumbel-softmax trick to sample from Categorical Distribution
         :param z: (Tensor) Latent Codes [B x D x Q]
@@ -515,7 +508,7 @@ class CategoricalVAE(BaseVAE):
         s = s.view(-1, self.latent_dim * self.categorical_dim)
         return s
 
-    def forward(self, input: Tensor, **kwargs) ->List[Tensor]:
+    def forward(self, input: 'Tensor', **kwargs) ->List[Tensor]:
         q = self.encode(input)[0]
         z = self.reparameterize(q)
         return [self.decode(z), input, q]
@@ -544,7 +537,7 @@ class CategoricalVAE(BaseVAE):
         loss = self.alpha * recons_loss + kld_weight * kld_loss
         return {'loss': loss, 'Reconstruction_Loss': recons_loss, 'KLD': -kld_loss}
 
-    def sample(self, num_samples: int, current_device: int, **kwargs) ->Tensor:
+    def sample(self, num_samples: 'int', current_device: 'int', **kwargs) ->Tensor:
         """
         Samples from the latent space and return the corresponding
         image space map.
@@ -561,7 +554,7 @@ class CategoricalVAE(BaseVAE):
         samples = self.decode(z)
         return samples
 
-    def generate(self, x: Tensor, **kwargs) ->Tensor:
+    def generate(self, x: 'Tensor', **kwargs) ->Tensor:
         """
         Given an input image x, returns the reconstructed image
         :param x: (Tensor) [B x C x H x W]
@@ -572,7 +565,7 @@ class CategoricalVAE(BaseVAE):
 
 class ConditionalVAE(BaseVAE):
 
-    def __init__(self, in_channels: int, num_classes: int, latent_dim: int, hidden_dims: List=None, img_size: int=64, **kwargs) ->None:
+    def __init__(self, in_channels: 'int', num_classes: 'int', latent_dim: 'int', hidden_dims: 'List'=None, img_size: 'int'=64, **kwargs) ->None:
         super(ConditionalVAE, self).__init__()
         self.latent_dim = latent_dim
         self.img_size = img_size
@@ -596,7 +589,7 @@ class ConditionalVAE(BaseVAE):
         self.decoder = nn.Sequential(*modules)
         self.final_layer = nn.Sequential(nn.ConvTranspose2d(hidden_dims[-1], hidden_dims[-1], kernel_size=3, stride=2, padding=1, output_padding=1), nn.BatchNorm2d(hidden_dims[-1]), nn.LeakyReLU(), nn.Conv2d(hidden_dims[-1], out_channels=3, kernel_size=3, padding=1), nn.Tanh())
 
-    def encode(self, input: Tensor) ->List[Tensor]:
+    def encode(self, input: 'Tensor') ->List[Tensor]:
         """
         Encodes the input by passing through the encoder network
         and returns the latent codes.
@@ -609,14 +602,14 @@ class ConditionalVAE(BaseVAE):
         log_var = self.fc_var(result)
         return [mu, log_var]
 
-    def decode(self, z: Tensor) ->Tensor:
+    def decode(self, z: 'Tensor') ->Tensor:
         result = self.decoder_input(z)
         result = result.view(-1, 512, 2, 2)
         result = self.decoder(result)
         result = self.final_layer(result)
         return result
 
-    def reparameterize(self, mu: Tensor, logvar: Tensor) ->Tensor:
+    def reparameterize(self, mu: 'Tensor', logvar: 'Tensor') ->Tensor:
         """
         Will a single z be enough ti compute the expectation
         for the loss??
@@ -628,7 +621,7 @@ class ConditionalVAE(BaseVAE):
         eps = torch.randn_like(std)
         return eps * std + mu
 
-    def forward(self, input: Tensor, **kwargs) ->List[Tensor]:
+    def forward(self, input: 'Tensor', **kwargs) ->List[Tensor]:
         y = kwargs['labels'].float()
         embedded_class = self.embed_class(y)
         embedded_class = embedded_class.view(-1, self.img_size, self.img_size).unsqueeze(1)
@@ -650,7 +643,7 @@ class ConditionalVAE(BaseVAE):
         loss = recons_loss + kld_weight * kld_loss
         return {'loss': loss, 'Reconstruction_Loss': recons_loss, 'KLD': -kld_loss}
 
-    def sample(self, num_samples: int, current_device: int, **kwargs) ->Tensor:
+    def sample(self, num_samples: 'int', current_device: 'int', **kwargs) ->Tensor:
         """
         Samples from the latent space and return the corresponding
         image space map.
@@ -665,7 +658,7 @@ class ConditionalVAE(BaseVAE):
         samples = self.decode(z)
         return samples
 
-    def generate(self, x: Tensor, **kwargs) ->Tensor:
+    def generate(self, x: 'Tensor', **kwargs) ->Tensor:
         """
         Given an input image x, returns the reconstructed image
         :param x: (Tensor) [B x C x H x W]
@@ -676,7 +669,7 @@ class ConditionalVAE(BaseVAE):
 
 class DFCVAE(BaseVAE):
 
-    def __init__(self, in_channels: int, latent_dim: int, hidden_dims: List=None, alpha: float=1, beta: float=0.5, **kwargs) ->None:
+    def __init__(self, in_channels: 'int', latent_dim: 'int', hidden_dims: 'List'=None, alpha: 'float'=1, beta: 'float'=0.5, **kwargs) ->None:
         super(DFCVAE, self).__init__()
         self.latent_dim = latent_dim
         self.alpha = alpha
@@ -702,7 +695,7 @@ class DFCVAE(BaseVAE):
             param.requires_grad = False
         self.feature_network.eval()
 
-    def encode(self, input: Tensor) ->List[Tensor]:
+    def encode(self, input: 'Tensor') ->List[Tensor]:
         """
         Encodes the input by passing through the encoder network
         and returns the latent codes.
@@ -715,7 +708,7 @@ class DFCVAE(BaseVAE):
         log_var = self.fc_var(result)
         return [mu, log_var]
 
-    def decode(self, z: Tensor) ->Tensor:
+    def decode(self, z: 'Tensor') ->Tensor:
         """
         Maps the given latent codes
         onto the image space.
@@ -728,7 +721,7 @@ class DFCVAE(BaseVAE):
         result = self.final_layer(result)
         return result
 
-    def reparameterize(self, mu: Tensor, logvar: Tensor) ->Tensor:
+    def reparameterize(self, mu: 'Tensor', logvar: 'Tensor') ->Tensor:
         """
         Reparameterization trick to sample from N(mu, var) from
         N(0,1).
@@ -740,7 +733,7 @@ class DFCVAE(BaseVAE):
         eps = torch.randn_like(std)
         return eps * std + mu
 
-    def forward(self, input: Tensor, **kwargs) ->List[Tensor]:
+    def forward(self, input: 'Tensor', **kwargs) ->List[Tensor]:
         mu, log_var = self.encode(input)
         z = self.reparameterize(mu, log_var)
         recons = self.decode(z)
@@ -748,7 +741,7 @@ class DFCVAE(BaseVAE):
         input_features = self.extract_features(input)
         return [recons, input, recons_features, input_features, mu, log_var]
 
-    def extract_features(self, input: Tensor, feature_layers: List=None) ->List[Tensor]:
+    def extract_features(self, input: 'Tensor', feature_layers: 'List'=None) ->List[Tensor]:
         """
         Extracts the features from the pretrained model
         at the layers indicated by feature_layers.
@@ -789,7 +782,7 @@ class DFCVAE(BaseVAE):
         loss = self.beta * (recons_loss + feature_loss) + self.alpha * kld_weight * kld_loss
         return {'loss': loss, 'Reconstruction_Loss': recons_loss, 'KLD': -kld_loss}
 
-    def sample(self, num_samples: int, current_device: int, **kwargs) ->Tensor:
+    def sample(self, num_samples: 'int', current_device: 'int', **kwargs) ->Tensor:
         """
         Samples from the latent space and return the corresponding
         image space map.
@@ -802,7 +795,7 @@ class DFCVAE(BaseVAE):
         samples = self.decode(z)
         return samples
 
-    def generate(self, x: Tensor, **kwargs) ->Tensor:
+    def generate(self, x: 'Tensor', **kwargs) ->Tensor:
         """
         Given an input image x, returns the reconstructed image
         :param x: (Tensor) [B x C x H x W]
@@ -813,7 +806,7 @@ class DFCVAE(BaseVAE):
 
 class DIPVAE(BaseVAE):
 
-    def __init__(self, in_channels: int, latent_dim: int, hidden_dims: List=None, lambda_diag: float=10.0, lambda_offdiag: float=5.0, **kwargs) ->None:
+    def __init__(self, in_channels: 'int', latent_dim: 'int', hidden_dims: 'List'=None, lambda_diag: 'float'=10.0, lambda_offdiag: 'float'=5.0, **kwargs) ->None:
         super(DIPVAE, self).__init__()
         self.latent_dim = latent_dim
         self.lambda_diag = lambda_diag
@@ -835,7 +828,7 @@ class DIPVAE(BaseVAE):
         self.decoder = nn.Sequential(*modules)
         self.final_layer = nn.Sequential(nn.ConvTranspose2d(hidden_dims[-1], hidden_dims[-1], kernel_size=3, stride=2, padding=1, output_padding=1), nn.BatchNorm2d(hidden_dims[-1]), nn.LeakyReLU(), nn.Conv2d(hidden_dims[-1], out_channels=3, kernel_size=3, padding=1), nn.Tanh())
 
-    def encode(self, input: Tensor) ->List[Tensor]:
+    def encode(self, input: 'Tensor') ->List[Tensor]:
         """
         Encodes the input by passing through the encoder network
         and returns the latent codes.
@@ -848,7 +841,7 @@ class DIPVAE(BaseVAE):
         log_var = self.fc_var(result)
         return [mu, log_var]
 
-    def decode(self, z: Tensor) ->Tensor:
+    def decode(self, z: 'Tensor') ->Tensor:
         """
         Maps the given latent codes
         onto the image space.
@@ -861,7 +854,7 @@ class DIPVAE(BaseVAE):
         result = self.final_layer(result)
         return result
 
-    def reparameterize(self, mu: Tensor, logvar: Tensor) ->Tensor:
+    def reparameterize(self, mu: 'Tensor', logvar: 'Tensor') ->Tensor:
         """
         Reparameterization trick to sample from N(mu, var) from
         N(0,1).
@@ -873,7 +866,7 @@ class DIPVAE(BaseVAE):
         eps = torch.randn_like(std)
         return eps * std + mu
 
-    def forward(self, input: Tensor, **kwargs) ->List[Tensor]:
+    def forward(self, input: 'Tensor', **kwargs) ->List[Tensor]:
         mu, log_var = self.encode(input)
         z = self.reparameterize(mu, log_var)
         return [self.decode(z), input, mu, log_var]
@@ -902,7 +895,7 @@ class DIPVAE(BaseVAE):
         loss = recons_loss + kld_weight * kld_loss + dip_loss
         return {'loss': loss, 'Reconstruction_Loss': recons_loss, 'KLD': -kld_loss, 'DIP_Loss': dip_loss}
 
-    def sample(self, num_samples: int, current_device: int, **kwargs) ->Tensor:
+    def sample(self, num_samples: 'int', current_device: 'int', **kwargs) ->Tensor:
         """
         Samples from the latent space and return the corresponding
         image space map.
@@ -915,7 +908,7 @@ class DIPVAE(BaseVAE):
         samples = self.decode(z)
         return samples
 
-    def generate(self, x: Tensor, **kwargs) ->Tensor:
+    def generate(self, x: 'Tensor', **kwargs) ->Tensor:
         """
         Given an input image x, returns the reconstructed image
         :param x: (Tensor) [B x C x H x W]
@@ -926,7 +919,7 @@ class DIPVAE(BaseVAE):
 
 class FactorVAE(BaseVAE):
 
-    def __init__(self, in_channels: int, latent_dim: int, hidden_dims: List=None, gamma: float=40.0, **kwargs) ->None:
+    def __init__(self, in_channels: 'int', latent_dim: 'int', hidden_dims: 'List'=None, gamma: 'float'=40.0, **kwargs) ->None:
         super(FactorVAE, self).__init__()
         self.latent_dim = latent_dim
         self.gamma = gamma
@@ -949,7 +942,7 @@ class FactorVAE(BaseVAE):
         self.discriminator = nn.Sequential(nn.Linear(self.latent_dim, 1000), nn.BatchNorm1d(1000), nn.LeakyReLU(0.2), nn.Linear(1000, 1000), nn.BatchNorm1d(1000), nn.LeakyReLU(0.2), nn.Linear(1000, 1000), nn.BatchNorm1d(1000), nn.LeakyReLU(0.2), nn.Linear(1000, 2))
         self.D_z_reserve = None
 
-    def encode(self, input: Tensor) ->List[Tensor]:
+    def encode(self, input: 'Tensor') ->List[Tensor]:
         """
         Encodes the input by passing through the encoder network
         and returns the latent codes.
@@ -962,7 +955,7 @@ class FactorVAE(BaseVAE):
         log_var = self.fc_var(result)
         return [mu, log_var]
 
-    def decode(self, z: Tensor) ->Tensor:
+    def decode(self, z: 'Tensor') ->Tensor:
         """
         Maps the given latent codes
         onto the image space.
@@ -975,7 +968,7 @@ class FactorVAE(BaseVAE):
         result = self.final_layer(result)
         return result
 
-    def reparameterize(self, mu: Tensor, logvar: Tensor) ->Tensor:
+    def reparameterize(self, mu: 'Tensor', logvar: 'Tensor') ->Tensor:
         """
         Reparameterization trick to sample from N(mu, var) from
         N(0,1).
@@ -987,12 +980,12 @@ class FactorVAE(BaseVAE):
         eps = torch.randn_like(std)
         return eps * std + mu
 
-    def forward(self, input: Tensor, **kwargs) ->List[Tensor]:
+    def forward(self, input: 'Tensor', **kwargs) ->List[Tensor]:
         mu, log_var = self.encode(input)
         z = self.reparameterize(mu, log_var)
         return [self.decode(z), input, mu, log_var, z]
 
-    def permute_latent(self, z: Tensor) ->Tensor:
+    def permute_latent(self, z: 'Tensor') ->Tensor:
         """
         Permutes each of the latent codes in the batch
         :param z: [B x D]
@@ -1034,7 +1027,7 @@ class FactorVAE(BaseVAE):
             D_tc_loss = 0.5 * (F.cross_entropy(self.D_z_reserve, false_labels) + F.cross_entropy(D_z_perm, true_labels))
             return {'loss': D_tc_loss, 'D_TC_Loss': D_tc_loss}
 
-    def sample(self, num_samples: int, current_device: int, **kwargs) ->Tensor:
+    def sample(self, num_samples: 'int', current_device: 'int', **kwargs) ->Tensor:
         """
         Samples from the latent space and return the corresponding
         image space map.
@@ -1047,7 +1040,7 @@ class FactorVAE(BaseVAE):
         samples = self.decode(z)
         return samples
 
-    def generate(self, x: Tensor, **kwargs) ->Tensor:
+    def generate(self, x: 'Tensor', **kwargs) ->Tensor:
         """
         Given an input image x, returns the reconstructed image
         :param x: (Tensor) [B x C x H x W]
@@ -1069,7 +1062,7 @@ def init_(m):
 
 class GammaVAE(BaseVAE):
 
-    def __init__(self, in_channels: int, latent_dim: int, hidden_dims: List=None, gamma_shape: float=8.0, prior_shape: float=2.0, prior_rate: float=1.0, **kwargs) ->None:
+    def __init__(self, in_channels: 'int', latent_dim: 'int', hidden_dims: 'List'=None, gamma_shape: 'float'=8.0, prior_shape: 'float'=2.0, prior_rate: 'float'=1.0, **kwargs) ->None:
         super(GammaVAE, self).__init__()
         self.latent_dim = latent_dim
         self.B = gamma_shape
@@ -1098,7 +1091,7 @@ class GammaVAE(BaseVAE):
             for m in self._modules[block]:
                 init_(m)
 
-    def encode(self, input: Tensor) ->List[Tensor]:
+    def encode(self, input: 'Tensor') ->List[Tensor]:
         """
         Encodes the input by passing through the encoder network
         and returns the latent codes.
@@ -1111,14 +1104,14 @@ class GammaVAE(BaseVAE):
         beta = self.fc_var(result)
         return [alpha, beta]
 
-    def decode(self, z: Tensor) ->Tensor:
+    def decode(self, z: 'Tensor') ->Tensor:
         result = self.decoder_input(z)
         result = result.view(-1, 512, 2, 2)
         result = self.decoder(result)
         result = self.final_layer(result)
         return result
 
-    def reparameterize(self, alpha: Tensor, beta: Tensor) ->Tensor:
+    def reparameterize(self, alpha: 'Tensor', beta: 'Tensor') ->Tensor:
         """
         Reparameterize the Gamma distribution by the shape augmentation trick.
         Reference:
@@ -1134,7 +1127,7 @@ class GammaVAE(BaseVAE):
         z = self.h_func(alpha + self.B, eps)
         return z / beta
 
-    def h_func(self, alpha: Tensor, eps: Tensor) ->Tensor:
+    def h_func(self, alpha: 'Tensor', eps: 'Tensor') ->Tensor:
         """
         Reparameterize a sample eps ~ N(0, 1) so that h(z) ~ Gamma(alpha, 1)
         :param alpha: (Tensor) Shape parameter
@@ -1144,7 +1137,7 @@ class GammaVAE(BaseVAE):
         z = (alpha - 1.0 / 3.0) * (1 + eps / torch.sqrt(9.0 * alpha - 3.0)) ** 3
         return z
 
-    def inv_h_func(self, alpha: Tensor, z: Tensor) ->Tensor:
+    def inv_h_func(self, alpha: 'Tensor', z: 'Tensor') ->Tensor:
         """
         Inverse reparameterize the given z into eps.
         :param alpha: (Tensor)
@@ -1154,7 +1147,7 @@ class GammaVAE(BaseVAE):
         eps = torch.sqrt(9.0 * alpha - 3.0) * ((z / (alpha - 1.0 / 3.0)) ** (1.0 / 3.0) - 1.0)
         return eps
 
-    def forward(self, input: Tensor, **kwargs) ->Tensor:
+    def forward(self, input: 'Tensor', **kwargs) ->Tensor:
         alpha, beta = self.encode(input)
         z = self.reparameterize(alpha, beta)
         return [self.decode(z), input, alpha, beta]
@@ -1189,7 +1182,7 @@ class GammaVAE(BaseVAE):
         loss = torch.mean(loss, dim=0)
         return {'loss': loss}
 
-    def sample(self, num_samples: int, current_device: int, **kwargs) ->Tensor:
+    def sample(self, num_samples: 'int', current_device: 'int', **kwargs) ->Tensor:
         """
         Samples from the latent space and return the corresponding
         image space map.
@@ -1202,7 +1195,7 @@ class GammaVAE(BaseVAE):
         samples = self.decode(z)
         return samples
 
-    def generate(self, x: Tensor, **kwargs) ->Tensor:
+    def generate(self, x: 'Tensor', **kwargs) ->Tensor:
         """
         Given an input image x, returns the reconstructed image
         :param x: (Tensor) [B x C x H x W]
@@ -1213,7 +1206,7 @@ class GammaVAE(BaseVAE):
 
 class HVAE(BaseVAE):
 
-    def __init__(self, in_channels: int, latent1_dim: int, latent2_dim: int, hidden_dims: List=None, img_size: int=64, pseudo_input_size: int=128, **kwargs) ->None:
+    def __init__(self, in_channels: 'int', latent1_dim: 'int', latent2_dim: 'int', hidden_dims: 'List'=None, img_size: 'int'=64, pseudo_input_size: 'int'=128, **kwargs) ->None:
         super(HVAE, self).__init__()
         self.latent1_dim = latent1_dim
         self.latent2_dim = latent2_dim
@@ -1249,7 +1242,7 @@ class HVAE(BaseVAE):
         self.decoder = nn.Sequential(*modules)
         self.final_layer = nn.Sequential(nn.ConvTranspose2d(hidden_dims[-1], hidden_dims[-1], kernel_size=3, stride=2, padding=1, output_padding=1), nn.BatchNorm2d(hidden_dims[-1]), nn.LeakyReLU(), nn.Conv2d(hidden_dims[-1], out_channels=3, kernel_size=3, padding=1), nn.Tanh())
 
-    def encode_z2(self, input: Tensor) ->List[Tensor]:
+    def encode_z2(self, input: 'Tensor') ->List[Tensor]:
         """
         Encodes the input by passing through the encoder network
         and returns the latent codes.
@@ -1262,7 +1255,7 @@ class HVAE(BaseVAE):
         z2_log_var = self.fc_z2_var(result)
         return [z2_mu, z2_log_var]
 
-    def encode_z1(self, input: Tensor, z2: Tensor) ->List[Tensor]:
+    def encode_z1(self, input: 'Tensor', z2: 'Tensor') ->List[Tensor]:
         x = self.embed_data(input)
         z2 = self.embed_z2_code(z2)
         z2 = z2.view(-1, self.img_size, self.img_size).unsqueeze(1)
@@ -1273,18 +1266,18 @@ class HVAE(BaseVAE):
         z1_log_var = self.fc_z1_var(result)
         return [z1_mu, z1_log_var]
 
-    def encode(self, input: Tensor) ->List[Tensor]:
+    def encode(self, input: 'Tensor') ->List[Tensor]:
         z2_mu, z2_log_var = self.encode_z2(input)
         z2 = self.reparameterize(z2_mu, z2_log_var)
         z1_mu, z1_log_var = self.encode_z1(input, z2)
         return [z1_mu, z1_log_var, z2_mu, z2_log_var, z2]
 
-    def decode(self, input: Tensor) ->Tensor:
+    def decode(self, input: 'Tensor') ->Tensor:
         result = self.decoder(input)
         result = self.final_layer(result)
         return result
 
-    def reparameterize(self, mu: Tensor, logvar: Tensor) ->Tensor:
+    def reparameterize(self, mu: 'Tensor', logvar: 'Tensor') ->Tensor:
         """
         Will a single z be enough ti compute the expectation
         for the loss??
@@ -1296,7 +1289,7 @@ class HVAE(BaseVAE):
         eps = torch.randn_like(std)
         return eps * std + mu
 
-    def forward(self, input: Tensor, **kwargs) ->List[Tensor]:
+    def forward(self, input: 'Tensor', **kwargs) ->List[Tensor]:
         z1_mu, z1_log_var, z2_mu, z2_log_var, z2 = self.encode(input)
         z1 = self.reparameterize(z1_mu, z1_log_var)
         debedded_z1 = self.debed_z1_code(z1)
@@ -1327,7 +1320,7 @@ class HVAE(BaseVAE):
         loss = recons_loss + kld_weight * kld_loss
         return {'loss': loss, 'Reconstruction Loss': recons_loss, 'KLD': -kld_loss}
 
-    def sample(self, batch_size: int, current_device: int, **kwargs) ->Tensor:
+    def sample(self, batch_size: 'int', current_device: 'int', **kwargs) ->Tensor:
         z2 = torch.randn(batch_size, self.latent2_dim)
         z2 = z2
         z1_mu = self.recons_z1_mu(z2)
@@ -1340,7 +1333,7 @@ class HVAE(BaseVAE):
         samples = self.decode(result)
         return samples
 
-    def generate(self, x: Tensor, **kwargs) ->Tensor:
+    def generate(self, x: 'Tensor', **kwargs) ->Tensor:
         """
         Given an input image x, returns the reconstructed image
         :param x: (Tensor) [B x C x H x W]
@@ -1351,7 +1344,7 @@ class HVAE(BaseVAE):
 
 class InfoVAE(BaseVAE):
 
-    def __init__(self, in_channels: int, latent_dim: int, hidden_dims: List=None, alpha: float=-0.5, beta: float=5.0, reg_weight: int=100, kernel_type: str='imq', latent_var: float=2.0, **kwargs) ->None:
+    def __init__(self, in_channels: 'int', latent_dim: 'int', hidden_dims: 'List'=None, alpha: 'float'=-0.5, beta: 'float'=5.0, reg_weight: 'int'=100, kernel_type: 'str'='imq', latent_var: 'float'=2.0, **kwargs) ->None:
         super(InfoVAE, self).__init__()
         self.latent_dim = latent_dim
         self.reg_weight = reg_weight
@@ -1377,7 +1370,7 @@ class InfoVAE(BaseVAE):
         self.decoder = nn.Sequential(*modules)
         self.final_layer = nn.Sequential(nn.ConvTranspose2d(hidden_dims[-1], hidden_dims[-1], kernel_size=3, stride=2, padding=1, output_padding=1), nn.BatchNorm2d(hidden_dims[-1]), nn.LeakyReLU(), nn.Conv2d(hidden_dims[-1], out_channels=3, kernel_size=3, padding=1), nn.Tanh())
 
-    def encode(self, input: Tensor) ->List[Tensor]:
+    def encode(self, input: 'Tensor') ->List[Tensor]:
         """
         Encodes the input by passing through the encoder network
         and returns the latent codes.
@@ -1390,14 +1383,14 @@ class InfoVAE(BaseVAE):
         log_var = self.fc_var(result)
         return [mu, log_var]
 
-    def decode(self, z: Tensor) ->Tensor:
+    def decode(self, z: 'Tensor') ->Tensor:
         result = self.decoder_input(z)
         result = result.view(-1, 512, 2, 2)
         result = self.decoder(result)
         result = self.final_layer(result)
         return result
 
-    def reparameterize(self, mu: Tensor, logvar: Tensor) ->Tensor:
+    def reparameterize(self, mu: 'Tensor', logvar: 'Tensor') ->Tensor:
         """
         Reparameterization trick to sample from N(mu, var) from
         N(0,1).
@@ -1409,7 +1402,7 @@ class InfoVAE(BaseVAE):
         eps = torch.randn_like(std)
         return eps * std + mu
 
-    def forward(self, input: Tensor, **kwargs) ->List[Tensor]:
+    def forward(self, input: 'Tensor', **kwargs) ->List[Tensor]:
         mu, log_var = self.encode(input)
         z = self.reparameterize(mu, log_var)
         return [self.decode(z), input, z, mu, log_var]
@@ -1429,7 +1422,7 @@ class InfoVAE(BaseVAE):
         loss = self.beta * recons_loss + (1.0 - self.alpha) * kld_weight * kld_loss + (self.alpha + self.reg_weight - 1.0) / bias_corr * mmd_loss
         return {'loss': loss, 'Reconstruction_Loss': recons_loss, 'MMD': mmd_loss, 'KLD': -kld_loss}
 
-    def compute_kernel(self, x1: Tensor, x2: Tensor) ->Tensor:
+    def compute_kernel(self, x1: 'Tensor', x2: 'Tensor') ->Tensor:
         D = x1.size(1)
         N = x1.size(0)
         x1 = x1.unsqueeze(-2)
@@ -1449,7 +1442,7 @@ class InfoVAE(BaseVAE):
             raise ValueError('Undefined kernel type.')
         return result
 
-    def compute_rbf(self, x1: Tensor, x2: Tensor, eps: float=1e-07) ->Tensor:
+    def compute_rbf(self, x1: 'Tensor', x2: 'Tensor', eps: 'float'=1e-07) ->Tensor:
         """
         Computes the RBF Kernel between x1 and x2.
         :param x1: (Tensor)
@@ -1462,7 +1455,7 @@ class InfoVAE(BaseVAE):
         result = torch.exp(-((x1 - x2).pow(2).mean(-1) / sigma))
         return result
 
-    def compute_inv_mult_quad(self, x1: Tensor, x2: Tensor, eps: float=1e-07) ->Tensor:
+    def compute_inv_mult_quad(self, x1: 'Tensor', x2: 'Tensor', eps: 'float'=1e-07) ->Tensor:
         """
         Computes the Inverse Multi-Quadratics Kernel between x1 and x2,
         given by
@@ -1479,7 +1472,7 @@ class InfoVAE(BaseVAE):
         result = kernel.sum() - kernel.diag().sum()
         return result
 
-    def compute_mmd(self, z: Tensor) ->Tensor:
+    def compute_mmd(self, z: 'Tensor') ->Tensor:
         prior_z = torch.randn_like(z)
         prior_z__kernel = self.compute_kernel(prior_z, prior_z)
         z__kernel = self.compute_kernel(z, z)
@@ -1487,7 +1480,7 @@ class InfoVAE(BaseVAE):
         mmd = prior_z__kernel.mean() + z__kernel.mean() - 2 * priorz_z__kernel.mean()
         return mmd
 
-    def sample(self, num_samples: int, current_device: int, **kwargs) ->Tensor:
+    def sample(self, num_samples: 'int', current_device: 'int', **kwargs) ->Tensor:
         """
         Samples from the latent space and return the corresponding
         image space map.
@@ -1500,7 +1493,7 @@ class InfoVAE(BaseVAE):
         samples = self.decode(z)
         return samples
 
-    def generate(self, x: Tensor, **kwargs) ->Tensor:
+    def generate(self, x: 'Tensor', **kwargs) ->Tensor:
         """
         Given an input image x, returns the reconstructed image
         :param x: (Tensor) [B x C x H x W]
@@ -1511,7 +1504,7 @@ class InfoVAE(BaseVAE):
 
 class IWAE(BaseVAE):
 
-    def __init__(self, in_channels: int, latent_dim: int, hidden_dims: List=None, num_samples: int=5, **kwargs) ->None:
+    def __init__(self, in_channels: 'int', latent_dim: 'int', hidden_dims: 'List'=None, num_samples: 'int'=5, **kwargs) ->None:
         super(IWAE, self).__init__()
         self.latent_dim = latent_dim
         self.num_samples = num_samples
@@ -1532,7 +1525,7 @@ class IWAE(BaseVAE):
         self.decoder = nn.Sequential(*modules)
         self.final_layer = nn.Sequential(nn.ConvTranspose2d(hidden_dims[-1], hidden_dims[-1], kernel_size=3, stride=2, padding=1, output_padding=1), nn.BatchNorm2d(hidden_dims[-1]), nn.LeakyReLU(), nn.Conv2d(hidden_dims[-1], out_channels=3, kernel_size=3, padding=1), nn.Tanh())
 
-    def encode(self, input: Tensor) ->List[Tensor]:
+    def encode(self, input: 'Tensor') ->List[Tensor]:
         """
         Encodes the input by passing through the encoder network
         and returns the latent codes.
@@ -1545,7 +1538,7 @@ class IWAE(BaseVAE):
         log_var = self.fc_var(result)
         return [mu, log_var]
 
-    def decode(self, z: Tensor) ->Tensor:
+    def decode(self, z: 'Tensor') ->Tensor:
         """
         Maps the given latent codes of S samples
         onto the image space.
@@ -1561,7 +1554,7 @@ class IWAE(BaseVAE):
         result = result.view([B, -1, result.size(1), result.size(2), result.size(3)])
         return result
 
-    def reparameterize(self, mu: Tensor, logvar: Tensor) ->Tensor:
+    def reparameterize(self, mu: 'Tensor', logvar: 'Tensor') ->Tensor:
         """
         :param mu: (Tensor) Mean of the latent Gaussian
         :param logvar: (Tensor) Standard deviation of the latent Gaussian
@@ -1571,7 +1564,7 @@ class IWAE(BaseVAE):
         eps = torch.randn_like(std)
         return eps * std + mu
 
-    def forward(self, input: Tensor, **kwargs) ->List[Tensor]:
+    def forward(self, input: 'Tensor', **kwargs) ->List[Tensor]:
         mu, log_var = self.encode(input)
         mu = mu.repeat(self.num_samples, 1, 1).permute(1, 0, 2)
         log_var = log_var.repeat(self.num_samples, 1, 1).permute(1, 0, 2)
@@ -1601,7 +1594,7 @@ class IWAE(BaseVAE):
         loss = torch.mean(torch.sum(weight * log_weight, dim=-1), dim=0)
         return {'loss': loss, 'Reconstruction_Loss': log_p_x_z.mean(), 'KLD': -kld_loss.mean()}
 
-    def sample(self, num_samples: int, current_device: int, **kwargs) ->Tensor:
+    def sample(self, num_samples: 'int', current_device: 'int', **kwargs) ->Tensor:
         """
         Samples from the latent space and return the corresponding
         image space map.
@@ -1614,7 +1607,7 @@ class IWAE(BaseVAE):
         samples = self.decode(z).squeeze()
         return samples
 
-    def generate(self, x: Tensor, **kwargs) ->Tensor:
+    def generate(self, x: 'Tensor', **kwargs) ->Tensor:
         """
         Given an input image x, returns the reconstructed image.
         Returns only the first reconstructed sample
@@ -1627,7 +1620,7 @@ class IWAE(BaseVAE):
 class JointVAE(BaseVAE):
     num_iter = 1
 
-    def __init__(self, in_channels: int, latent_dim: int, categorical_dim: int, latent_min_capacity: float=0.0, latent_max_capacity: float=25.0, latent_gamma: float=30.0, latent_num_iter: int=25000, categorical_min_capacity: float=0.0, categorical_max_capacity: float=25.0, categorical_gamma: float=30.0, categorical_num_iter: int=25000, hidden_dims: List=None, temperature: float=0.5, anneal_rate: float=3e-05, anneal_interval: int=100, alpha: float=30.0, **kwargs) ->None:
+    def __init__(self, in_channels: 'int', latent_dim: 'int', categorical_dim: 'int', latent_min_capacity: 'float'=0.0, latent_max_capacity: 'float'=25.0, latent_gamma: 'float'=30.0, latent_num_iter: 'int'=25000, categorical_min_capacity: 'float'=0.0, categorical_max_capacity: 'float'=25.0, categorical_gamma: 'float'=30.0, categorical_num_iter: 'int'=25000, hidden_dims: 'List'=None, temperature: 'float'=0.5, anneal_rate: 'float'=3e-05, anneal_interval: 'int'=100, alpha: 'float'=30.0, **kwargs) ->None:
         super(JointVAE, self).__init__()
         self.latent_dim = latent_dim
         self.categorical_dim = categorical_dim
@@ -1663,7 +1656,7 @@ class JointVAE(BaseVAE):
         self.final_layer = nn.Sequential(nn.ConvTranspose2d(hidden_dims[-1], hidden_dims[-1], kernel_size=3, stride=2, padding=1, output_padding=1), nn.BatchNorm2d(hidden_dims[-1]), nn.LeakyReLU(), nn.Conv2d(hidden_dims[-1], out_channels=3, kernel_size=3, padding=1), nn.Tanh())
         self.sampling_dist = torch.distributions.OneHotCategorical(1.0 / categorical_dim * torch.ones((self.categorical_dim, 1)))
 
-    def encode(self, input: Tensor) ->List[Tensor]:
+    def encode(self, input: 'Tensor') ->List[Tensor]:
         """
         Encodes the input by passing through the encoder network
         and returns the latent codes.
@@ -1678,7 +1671,7 @@ class JointVAE(BaseVAE):
         z = z.view(-1, self.categorical_dim)
         return [mu, log_var, z]
 
-    def decode(self, z: Tensor) ->Tensor:
+    def decode(self, z: 'Tensor') ->Tensor:
         """
         Maps the given latent codes
         onto the image space.
@@ -1691,7 +1684,7 @@ class JointVAE(BaseVAE):
         result = self.final_layer(result)
         return result
 
-    def reparameterize(self, mu: Tensor, log_var: Tensor, q: Tensor, eps: float=1e-07) ->Tensor:
+    def reparameterize(self, mu: 'Tensor', log_var: 'Tensor', q: 'Tensor', eps: 'float'=1e-07) ->Tensor:
         """
         Gumbel-softmax trick to sample from Categorical Distribution
         :param mu: (Tensor) mean of the latent Gaussian  [B x D]
@@ -1708,7 +1701,7 @@ class JointVAE(BaseVAE):
         s = s.view(-1, self.categorical_dim)
         return torch.cat([z, s], dim=1)
 
-    def forward(self, input: Tensor, **kwargs) ->List[Tensor]:
+    def forward(self, input: 'Tensor', **kwargs) ->List[Tensor]:
         mu, log_var, q = self.encode(input)
         z = self.reparameterize(mu, log_var, q)
         return [self.decode(z), input, q, mu, log_var]
@@ -1747,7 +1740,7 @@ class JointVAE(BaseVAE):
             self.num_iter += 1
         return {'loss': loss, 'Reconstruction_Loss': recons_loss, 'Capacity_Loss': capacity_loss}
 
-    def sample(self, num_samples: int, current_device: int, **kwargs) ->Tensor:
+    def sample(self, num_samples: 'int', current_device: 'int', **kwargs) ->Tensor:
         """
         Samples from the latent space and return the corresponding
         image space map.
@@ -1765,7 +1758,7 @@ class JointVAE(BaseVAE):
         samples = self.decode(z)
         return samples
 
-    def generate(self, x: Tensor, **kwargs) ->Tensor:
+    def generate(self, x: 'Tensor', **kwargs) ->Tensor:
         """
         Given an input image x, returns the reconstructed image
         :param x: (Tensor) [B x C x H x W]
@@ -1776,7 +1769,7 @@ class JointVAE(BaseVAE):
 
 class LogCoshVAE(BaseVAE):
 
-    def __init__(self, in_channels: int, latent_dim: int, hidden_dims: List=None, alpha: float=100.0, beta: float=10.0, **kwargs) ->None:
+    def __init__(self, in_channels: 'int', latent_dim: 'int', hidden_dims: 'List'=None, alpha: 'float'=100.0, beta: 'float'=10.0, **kwargs) ->None:
         super(LogCoshVAE, self).__init__()
         self.latent_dim = latent_dim
         self.alpha = alpha
@@ -1798,7 +1791,7 @@ class LogCoshVAE(BaseVAE):
         self.decoder = nn.Sequential(*modules)
         self.final_layer = nn.Sequential(nn.ConvTranspose2d(hidden_dims[-1], hidden_dims[-1], kernel_size=3, stride=2, padding=1, output_padding=1), nn.BatchNorm2d(hidden_dims[-1]), nn.LeakyReLU(), nn.Conv2d(hidden_dims[-1], out_channels=3, kernel_size=3, padding=1), nn.Tanh())
 
-    def encode(self, input: Tensor) ->List[Tensor]:
+    def encode(self, input: 'Tensor') ->List[Tensor]:
         """
         Encodes the input by passing through the encoder network
         and returns the latent codes.
@@ -1811,7 +1804,7 @@ class LogCoshVAE(BaseVAE):
         log_var = self.fc_var(result)
         return [mu, log_var]
 
-    def decode(self, z: Tensor) ->Tensor:
+    def decode(self, z: 'Tensor') ->Tensor:
         """
         Maps the given latent codes
         onto the image space.
@@ -1824,7 +1817,7 @@ class LogCoshVAE(BaseVAE):
         result = self.final_layer(result)
         return result
 
-    def reparameterize(self, mu: Tensor, logvar: Tensor) ->Tensor:
+    def reparameterize(self, mu: 'Tensor', logvar: 'Tensor') ->Tensor:
         """
         Reparameterization trick to sample from N(mu, var) from
         N(0,1).
@@ -1836,7 +1829,7 @@ class LogCoshVAE(BaseVAE):
         eps = torch.randn_like(std)
         return eps * std + mu
 
-    def forward(self, input: Tensor, **kwargs) ->List[Tensor]:
+    def forward(self, input: 'Tensor', **kwargs) ->List[Tensor]:
         mu, log_var = self.encode(input)
         z = self.reparameterize(mu, log_var)
         return [self.decode(z), input, mu, log_var]
@@ -1861,7 +1854,7 @@ class LogCoshVAE(BaseVAE):
         loss = recons_loss + self.beta * kld_weight * kld_loss
         return {'loss': loss, 'Reconstruction_Loss': recons_loss, 'KLD': -kld_loss}
 
-    def sample(self, num_samples: int, current_device: int, **kwargs) ->Tensor:
+    def sample(self, num_samples: 'int', current_device: 'int', **kwargs) ->Tensor:
         """
         Samples from the latent space and return the corresponding
         image space map.
@@ -1874,7 +1867,7 @@ class LogCoshVAE(BaseVAE):
         samples = self.decode(z)
         return samples
 
-    def generate(self, x: Tensor, **kwargs) ->Tensor:
+    def generate(self, x: 'Tensor', **kwargs) ->Tensor:
         """
         Given an input image x, returns the reconstructed image
         :param x: (Tensor) [B x C x H x W]
@@ -1889,14 +1882,14 @@ def conv_out_shape(img_size):
 
 class EncoderBlock(nn.Module):
 
-    def __init__(self, in_channels: int, out_channels: int, latent_dim: int, img_size: int):
+    def __init__(self, in_channels: 'int', out_channels: 'int', latent_dim: 'int', img_size: 'int'):
         super(EncoderBlock, self).__init__()
         self.encoder = nn.Sequential(nn.Conv2d(in_channels, out_channels, kernel_size=3, stride=2, padding=1), nn.BatchNorm2d(out_channels), nn.LeakyReLU())
         out_size = conv_out_shape(img_size)
         self.encoder_mu = nn.Linear(out_channels * out_size ** 2, latent_dim)
         self.encoder_var = nn.Linear(out_channels * out_size ** 2, latent_dim)
 
-    def forward(self, input: Tensor) ->Tensor:
+    def forward(self, input: 'Tensor') ->Tensor:
         result = self.encoder(input)
         h = torch.flatten(result, start_dim=1)
         mu = self.encoder_mu(h)
@@ -1906,13 +1899,13 @@ class EncoderBlock(nn.Module):
 
 class LadderBlock(nn.Module):
 
-    def __init__(self, in_channels: int, latent_dim: int):
+    def __init__(self, in_channels: 'int', latent_dim: 'int'):
         super(LadderBlock, self).__init__()
         self.decode = nn.Sequential(nn.Linear(in_channels, latent_dim), nn.BatchNorm1d(latent_dim))
         self.fc_mu = nn.Linear(latent_dim, latent_dim)
         self.fc_var = nn.Linear(latent_dim, latent_dim)
 
-    def forward(self, z: Tensor) ->Tensor:
+    def forward(self, z: 'Tensor') ->Tensor:
         z = self.decode(z)
         mu = self.fc_mu(z)
         log_var = self.fc_var(z)
@@ -1921,7 +1914,7 @@ class LadderBlock(nn.Module):
 
 class LVAE(BaseVAE):
 
-    def __init__(self, in_channels: int, latent_dims: List, hidden_dims: List, **kwargs) ->None:
+    def __init__(self, in_channels: 'int', latent_dims: 'List', hidden_dims: 'List', **kwargs) ->None:
         super(LVAE, self).__init__()
         self.latent_dims = latent_dims
         self.hidden_dims = hidden_dims
@@ -1947,7 +1940,7 @@ class LVAE(BaseVAE):
         self.final_layer = nn.Sequential(nn.ConvTranspose2d(hidden_dims[-1], hidden_dims[-1], kernel_size=3, stride=2, padding=1, output_padding=1), nn.BatchNorm2d(hidden_dims[-1]), nn.LeakyReLU(), nn.Conv2d(hidden_dims[-1], out_channels=3, kernel_size=3, padding=1), nn.Tanh())
         hidden_dims.reverse()
 
-    def encode(self, input: Tensor) ->List[Tensor]:
+    def encode(self, input: 'Tensor') ->List[Tensor]:
         """
         Encodes the input by passing through the encoder network
         and returns the latent codes.
@@ -1961,7 +1954,7 @@ class LVAE(BaseVAE):
             post_params.append((mu, log_var))
         return post_params
 
-    def decode(self, z: Tensor, post_params: List) ->Tuple:
+    def decode(self, z: 'Tensor', post_params: 'List') ->Tuple:
         """
         Maps the given latent codes
         onto the image space.
@@ -1981,21 +1974,21 @@ class LVAE(BaseVAE):
         result = self.decoder(result)
         return self.final_layer(result), kl_div
 
-    def merge_gauss(self, mu_1: Tensor, mu_2: Tensor, log_var_1: Tensor, log_var_2: Tensor) ->List:
+    def merge_gauss(self, mu_1: 'Tensor', mu_2: 'Tensor', log_var_1: 'Tensor', log_var_2: 'Tensor') ->List:
         p_1 = 1.0 / (log_var_1.exp() + 1e-07)
         p_2 = 1.0 / (log_var_2.exp() + 1e-07)
         mu = (mu_1 * p_1 + mu_2 * p_2) / (p_1 + p_2)
         log_var = torch.log(1.0 / (p_1 + p_2))
         return [mu, log_var]
 
-    def compute_kl_divergence(self, z: Tensor, q_params: Tuple, p_params: Tuple):
+    def compute_kl_divergence(self, z: 'Tensor', q_params: 'Tuple', p_params: 'Tuple'):
         mu_q, log_var_q = q_params
         mu_p, log_var_p = p_params
         kl = log_var_p - log_var_q + (log_var_q.exp() + (mu_q - mu_p) ** 2) / (2 * log_var_p.exp()) - 0.5
         kl = torch.sum(kl, dim=-1)
         return kl
 
-    def reparameterize(self, mu: Tensor, logvar: Tensor) ->Tensor:
+    def reparameterize(self, mu: 'Tensor', logvar: 'Tensor') ->Tensor:
         """
         Reparameterization trick to sample from N(mu, var) from
         N(0,1).
@@ -2007,7 +2000,7 @@ class LVAE(BaseVAE):
         eps = torch.randn_like(std)
         return eps * std + mu
 
-    def forward(self, input: Tensor, **kwargs) ->List[Tensor]:
+    def forward(self, input: 'Tensor', **kwargs) ->List[Tensor]:
         post_params = self.encode(input)
         mu, log_var = post_params.pop()
         z = self.reparameterize(mu, log_var)
@@ -2031,7 +2024,7 @@ class LVAE(BaseVAE):
         loss = recons_loss + kld_weight * kld_loss
         return {'loss': loss, 'Reconstruction_Loss': recons_loss, 'KLD': -kld_loss}
 
-    def sample(self, num_samples: int, current_device: int, **kwargs) ->Tensor:
+    def sample(self, num_samples: 'int', current_device: 'int', **kwargs) ->Tensor:
         """
         Samples from the latent space and return the corresponding
         image space map.
@@ -2050,7 +2043,7 @@ class LVAE(BaseVAE):
         samples = self.final_layer(result)
         return samples
 
-    def generate(self, x: Tensor, **kwargs) ->Tensor:
+    def generate(self, x: 'Tensor', **kwargs) ->Tensor:
         """
         Given an input image x, returns the reconstructed image
         :param x: (Tensor) [B x C x H x W]
@@ -2061,7 +2054,7 @@ class LVAE(BaseVAE):
 
 class MIWAE(BaseVAE):
 
-    def __init__(self, in_channels: int, latent_dim: int, hidden_dims: List=None, num_samples: int=5, num_estimates: int=5, **kwargs) ->None:
+    def __init__(self, in_channels: 'int', latent_dim: 'int', hidden_dims: 'List'=None, num_samples: 'int'=5, num_estimates: 'int'=5, **kwargs) ->None:
         super(MIWAE, self).__init__()
         self.latent_dim = latent_dim
         self.num_samples = num_samples
@@ -2083,7 +2076,7 @@ class MIWAE(BaseVAE):
         self.decoder = nn.Sequential(*modules)
         self.final_layer = nn.Sequential(nn.ConvTranspose2d(hidden_dims[-1], hidden_dims[-1], kernel_size=3, stride=2, padding=1, output_padding=1), nn.BatchNorm2d(hidden_dims[-1]), nn.LeakyReLU(), nn.Conv2d(hidden_dims[-1], out_channels=3, kernel_size=3, padding=1), nn.Tanh())
 
-    def encode(self, input: Tensor) ->List[Tensor]:
+    def encode(self, input: 'Tensor') ->List[Tensor]:
         """
         Encodes the input by passing through the encoder network
         and returns the latent codes.
@@ -2096,7 +2089,7 @@ class MIWAE(BaseVAE):
         log_var = self.fc_var(result)
         return [mu, log_var]
 
-    def decode(self, z: Tensor) ->Tensor:
+    def decode(self, z: 'Tensor') ->Tensor:
         """
         Maps the given latent codes of S samples
         onto the image space.
@@ -2112,7 +2105,7 @@ class MIWAE(BaseVAE):
         result = result.view([B, M, S, result.size(-3), result.size(-2), result.size(-1)])
         return result
 
-    def reparameterize(self, mu: Tensor, logvar: Tensor) ->Tensor:
+    def reparameterize(self, mu: 'Tensor', logvar: 'Tensor') ->Tensor:
         """
         :param mu: (Tensor) Mean of the latent Gaussian
         :param logvar: (Tensor) Standard deviation of the latent Gaussian
@@ -2122,7 +2115,7 @@ class MIWAE(BaseVAE):
         eps = torch.randn_like(std)
         return eps * std + mu
 
-    def forward(self, input: Tensor, **kwargs) ->List[Tensor]:
+    def forward(self, input: 'Tensor', **kwargs) ->List[Tensor]:
         mu, log_var = self.encode(input)
         mu = mu.repeat(self.num_estimates, self.num_samples, 1, 1).permute(2, 0, 1, 3)
         log_var = log_var.repeat(self.num_estimates, self.num_samples, 1, 1).permute(2, 0, 1, 3)
@@ -2152,7 +2145,7 @@ class MIWAE(BaseVAE):
         loss = torch.mean(torch.mean(torch.sum(weight * log_weight, dim=-1), dim=-2), dim=0)
         return {'loss': loss, 'Reconstruction_Loss': log_p_x_z.mean(), 'KLD': -kld_loss.mean()}
 
-    def sample(self, num_samples: int, current_device: int, **kwargs) ->Tensor:
+    def sample(self, num_samples: 'int', current_device: 'int', **kwargs) ->Tensor:
         """
         Samples from the latent space and return the corresponding
         image space map.
@@ -2165,7 +2158,7 @@ class MIWAE(BaseVAE):
         samples = self.decode(z).squeeze()
         return samples
 
-    def generate(self, x: Tensor, **kwargs) ->Tensor:
+    def generate(self, x: 'Tensor', **kwargs) ->Tensor:
         """
         Given an input image x, returns the reconstructed image.
         Returns only the first reconstructed sample
@@ -2177,7 +2170,7 @@ class MIWAE(BaseVAE):
 
 class MSSIM(nn.Module):
 
-    def __init__(self, in_channels: int=3, window_size: int=11, size_average: bool=True) ->None:
+    def __init__(self, in_channels: 'int'=3, window_size: 'int'=11, size_average: 'bool'=True) ->None:
         """
         Computes the differentiable MS-SSIM loss
         Reference:
@@ -2193,7 +2186,7 @@ class MSSIM(nn.Module):
         self.window_size = window_size
         self.size_average = size_average
 
-    def gaussian_window(self, window_size: int, sigma: float) ->Tensor:
+    def gaussian_window(self, window_size: 'int', sigma: 'float') ->Tensor:
         kernel = torch.tensor([exp((x - window_size // 2) ** 2 / (2 * sigma ** 2)) for x in range(window_size)])
         return kernel / kernel.sum()
 
@@ -2203,7 +2196,7 @@ class MSSIM(nn.Module):
         window = _2D_window.expand(in_channels, 1, window_size, window_size).contiguous()
         return window
 
-    def ssim(self, img1: Tensor, img2: Tensor, window_size: int, in_channel: int, size_average: bool) ->Tensor:
+    def ssim(self, img1: 'Tensor', img2: 'Tensor', window_size: 'int', in_channel: 'int', size_average: 'bool') ->Tensor:
         device = img1.device
         window = self.create_window(window_size, in_channel)
         mu1 = F.conv2d(img1, window, padding=window_size // 2, groups=in_channel)
@@ -2227,7 +2220,7 @@ class MSSIM(nn.Module):
             ret = ssim_map.mean(1).mean(1).mean(1)
         return ret, cs
 
-    def forward(self, img1: Tensor, img2: Tensor) ->Tensor:
+    def forward(self, img1: 'Tensor', img2: 'Tensor') ->Tensor:
         device = img1.device
         weights = torch.FloatTensor([0.0448, 0.2856, 0.3001, 0.2363, 0.1333])
         levels = weights.size()[0]
@@ -2249,7 +2242,7 @@ class MSSIM(nn.Module):
 
 class MSSIMVAE(BaseVAE):
 
-    def __init__(self, in_channels: int, latent_dim: int, hidden_dims: List=None, window_size: int=11, size_average: bool=True, **kwargs) ->None:
+    def __init__(self, in_channels: 'int', latent_dim: 'int', hidden_dims: 'List'=None, window_size: 'int'=11, size_average: 'bool'=True, **kwargs) ->None:
         super(MSSIMVAE, self).__init__()
         self.latent_dim = latent_dim
         self.in_channels = in_channels
@@ -2271,7 +2264,7 @@ class MSSIMVAE(BaseVAE):
         self.final_layer = nn.Sequential(nn.ConvTranspose2d(hidden_dims[-1], hidden_dims[-1], kernel_size=3, stride=2, padding=1, output_padding=1), nn.BatchNorm2d(hidden_dims[-1]), nn.LeakyReLU(), nn.Conv2d(hidden_dims[-1], out_channels=3, kernel_size=3, padding=1), nn.Tanh())
         self.mssim_loss = MSSIM(self.in_channels, window_size, size_average)
 
-    def encode(self, input: Tensor) ->List[Tensor]:
+    def encode(self, input: 'Tensor') ->List[Tensor]:
         """
         Encodes the input by passing through the encoder network
         and returns the latent codes.
@@ -2284,7 +2277,7 @@ class MSSIMVAE(BaseVAE):
         log_var = self.fc_var(result)
         return [mu, log_var]
 
-    def decode(self, z: Tensor) ->Tensor:
+    def decode(self, z: 'Tensor') ->Tensor:
         """
         Maps the given latent codes
         onto the image space.
@@ -2297,7 +2290,7 @@ class MSSIMVAE(BaseVAE):
         result = self.final_layer(result)
         return result
 
-    def reparameterize(self, mu: Tensor, logvar: Tensor) ->Tensor:
+    def reparameterize(self, mu: 'Tensor', logvar: 'Tensor') ->Tensor:
         """
         Reparameterization trick to sample from N(mu, var) from
         N(0,1).
@@ -2309,7 +2302,7 @@ class MSSIMVAE(BaseVAE):
         eps = torch.randn_like(std)
         return eps * std + mu
 
-    def forward(self, input: Tensor, **kwargs) ->List[Tensor]:
+    def forward(self, input: 'Tensor', **kwargs) ->List[Tensor]:
         mu, log_var = self.encode(input)
         z = self.reparameterize(mu, log_var)
         return [self.decode(z), input, mu, log_var]
@@ -2332,7 +2325,7 @@ class MSSIMVAE(BaseVAE):
         loss = recons_loss + kld_weight * kld_loss
         return {'loss': loss, 'Reconstruction_Loss': recons_loss, 'KLD': -kld_loss}
 
-    def sample(self, num_samples: int, current_device: int, **kwargs) ->Tensor:
+    def sample(self, num_samples: 'int', current_device: 'int', **kwargs) ->Tensor:
         """
         Samples from the latent space and return the corresponding
         image space map.
@@ -2345,7 +2338,7 @@ class MSSIMVAE(BaseVAE):
         samples = self.decode(z)
         return samples
 
-    def generate(self, x: Tensor, **kwargs) ->Tensor:
+    def generate(self, x: 'Tensor', **kwargs) ->Tensor:
         """
         Given an input image x, returns the reconstructed image
         :param x: (Tensor) [B x C x H x W]
@@ -2356,7 +2349,7 @@ class MSSIMVAE(BaseVAE):
 
 class SWAE(BaseVAE):
 
-    def __init__(self, in_channels: int, latent_dim: int, hidden_dims: List=None, reg_weight: int=100, wasserstein_deg: float=2.0, num_projections: int=50, projection_dist: str='normal', **kwargs) ->None:
+    def __init__(self, in_channels: 'int', latent_dim: 'int', hidden_dims: 'List'=None, reg_weight: 'int'=100, wasserstein_deg: 'float'=2.0, num_projections: 'int'=50, projection_dist: 'str'='normal', **kwargs) ->None:
         super(SWAE, self).__init__()
         self.latent_dim = latent_dim
         self.reg_weight = reg_weight
@@ -2379,7 +2372,7 @@ class SWAE(BaseVAE):
         self.decoder = nn.Sequential(*modules)
         self.final_layer = nn.Sequential(nn.ConvTranspose2d(hidden_dims[-1], hidden_dims[-1], kernel_size=3, stride=2, padding=1, output_padding=1), nn.BatchNorm2d(hidden_dims[-1]), nn.LeakyReLU(), nn.Conv2d(hidden_dims[-1], out_channels=3, kernel_size=3, padding=1), nn.Tanh())
 
-    def encode(self, input: Tensor) ->Tensor:
+    def encode(self, input: 'Tensor') ->Tensor:
         """
         Encodes the input by passing through the encoder network
         and returns the latent codes.
@@ -2391,14 +2384,14 @@ class SWAE(BaseVAE):
         z = self.fc_z(result)
         return z
 
-    def decode(self, z: Tensor) ->Tensor:
+    def decode(self, z: 'Tensor') ->Tensor:
         result = self.decoder_input(z)
         result = result.view(-1, 512, 2, 2)
         result = self.decoder(result)
         result = self.final_layer(result)
         return result
 
-    def forward(self, input: Tensor, **kwargs) ->List[Tensor]:
+    def forward(self, input: 'Tensor', **kwargs) ->List[Tensor]:
         z = self.encode(input)
         return [self.decode(z), input, z]
 
@@ -2415,7 +2408,7 @@ class SWAE(BaseVAE):
         loss = recons_loss_l2 + recons_loss_l1 + swd_loss
         return {'loss': loss, 'Reconstruction_Loss': recons_loss_l2 + recons_loss_l1, 'SWD': swd_loss}
 
-    def get_random_projections(self, latent_dim: int, num_samples: int) ->Tensor:
+    def get_random_projections(self, latent_dim: 'int', num_samples: 'int') ->Tensor:
         """
         Returns random samples from latent distribution's (Gaussian)
         unit sphere for projecting the encoded samples and the
@@ -2434,7 +2427,7 @@ class SWAE(BaseVAE):
         rand_proj = rand_samples / rand_samples.norm(dim=1).view(-1, 1)
         return rand_proj
 
-    def compute_swd(self, z: Tensor, p: float, reg_weight: float) ->Tensor:
+    def compute_swd(self, z: 'Tensor', p: 'float', reg_weight: 'float') ->Tensor:
         """
         Computes the Sliced Wasserstein Distance (SWD) - which consists of
         randomly projecting the encoded and prior vectors and computing
@@ -2454,7 +2447,7 @@ class SWAE(BaseVAE):
         w_dist = w_dist.pow(p)
         return reg_weight * w_dist.mean()
 
-    def sample(self, num_samples: int, current_device: int, **kwargs) ->Tensor:
+    def sample(self, num_samples: 'int', current_device: 'int', **kwargs) ->Tensor:
         """
         Samples from the latent space and return the corresponding
         image space map.
@@ -2467,7 +2460,7 @@ class SWAE(BaseVAE):
         samples = self.decode(z)
         return samples
 
-    def generate(self, x: Tensor, **kwargs) ->Tensor:
+    def generate(self, x: 'Tensor', **kwargs) ->Tensor:
         """
         Given an input image x, returns the reconstructed image
         :param x: (Tensor) [B x C x H x W]
@@ -2478,7 +2471,7 @@ class SWAE(BaseVAE):
 
 class TwoStageVAE(BaseVAE):
 
-    def __init__(self, in_channels: int, latent_dim: int, hidden_dims: List=None, hidden_dims2: List=None, **kwargs) ->None:
+    def __init__(self, in_channels: 'int', latent_dim: 'int', hidden_dims: 'List'=None, hidden_dims2: 'List'=None, **kwargs) ->None:
         super(TwoStageVAE, self).__init__()
         self.latent_dim = latent_dim
         modules = []
@@ -2515,7 +2508,7 @@ class TwoStageVAE(BaseVAE):
             in_channels = h_dim
         self.decoder2 = nn.Sequential(*decoder2)
 
-    def encode(self, input: Tensor) ->List[Tensor]:
+    def encode(self, input: 'Tensor') ->List[Tensor]:
         """
         Encodes the input by passing through the encoder network
         and returns the latent codes.
@@ -2528,7 +2521,7 @@ class TwoStageVAE(BaseVAE):
         log_var = self.fc_var(result)
         return [mu, log_var]
 
-    def decode(self, z: Tensor) ->Tensor:
+    def decode(self, z: 'Tensor') ->Tensor:
         """
         Maps the given latent codes
         onto the image space.
@@ -2541,7 +2534,7 @@ class TwoStageVAE(BaseVAE):
         result = self.final_layer(result)
         return result
 
-    def reparameterize(self, mu: Tensor, logvar: Tensor) ->Tensor:
+    def reparameterize(self, mu: 'Tensor', logvar: 'Tensor') ->Tensor:
         """
         Reparameterization trick to sample from N(mu, var) from
         N(0,1).
@@ -2553,7 +2546,7 @@ class TwoStageVAE(BaseVAE):
         eps = torch.randn_like(std)
         return eps * std + mu
 
-    def forward(self, input: Tensor, **kwargs) ->List[Tensor]:
+    def forward(self, input: 'Tensor', **kwargs) ->List[Tensor]:
         mu, log_var = self.encode(input)
         z = self.reparameterize(mu, log_var)
         return [self.decode(z), input, mu, log_var]
@@ -2576,7 +2569,7 @@ class TwoStageVAE(BaseVAE):
         loss = recons_loss + kld_weight * kld_loss
         return {'loss': loss, 'Reconstruction_Loss': recons_loss, 'KLD': -kld_loss}
 
-    def sample(self, num_samples: int, current_device: int, **kwargs) ->Tensor:
+    def sample(self, num_samples: 'int', current_device: 'int', **kwargs) ->Tensor:
         """
         Samples from the latent space and return the corresponding
         image space map.
@@ -2589,7 +2582,7 @@ class TwoStageVAE(BaseVAE):
         samples = self.decode(z)
         return samples
 
-    def generate(self, x: Tensor, **kwargs) ->Tensor:
+    def generate(self, x: 'Tensor', **kwargs) ->Tensor:
         """
         Given an input image x, returns the reconstructed image
         :param x: (Tensor) [B x C x H x W]
@@ -2600,7 +2593,7 @@ class TwoStageVAE(BaseVAE):
 
 class VampVAE(BaseVAE):
 
-    def __init__(self, in_channels: int, latent_dim: int, hidden_dims: List=None, num_components: int=50, **kwargs) ->None:
+    def __init__(self, in_channels: 'int', latent_dim: 'int', hidden_dims: 'List'=None, num_components: 'int'=50, **kwargs) ->None:
         super(VampVAE, self).__init__()
         self.latent_dim = latent_dim
         self.num_components = num_components
@@ -2623,7 +2616,7 @@ class VampVAE(BaseVAE):
         self.pseudo_input = torch.eye(self.num_components, requires_grad=False)
         self.embed_pseudo = nn.Sequential(nn.Linear(self.num_components, 12288), nn.Hardtanh(0.0, 1.0))
 
-    def encode(self, input: Tensor) ->List[Tensor]:
+    def encode(self, input: 'Tensor') ->List[Tensor]:
         """
         Encodes the input by passing through the encoder network
         and returns the latent codes.
@@ -2636,14 +2629,14 @@ class VampVAE(BaseVAE):
         log_var = self.fc_var(result)
         return [mu, log_var]
 
-    def decode(self, z: Tensor) ->Tensor:
+    def decode(self, z: 'Tensor') ->Tensor:
         result = self.decoder_input(z)
         result = result.view(-1, 512, 2, 2)
         result = self.decoder(result)
         result = self.final_layer(result)
         return result
 
-    def reparameterize(self, mu: Tensor, logvar: Tensor) ->Tensor:
+    def reparameterize(self, mu: 'Tensor', logvar: 'Tensor') ->Tensor:
         """
         Will a single z be enough ti compute the expectation
         for the loss??
@@ -2655,7 +2648,7 @@ class VampVAE(BaseVAE):
         eps = torch.randn_like(std)
         return eps * std + mu
 
-    def forward(self, input: Tensor, **kwargs) ->List[Tensor]:
+    def forward(self, input: 'Tensor', **kwargs) ->List[Tensor]:
         mu, log_var = self.encode(input)
         z = self.reparameterize(mu, log_var)
         return [self.decode(z), input, mu, log_var, z]
@@ -2685,7 +2678,7 @@ class VampVAE(BaseVAE):
         loss = recons_loss + kld_weight * kld_loss
         return {'loss': loss, 'Reconstruction_Loss': recons_loss, 'KLD': -kld_loss}
 
-    def sample(self, num_samples: int, current_device: int, **kwargs) ->Tensor:
+    def sample(self, num_samples: 'int', current_device: 'int', **kwargs) ->Tensor:
         """
         Samples from the latent space and return the corresponding
         image space map.
@@ -2698,7 +2691,7 @@ class VampVAE(BaseVAE):
         samples = self.decode(z)
         return samples
 
-    def generate(self, x: Tensor, **kwargs) ->Tensor:
+    def generate(self, x: 'Tensor', **kwargs) ->Tensor:
         """
         Given an input image x, returns the reconstructed image
         :param x: (Tensor) [B x C x H x W]
@@ -2709,7 +2702,7 @@ class VampVAE(BaseVAE):
 
 class VanillaVAE(BaseVAE):
 
-    def __init__(self, in_channels: int, latent_dim: int, hidden_dims: List=None, **kwargs) ->None:
+    def __init__(self, in_channels: 'int', latent_dim: 'int', hidden_dims: 'List'=None, **kwargs) ->None:
         super(VanillaVAE, self).__init__()
         self.latent_dim = latent_dim
         modules = []
@@ -2729,7 +2722,7 @@ class VanillaVAE(BaseVAE):
         self.decoder = nn.Sequential(*modules)
         self.final_layer = nn.Sequential(nn.ConvTranspose2d(hidden_dims[-1], hidden_dims[-1], kernel_size=3, stride=2, padding=1, output_padding=1), nn.BatchNorm2d(hidden_dims[-1]), nn.LeakyReLU(), nn.Conv2d(hidden_dims[-1], out_channels=3, kernel_size=3, padding=1), nn.Tanh())
 
-    def encode(self, input: Tensor) ->List[Tensor]:
+    def encode(self, input: 'Tensor') ->List[Tensor]:
         """
         Encodes the input by passing through the encoder network
         and returns the latent codes.
@@ -2742,7 +2735,7 @@ class VanillaVAE(BaseVAE):
         log_var = self.fc_var(result)
         return [mu, log_var]
 
-    def decode(self, z: Tensor) ->Tensor:
+    def decode(self, z: 'Tensor') ->Tensor:
         """
         Maps the given latent codes
         onto the image space.
@@ -2755,7 +2748,7 @@ class VanillaVAE(BaseVAE):
         result = self.final_layer(result)
         return result
 
-    def reparameterize(self, mu: Tensor, logvar: Tensor) ->Tensor:
+    def reparameterize(self, mu: 'Tensor', logvar: 'Tensor') ->Tensor:
         """
         Reparameterization trick to sample from N(mu, var) from
         N(0,1).
@@ -2767,7 +2760,7 @@ class VanillaVAE(BaseVAE):
         eps = torch.randn_like(std)
         return eps * std + mu
 
-    def forward(self, input: Tensor, **kwargs) ->List[Tensor]:
+    def forward(self, input: 'Tensor', **kwargs) ->List[Tensor]:
         mu, log_var = self.encode(input)
         z = self.reparameterize(mu, log_var)
         return [self.decode(z), input, mu, log_var]
@@ -2790,7 +2783,7 @@ class VanillaVAE(BaseVAE):
         loss = recons_loss + kld_weight * kld_loss
         return {'loss': loss, 'Reconstruction_Loss': recons_loss.detach(), 'KLD': -kld_loss.detach()}
 
-    def sample(self, num_samples: int, current_device: int, **kwargs) ->Tensor:
+    def sample(self, num_samples: 'int', current_device: 'int', **kwargs) ->Tensor:
         """
         Samples from the latent space and return the corresponding
         image space map.
@@ -2803,7 +2796,7 @@ class VanillaVAE(BaseVAE):
         samples = self.decode(z)
         return samples
 
-    def generate(self, x: Tensor, **kwargs) ->Tensor:
+    def generate(self, x: 'Tensor', **kwargs) ->Tensor:
         """
         Given an input image x, returns the reconstructed image
         :param x: (Tensor) [B x C x H x W]
@@ -2818,7 +2811,7 @@ class VectorQuantizer(nn.Module):
     [1] https://github.com/deepmind/sonnet/blob/v2/sonnet/src/nets/vqvae.py
     """
 
-    def __init__(self, num_embeddings: int, embedding_dim: int, beta: float=0.25):
+    def __init__(self, num_embeddings: 'int', embedding_dim: 'int', beta: 'float'=0.25):
         super(VectorQuantizer, self).__init__()
         self.K = num_embeddings
         self.D = embedding_dim
@@ -2826,7 +2819,7 @@ class VectorQuantizer(nn.Module):
         self.embedding = nn.Embedding(self.K, self.D)
         self.embedding.weight.data.uniform_(-1 / self.K, 1 / self.K)
 
-    def forward(self, latents: Tensor) ->Tensor:
+    def forward(self, latents: 'Tensor') ->Tensor:
         latents = latents.permute(0, 2, 3, 1).contiguous()
         latents_shape = latents.shape
         flat_latents = latents.view(-1, self.D)
@@ -2846,17 +2839,17 @@ class VectorQuantizer(nn.Module):
 
 class ResidualLayer(nn.Module):
 
-    def __init__(self, in_channels: int, out_channels: int):
+    def __init__(self, in_channels: 'int', out_channels: 'int'):
         super(ResidualLayer, self).__init__()
         self.resblock = nn.Sequential(nn.Conv2d(in_channels, out_channels, kernel_size=3, padding=1, bias=False), nn.ReLU(True), nn.Conv2d(out_channels, out_channels, kernel_size=1, bias=False))
 
-    def forward(self, input: Tensor) ->Tensor:
+    def forward(self, input: 'Tensor') ->Tensor:
         return input + self.resblock(input)
 
 
 class VQVAE(BaseVAE):
 
-    def __init__(self, in_channels: int, embedding_dim: int, num_embeddings: int, hidden_dims: List=None, beta: float=0.25, img_size: int=64, **kwargs) ->None:
+    def __init__(self, in_channels: 'int', embedding_dim: 'int', num_embeddings: 'int', hidden_dims: 'List'=None, beta: 'float'=0.25, img_size: 'int'=64, **kwargs) ->None:
         super(VQVAE, self).__init__()
         self.embedding_dim = embedding_dim
         self.num_embeddings = num_embeddings
@@ -2886,7 +2879,7 @@ class VQVAE(BaseVAE):
         modules.append(nn.Sequential(nn.ConvTranspose2d(hidden_dims[-1], out_channels=3, kernel_size=4, stride=2, padding=1), nn.Tanh()))
         self.decoder = nn.Sequential(*modules)
 
-    def encode(self, input: Tensor) ->List[Tensor]:
+    def encode(self, input: 'Tensor') ->List[Tensor]:
         """
         Encodes the input by passing through the encoder network
         and returns the latent codes.
@@ -2896,7 +2889,7 @@ class VQVAE(BaseVAE):
         result = self.encoder(input)
         return [result]
 
-    def decode(self, z: Tensor) ->Tensor:
+    def decode(self, z: 'Tensor') ->Tensor:
         """
         Maps the given latent codes
         onto the image space.
@@ -2906,7 +2899,7 @@ class VQVAE(BaseVAE):
         result = self.decoder(z)
         return result
 
-    def forward(self, input: Tensor, **kwargs) ->List[Tensor]:
+    def forward(self, input: 'Tensor', **kwargs) ->List[Tensor]:
         encoding = self.encode(input)[0]
         quantized_inputs, vq_loss = self.vq_layer(encoding)
         return [self.decode(quantized_inputs), input, vq_loss]
@@ -2924,10 +2917,10 @@ class VQVAE(BaseVAE):
         loss = recons_loss + vq_loss
         return {'loss': loss, 'Reconstruction_Loss': recons_loss, 'VQ_Loss': vq_loss}
 
-    def sample(self, num_samples: int, current_device: Union[int, str], **kwargs) ->Tensor:
+    def sample(self, num_samples: 'int', current_device: 'Union[int, str]', **kwargs) ->Tensor:
         raise Warning('VQVAE sampler is not implemented.')
 
-    def generate(self, x: Tensor, **kwargs) ->Tensor:
+    def generate(self, x: 'Tensor', **kwargs) ->Tensor:
         """
         Given an input image x, returns the reconstructed image
         :param x: (Tensor) [B x C x H x W]
@@ -2938,7 +2931,7 @@ class VQVAE(BaseVAE):
 
 class WAE_MMD(BaseVAE):
 
-    def __init__(self, in_channels: int, latent_dim: int, hidden_dims: List=None, reg_weight: int=100, kernel_type: str='imq', latent_var: float=2.0, **kwargs) ->None:
+    def __init__(self, in_channels: 'int', latent_dim: 'int', hidden_dims: 'List'=None, reg_weight: 'int'=100, kernel_type: 'str'='imq', latent_var: 'float'=2.0, **kwargs) ->None:
         super(WAE_MMD, self).__init__()
         self.latent_dim = latent_dim
         self.reg_weight = reg_weight
@@ -2960,7 +2953,7 @@ class WAE_MMD(BaseVAE):
         self.decoder = nn.Sequential(*modules)
         self.final_layer = nn.Sequential(nn.ConvTranspose2d(hidden_dims[-1], hidden_dims[-1], kernel_size=3, stride=2, padding=1, output_padding=1), nn.BatchNorm2d(hidden_dims[-1]), nn.LeakyReLU(), nn.Conv2d(hidden_dims[-1], out_channels=3, kernel_size=3, padding=1), nn.Tanh())
 
-    def encode(self, input: Tensor) ->Tensor:
+    def encode(self, input: 'Tensor') ->Tensor:
         """
         Encodes the input by passing through the encoder network
         and returns the latent codes.
@@ -2972,14 +2965,14 @@ class WAE_MMD(BaseVAE):
         z = self.fc_z(result)
         return z
 
-    def decode(self, z: Tensor) ->Tensor:
+    def decode(self, z: 'Tensor') ->Tensor:
         result = self.decoder_input(z)
         result = result.view(-1, 512, 2, 2)
         result = self.decoder(result)
         result = self.final_layer(result)
         return result
 
-    def forward(self, input: Tensor, **kwargs) ->List[Tensor]:
+    def forward(self, input: 'Tensor', **kwargs) ->List[Tensor]:
         z = self.encode(input)
         return [self.decode(z), input, z]
 
@@ -2995,7 +2988,7 @@ class WAE_MMD(BaseVAE):
         loss = recons_loss + mmd_loss
         return {'loss': loss, 'Reconstruction_Loss': recons_loss, 'MMD': mmd_loss}
 
-    def compute_kernel(self, x1: Tensor, x2: Tensor) ->Tensor:
+    def compute_kernel(self, x1: 'Tensor', x2: 'Tensor') ->Tensor:
         D = x1.size(1)
         N = x1.size(0)
         x1 = x1.unsqueeze(-2)
@@ -3015,7 +3008,7 @@ class WAE_MMD(BaseVAE):
             raise ValueError('Undefined kernel type.')
         return result
 
-    def compute_rbf(self, x1: Tensor, x2: Tensor, eps: float=1e-07) ->Tensor:
+    def compute_rbf(self, x1: 'Tensor', x2: 'Tensor', eps: 'float'=1e-07) ->Tensor:
         """
         Computes the RBF Kernel between x1 and x2.
         :param x1: (Tensor)
@@ -3028,7 +3021,7 @@ class WAE_MMD(BaseVAE):
         result = torch.exp(-((x1 - x2).pow(2).mean(-1) / sigma))
         return result
 
-    def compute_inv_mult_quad(self, x1: Tensor, x2: Tensor, eps: float=1e-07) ->Tensor:
+    def compute_inv_mult_quad(self, x1: 'Tensor', x2: 'Tensor', eps: 'float'=1e-07) ->Tensor:
         """
         Computes the Inverse Multi-Quadratics Kernel between x1 and x2,
         given by
@@ -3045,7 +3038,7 @@ class WAE_MMD(BaseVAE):
         result = kernel.sum() - kernel.diag().sum()
         return result
 
-    def compute_mmd(self, z: Tensor, reg_weight: float) ->Tensor:
+    def compute_mmd(self, z: 'Tensor', reg_weight: 'float') ->Tensor:
         prior_z = torch.randn_like(z)
         prior_z__kernel = self.compute_kernel(prior_z, prior_z)
         z__kernel = self.compute_kernel(z, z)
@@ -3053,7 +3046,7 @@ class WAE_MMD(BaseVAE):
         mmd = reg_weight * prior_z__kernel.mean() + reg_weight * z__kernel.mean() - 2 * reg_weight * priorz_z__kernel.mean()
         return mmd
 
-    def sample(self, num_samples: int, current_device: int, **kwargs) ->Tensor:
+    def sample(self, num_samples: 'int', current_device: 'int', **kwargs) ->Tensor:
         """
         Samples from the latent space and return the corresponding
         image space map.
@@ -3066,7 +3059,7 @@ class WAE_MMD(BaseVAE):
         samples = self.decode(z)
         return samples
 
-    def generate(self, x: Tensor, **kwargs) ->Tensor:
+    def generate(self, x: 'Tensor', **kwargs) ->Tensor:
         """
         Given an input image x, returns the reconstructed image
         :param x: (Tensor) [B x C x H x W]
@@ -3077,67 +3070,34 @@ class WAE_MMD(BaseVAE):
 
 import torch
 from torch.nn import MSELoss, ReLU
-from paritybench._paritybench_helpers import _mock_config, _mock_layer, _paritybench_base, _fails_compile
+from types import SimpleNamespace
 
 
 TESTCASES = [
-    # (nn.Module, init_args, forward_args, jit_compiles)
+    # (nn.Module, init_args, forward_args)
     (BaseVAE,
      lambda: ([], {}),
-     lambda: ([], {}),
-     False),
+     lambda: ([], {})),
     (BetaTCVAE,
      lambda: ([], {'in_channels': 4, 'latent_dim': 4}),
-     lambda: ([torch.rand([4, 4, 64, 64])], {}),
-     False),
+     lambda: ([torch.rand([4, 4, 64, 64])], {})),
     (EncoderBlock,
      lambda: ([], {'in_channels': 4, 'out_channels': 4, 'latent_dim': 4, 'img_size': 4}),
-     lambda: ([torch.rand([4, 4, 4, 4])], {}),
-     False),
+     lambda: ([torch.rand([4, 4, 4, 4])], {})),
     (LadderBlock,
      lambda: ([], {'in_channels': 4, 'latent_dim': 4}),
-     lambda: ([torch.rand([4, 4, 4])], {}),
-     False),
+     lambda: ([torch.rand([4, 4, 4])], {})),
     (MSSIM,
      lambda: ([], {}),
-     lambda: ([torch.rand([4, 3, 64, 64]), torch.rand([4, 3, 64, 64])], {}),
-     False),
+     lambda: ([torch.rand([4, 3, 64, 64]), torch.rand([4, 3, 64, 64])], {})),
     (ResidualLayer,
      lambda: ([], {'in_channels': 4, 'out_channels': 4}),
-     lambda: ([torch.rand([4, 4, 4, 4])], {}),
-     True),
+     lambda: ([torch.rand([4, 4, 4, 4])], {})),
     (VQVAE,
      lambda: ([], {'in_channels': 4, 'embedding_dim': 4, 'num_embeddings': 4}),
-     lambda: ([torch.rand([4, 4, 4, 4])], {}),
-     False),
+     lambda: ([torch.rand([4, 4, 4, 4])], {})),
     (VectorQuantizer,
      lambda: ([], {'num_embeddings': 4, 'embedding_dim': 4}),
-     lambda: ([torch.rand([4, 4, 4, 4])], {}),
-     False),
+     lambda: ([torch.rand([4, 4, 4, 4])], {})),
 ]
-
-class Test_AntixK_PyTorch_VAE(_paritybench_base):
-    def test_000(self):
-        self._check(*TESTCASES[0])
-
-    def test_001(self):
-        self._check(*TESTCASES[1])
-
-    def test_002(self):
-        self._check(*TESTCASES[2])
-
-    def test_003(self):
-        self._check(*TESTCASES[3])
-
-    def test_004(self):
-        self._check(*TESTCASES[4])
-
-    def test_005(self):
-        self._check(*TESTCASES[5])
-
-    def test_006(self):
-        self._check(*TESTCASES[6])
-
-    def test_007(self):
-        self._check(*TESTCASES[7])
 

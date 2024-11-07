@@ -13,32 +13,41 @@ snr_distance = _module
 losses = _module
 angular_loss = _module
 arcface_loss = _module
+base_loss_wrapper = _module
 base_metric_loss_function = _module
-centroid_triplet_loss = _module
 circle_loss = _module
 contrastive_loss = _module
 cosface_loss = _module
 cross_batch_memory = _module
+dynamic_soft_margin_loss = _module
 fast_ap_loss = _module
 generic_pair_loss = _module
+histogram_loss = _module
 instance_loss = _module
 intra_pair_variance_loss = _module
 large_margin_softmax_loss = _module
 lifted_structure_loss = _module
+manifold_loss = _module
 margin_loss = _module
 mixins = _module
 multi_similarity_loss = _module
+multiple_losses = _module
 n_pairs_loss = _module
 nca_loss = _module
 normalized_softmax_loss = _module
 ntxent_loss = _module
+p2s_grad_loss = _module
+pnp_loss = _module
 proxy_anchor_loss = _module
 proxy_losses = _module
+ranked_list_loss = _module
+self_supervised_loss = _module
 signal_to_noise_ratio_losses = _module
 soft_triple_loss = _module
 sphereface_loss = _module
 subcenter_arcface_loss = _module
 supcon_loss = _module
+tcm_loss = _module
 triplet_margin_loss = _module
 tuplet_margin_loss = _module
 vicreg_loss = _module
@@ -50,7 +59,6 @@ batch_hard_miner = _module
 distance_weighted_miner = _module
 embeddings_already_packaged_as_triplets = _module
 hdc_miner = _module
-maximum_loss_miner = _module
 multi_similarity_miner = _module
 pair_margin_miner = _module
 triplet_margin_miner = _module
@@ -64,6 +72,7 @@ do_nothing_reducer = _module
 mean_reducer = _module
 multiple_reducers = _module
 per_anchor_reducer = _module
+sum_reducer = _module
 threshold_reducer = _module
 regularizers = _module
 base_regularizer = _module
@@ -89,7 +98,6 @@ deep_adversarial_metric_learning = _module
 metric_loss_only = _module
 train_with_classifier = _module
 twostream_metric_loss = _module
-unsupervised_embeddings_using_augmentations = _module
 utils = _module
 accuracy_calculator = _module
 common_functions = _module
@@ -103,19 +111,23 @@ module_with_records = _module
 module_with_records_and_reducer = _module
 tests = _module
 test_batched_distance = _module
+test_collected_stats = _module
+test_custom_check_shape = _module
 test_angular_loss = _module
 test_arcface_loss = _module
-test_centroid_triplet_loss = _module
 test_circle_loss = _module
 test_contrastive_loss = _module
 test_cosface_loss = _module
 test_cross_batch_memory = _module
+test_dynamic_soft_margin_loss = _module
 test_fastap_loss = _module
+test_histogram_loss = _module
 test_instance_loss = _module
 test_intra_pair_variance_loss = _module
 test_large_margin_softmax_loss = _module
 test_lifted_structure_loss = _module
 test_losses_without_labels = _module
+test_manifold_loss = _module
 test_margin_loss = _module
 test_multi_similarity_loss = _module
 test_multiple_losses = _module
@@ -123,11 +135,16 @@ test_nca_loss = _module
 test_normalized_softmax_loss = _module
 test_npairs_loss = _module
 test_ntxent_loss = _module
+test_p2s_grad_loss = _module
+test_pnp_loss = _module
 test_proxy_anchor_loss = _module
 test_proxy_nca_loss = _module
+test_ranked_list_loss = _module
+test_self_supervised_loss = _module
 test_signal_to_noise_ratio_losses = _module
 test_soft_triple_loss = _module
 test_subcenter_arcface_loss = _module
+test_tcm_loss = _module
 test_triplet_margin_loss = _module
 test_tuplet_margin_loss = _module
 test_vicreg_loss = _module
@@ -173,21 +190,14 @@ test_module_with_records_and_reducer = _module
 zzz_testing_utils = _module
 testing_utils = _module
 
-from paritybench._paritybench_helpers import _mock_config, patch_functional
 from unittest.mock import mock_open, MagicMock
 from torch.autograd import Function
 from torch.nn import Module
 import abc, collections, copy, enum, functools, inspect, itertools, logging, math, matplotlib, numbers, numpy, pandas, queue, random, re, scipy, sklearn, string, tensorflow, time, torch, torchaudio, torchvision, types, typing, uuid, warnings
+import operator as op
+from dataclasses import dataclass
 import numpy as np
 from torch import Tensor
-patch_functional()
-open = mock_open()
-yaml = logging = sys = argparse = MagicMock()
-ArgumentParser = argparse.ArgumentParser
-_global_config = args = argv = cfg = config = params = _mock_config()
-argparse.ArgumentParser.return_value.parse_args.return_value = _global_config
-yaml.load.return_value = _global_config
-sys.argv = _global_config
 __version__ = '1.0.0'
 xrange = range
 wraps = functools.wraps
@@ -199,12 +209,6 @@ import torch
 import numpy as np
 
 
-import inspect
-
-
-from collections import defaultdict
-
-
 import torch.nn.functional as F
 
 
@@ -214,13 +218,25 @@ import math
 import scipy.special
 
 
+from torch import nn
+
+
+import torch.nn as nn
+
+
+from torch.nn import Parameter
+
+
+import warnings
+
+
 from torch.utils.data.sampler import Sampler
 
 
 import itertools
 
 
-from torch.utils.data.sampler import BatchSampler
+from collections import defaultdict
 
 
 import copy
@@ -244,22 +260,25 @@ import re
 import scipy.stats
 
 
-from itertools import chain
-
-
 from torch.autograd import Variable
+
+
+from numpy.testing import assert_almost_equal
 
 
 from torch import Tensor
 
 
-from torch import nn
-
-
 import scipy
 
 
-import torch.nn as nn
+from torch.nn.modules.module import Module
+
+
+import torch.nn
+
+
+import torch.nn.functional
 
 
 from torch.nn import init
@@ -325,6 +344,123 @@ class BatchedDistance(torch.nn.Module):
             return getattr(self.distance, name)
 
 
+class BaseLossWrapper(torch.nn.Module):
+
+    def __init__(self, loss, **kwargs):
+        super().__init__(**kwargs)
+        loss_name = type(loss).__name__
+        self.check_loss_support(loss_name)
+
+    @staticmethod
+    def supported_losses():
+        raise NotImplementedError
+
+    @classmethod
+    def check_loss_support(self, loss_name):
+        raise NotImplementedError
+
+
+class ModuleWithRecords(torch.nn.Module):
+
+    def __init__(self, collect_stats=None):
+        super().__init__()
+        self.collect_stats = c_f.COLLECT_STATS if collect_stats is None else collect_stats
+
+    def add_to_recordable_attributes(self, name=None, list_of_names=None, is_stat=False):
+        if is_stat and not self.collect_stats:
+            pass
+        else:
+            c_f.add_to_recordable_attributes(self, name=name, list_of_names=list_of_names, is_stat=is_stat)
+
+    def reset_stats(self):
+        c_f.reset_stats(self)
+
+
+class CrossBatchMemory(BaseLossWrapper, ModuleWithRecords):
+
+    def __init__(self, loss, embedding_size, memory_size=1024, miner=None, **kwargs):
+        super().__init__(loss=loss, **kwargs)
+        self.loss = loss
+        self.miner = miner
+        self.embedding_size = embedding_size
+        self.memory_size = memory_size
+        self.reset_queue()
+        self.add_to_recordable_attributes(list_of_names=['embedding_size', 'memory_size', 'queue_idx'], is_stat=False)
+
+    @staticmethod
+    def supported_losses():
+        return ['AngularLoss', 'CircleLoss', 'ContrastiveLoss', 'GeneralizedLiftedStructureLoss', 'IntraPairVarianceLoss', 'LiftedStructureLoss', 'MarginLoss', 'MultiSimilarityLoss', 'NCALoss', 'NTXentLoss', 'SignalToNoiseRatioContrastiveLoss', 'SupConLoss', 'TripletMarginLoss', 'TupletMarginLoss']
+
+    @classmethod
+    def check_loss_support(cls, loss_name):
+        if loss_name not in cls.supported_losses():
+            raise Exception(f'CrossBatchMemory not supported for {loss_name}')
+
+    def forward(self, embeddings, labels, indices_tuple=None, enqueue_mask=None):
+        if indices_tuple is not None and enqueue_mask is not None:
+            raise ValueError('indices_tuple and enqueue_mask are mutually exclusive')
+        if enqueue_mask is not None:
+            assert len(enqueue_mask) == len(embeddings)
+        else:
+            assert len(embeddings) <= len(self.embedding_memory)
+        self.reset_stats()
+        device = embeddings.device
+        labels = c_f.to_device(labels, device=device)
+        self.embedding_memory = c_f.to_device(self.embedding_memory, device=device, dtype=embeddings.dtype)
+        self.label_memory = c_f.to_device(self.label_memory, device=device, dtype=labels.dtype)
+        if enqueue_mask is not None:
+            emb_for_queue = embeddings[enqueue_mask]
+            labels_for_queue = labels[enqueue_mask]
+            embeddings = embeddings[~enqueue_mask]
+            labels = labels[~enqueue_mask]
+            do_remove_self_comparisons = False
+        else:
+            emb_for_queue = embeddings
+            labels_for_queue = labels
+            do_remove_self_comparisons = True
+        queue_batch_size = len(emb_for_queue)
+        self.add_to_memory(emb_for_queue, labels_for_queue, queue_batch_size)
+        if not self.has_been_filled:
+            E_mem = self.embedding_memory[:self.queue_idx]
+            L_mem = self.label_memory[:self.queue_idx]
+        else:
+            E_mem = self.embedding_memory
+            L_mem = self.label_memory
+        indices_tuple = self.create_indices_tuple(embeddings, labels, E_mem, L_mem, indices_tuple, do_remove_self_comparisons)
+        loss = self.loss(embeddings, labels, indices_tuple, E_mem, L_mem)
+        return loss
+
+    def add_to_memory(self, embeddings, labels, batch_size):
+        self.curr_batch_idx = torch.arange(self.queue_idx, self.queue_idx + batch_size, device=labels.device) % self.memory_size
+        self.embedding_memory[self.curr_batch_idx] = embeddings.detach()
+        self.label_memory[self.curr_batch_idx] = labels.detach()
+        prev_queue_idx = self.queue_idx
+        self.queue_idx = (self.queue_idx + batch_size) % self.memory_size
+        if not self.has_been_filled and self.queue_idx <= prev_queue_idx:
+            self.has_been_filled = True
+
+    def create_indices_tuple(self, embeddings, labels, E_mem, L_mem, input_indices_tuple, do_remove_self_comparisons):
+        if self.miner:
+            indices_tuple = self.miner(embeddings, labels, E_mem, L_mem)
+        else:
+            indices_tuple = lmu.get_all_pairs_indices(labels, L_mem)
+        if do_remove_self_comparisons:
+            indices_tuple = lmu.remove_self_comparisons(indices_tuple, self.curr_batch_idx, self.memory_size)
+        if input_indices_tuple is not None:
+            if len(input_indices_tuple) == 3 and len(indices_tuple) == 4:
+                input_indices_tuple = lmu.convert_to_pairs(input_indices_tuple, labels)
+            elif len(input_indices_tuple) == 4 and len(indices_tuple) == 3:
+                input_indices_tuple = lmu.convert_to_triplets(input_indices_tuple, labels)
+            indices_tuple = c_f.concatenate_indices_tuples(indices_tuple, input_indices_tuple)
+        return indices_tuple
+
+    def reset_queue(self):
+        self.register_buffer('embedding_memory', torch.zeros(self.memory_size, self.embedding_size))
+        self.register_buffer('label_memory', torch.zeros(self.memory_size).long())
+        self.has_been_filled = False
+        self.queue_idx = 0
+
+
 class MultipleLosses(torch.nn.Module):
 
     def __init__(self, losses, miners=None, weights=None):
@@ -371,13 +507,49 @@ class MultipleLosses(torch.nn.Module):
                 assert len(x) == len(self.losses)
 
 
-class Identity(torch.nn.Module):
+class SelfSupervisedLoss(BaseLossWrapper):
+    """
+    Issue #411:
 
-    def __init__(self):
-        super().__init__()
+    A common use case is to have embeddings and ref_emb be augmented versions of each other.
+    For most losses right now you have to create labels to indicate
+    which embeddings correspond with which ref_emb.
+    A wrapper that does this for the user would be nice.
 
-    def forward(self, x):
-        return x
+        loss_fn = SelfSupervisedLoss(TripletMarginLoss())
+        loss = loss_fn(embeddings, ref_emb1, ref_emb2, ...)
+
+    where ref_embk = kth augmentation of embeddings.
+    """
+
+    def __init__(self, loss, symmetric=True, **kwargs):
+        super().__init__(loss=loss, **kwargs)
+        self.loss = loss
+        self.symmetric = symmetric
+
+    @staticmethod
+    def supported_losses():
+        return ['AngularLoss', 'CircleLoss', 'ContrastiveLoss', 'GeneralizedLiftedStructureLoss', 'IntraPairVarianceLoss', 'LiftedStructureLoss', 'MultiSimilarityLoss', 'NTXentLoss', 'SignalToNoiseRatioContrastiveLoss', 'SupConLoss', 'TripletMarginLoss', 'NCALoss', 'TupletMarginLoss']
+
+    @classmethod
+    def check_loss_support(cls, loss_name):
+        if loss_name not in cls.supported_losses():
+            raise Exception(f'SelfSupervisedLoss not supported for {loss_name}')
+
+    def forward(self, embeddings, ref_emb):
+        """
+        embeddings: representations of the original set of inputs
+        ref_emb:    representations of an augmentation of the inputs.
+        *args:      variable length argument list, where each argument
+                    is an additional representation of an augmented version of the input.
+                    i.e. ref_emb2, ref_emb3, ...
+        """
+        labels = torch.arange(embeddings.shape[0])
+        if self.symmetric:
+            embeddings = torch.cat([embeddings, ref_emb], dim=0)
+            labels = torch.cat([labels, labels], dim=0)
+            return self.loss(embeddings, labels)
+        return self.loss(embeddings=embeddings, labels=labels, ref_emb=ref_emb, ref_labels=labels.clone())
 
 
 class EmbeddingRegularizerMixin:
@@ -405,22 +577,6 @@ class EmbeddingRegularizerMixin:
         return ['embedding_reg_loss']
 
 
-class ModuleWithRecords(torch.nn.Module):
-
-    def __init__(self, collect_stats=None):
-        super().__init__()
-        self.collect_stats = c_f.COLLECT_STATS if collect_stats is None else collect_stats
-
-    def add_to_recordable_attributes(self, name=None, list_of_names=None, is_stat=False):
-        if is_stat and not self.collect_stats:
-            pass
-        else:
-            c_f.add_to_recordable_attributes(self, name=name, list_of_names=list_of_names, is_stat=is_stat)
-
-    def reset_stats(self):
-        c_f.reset_stats(self)
-
-
 class BaseDistance(ModuleWithRecords):
 
     def __init__(self, normalize_embeddings=True, p=2, power=1, is_inverted=False, **kwargs):
@@ -430,9 +586,11 @@ class BaseDistance(ModuleWithRecords):
         self.power = power
         self.is_inverted = is_inverted
         self.add_to_recordable_attributes(list_of_names=['p', 'power'], is_stat=False)
+        self.add_to_recordable_attributes(list_of_names=['initial_avg_query_norm', 'initial_avg_ref_norm', 'final_avg_query_norm', 'final_avg_ref_norm'], is_stat=True)
 
     def forward(self, query_emb, ref_emb=None):
         self.reset_stats()
+        self.check_shapes(query_emb, ref_emb)
         query_emb_normalized = self.maybe_normalize(query_emb)
         if ref_emb is None:
             ref_emb = query_emb
@@ -481,13 +639,14 @@ class BaseDistance(ModuleWithRecords):
     def set_default_stats(self, query_emb, ref_emb, query_emb_normalized, ref_emb_normalized):
         if self.collect_stats:
             with torch.no_grad():
-                stats_dict = {'initial_avg_query_norm': torch.mean(self.get_norm(query_emb)).item(), 'initial_avg_ref_norm': torch.mean(self.get_norm(ref_emb)).item(), 'final_avg_query_norm': torch.mean(self.get_norm(query_emb_normalized)).item(), 'final_avg_ref_norm': torch.mean(self.get_norm(ref_emb_normalized)).item()}
-                self.set_stats(stats_dict)
+                self.initial_avg_query_norm = torch.mean(self.get_norm(query_emb)).item()
+                self.initial_avg_ref_norm = torch.mean(self.get_norm(ref_emb)).item()
+                self.final_avg_query_norm = torch.mean(self.get_norm(query_emb_normalized)).item()
+                self.final_avg_ref_norm = torch.mean(self.get_norm(ref_emb_normalized)).item()
 
-    def set_stats(self, stats_dict):
-        for k, v in stats_dict.items():
-            self.add_to_recordable_attributes(name=k, is_stat=True)
-            setattr(self, k, v)
+    def check_shapes(self, query_emb, ref_emb):
+        if query_emb.ndim != 2 or ref_emb is not None and ref_emb.ndim != 2:
+            raise ValueError('embeddings must be a 2D tensor of shape (batch_size, embedding_size)')
 
 
 class LpDistance(BaseDistance):
@@ -526,15 +685,17 @@ class ModuleWithRecordsAndDistance(ModuleWithRecords):
 
 class BaseReducer(ModuleWithRecords):
 
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.add_to_recordable_attributes(name='losses_size', is_stat=True)
+
     def forward(self, loss_dict, embeddings, labels):
         self.reset_stats()
         assert len(loss_dict) == 1
         loss_name = list(loss_dict.keys())[0]
         loss_info = loss_dict[loss_name]
-        self.add_to_recordable_attributes(name=loss_name, is_stat=True)
         losses, loss_indices, reduction_type, kwargs = self.unpack_loss_info(loss_info)
         loss_val = self.reduce_the_loss(losses, loss_indices, reduction_type, kwargs, embeddings, labels)
-        setattr(self, loss_name, loss_val.item())
         return loss_val
 
     def unpack_loss_info(self, loss_info):
@@ -607,7 +768,6 @@ class BaseReducer(ModuleWithRecords):
 
     def set_losses_size_stat(self, losses):
         if self.collect_stats:
-            self.add_to_recordable_attributes(name='losses_size', is_stat=True)
             if not torch.is_tensor(losses) or losses.ndim == 0:
                 self.losses_size = 1
             else:
@@ -741,84 +901,6 @@ class BaseMetricLossFunction(EmbeddingRegularizerMixin, ModuleWithRecordsReducer
         return reg_names
 
 
-class CrossBatchMemory(ModuleWithRecords):
-
-    def __init__(self, loss, embedding_size, memory_size=1024, miner=None, **kwargs):
-        super().__init__(**kwargs)
-        self.loss = loss
-        self.miner = miner
-        self.embedding_size = embedding_size
-        self.memory_size = memory_size
-        self.reset_queue()
-        self.add_to_recordable_attributes(list_of_names=['embedding_size', 'memory_size', 'queue_idx'], is_stat=False)
-
-    def forward(self, embeddings, labels, indices_tuple=None, enqueue_idx=None):
-        if enqueue_idx is not None:
-            assert len(enqueue_idx) <= len(self.embedding_memory)
-            assert len(enqueue_idx) < len(embeddings)
-        else:
-            assert len(embeddings) <= len(self.embedding_memory)
-        self.reset_stats()
-        device = embeddings.device
-        labels = c_f.to_device(labels, device=device)
-        self.embedding_memory = c_f.to_device(self.embedding_memory, device=device, dtype=embeddings.dtype)
-        self.label_memory = c_f.to_device(self.label_memory, device=device, dtype=labels.dtype)
-        if enqueue_idx is not None:
-            mask = torch.zeros(len(embeddings), device=device, dtype=torch.bool)
-            mask[enqueue_idx] = True
-            emb_for_queue = embeddings[mask]
-            labels_for_queue = labels[mask]
-            embeddings = embeddings[~mask]
-            labels = labels[~mask]
-            do_remove_self_comparisons = False
-        else:
-            emb_for_queue = embeddings
-            labels_for_queue = labels
-            do_remove_self_comparisons = True
-        batch_size = len(embeddings)
-        queue_batch_size = len(emb_for_queue)
-        self.add_to_memory(emb_for_queue, labels_for_queue, queue_batch_size)
-        if not self.has_been_filled:
-            E_mem = self.embedding_memory[:self.queue_idx]
-            L_mem = self.label_memory[:self.queue_idx]
-        else:
-            E_mem = self.embedding_memory
-            L_mem = self.label_memory
-        indices_tuple = self.create_indices_tuple(batch_size, embeddings, labels, E_mem, L_mem, indices_tuple, do_remove_self_comparisons)
-        loss = self.loss(embeddings, labels, indices_tuple, E_mem, L_mem)
-        return loss
-
-    def add_to_memory(self, embeddings, labels, batch_size):
-        self.curr_batch_idx = torch.arange(self.queue_idx, self.queue_idx + batch_size, device=labels.device) % self.memory_size
-        self.embedding_memory[self.curr_batch_idx] = embeddings.detach()
-        self.label_memory[self.curr_batch_idx] = labels.detach()
-        prev_queue_idx = self.queue_idx
-        self.queue_idx = (self.queue_idx + batch_size) % self.memory_size
-        if not self.has_been_filled and self.queue_idx <= prev_queue_idx:
-            self.has_been_filled = True
-
-    def create_indices_tuple(self, batch_size, embeddings, labels, E_mem, L_mem, input_indices_tuple, do_remove_self_comparisons):
-        if self.miner:
-            indices_tuple = self.miner(embeddings, labels, E_mem, L_mem)
-        else:
-            indices_tuple = lmu.get_all_pairs_indices(labels, L_mem)
-        if do_remove_self_comparisons:
-            indices_tuple = lmu.remove_self_comparisons(indices_tuple, self.curr_batch_idx, self.memory_size)
-        if input_indices_tuple is not None:
-            if len(input_indices_tuple) == 3 and len(indices_tuple) == 4:
-                input_indices_tuple = lmu.convert_to_pairs(input_indices_tuple, labels)
-            elif len(input_indices_tuple) == 4 and len(indices_tuple) == 3:
-                input_indices_tuple = lmu.convert_to_triplets(input_indices_tuple, labels)
-            indices_tuple = c_f.concatenate_indices_tuples(indices_tuple, input_indices_tuple)
-        return indices_tuple
-
-    def reset_queue(self):
-        self.embedding_memory = torch.zeros(self.memory_size, self.embedding_size)
-        self.label_memory = torch.zeros(self.memory_size).long()
-        self.has_been_filled = False
-        self.queue_idx = 0
-
-
 def all_gather(x):
     world_size = torch.distributed.get_world_size()
     if world_size > 1:
@@ -838,25 +920,33 @@ def all_gather_embeddings_and_labels(emb, labels):
     if not is_distributed():
         return None, None
     ref_emb = all_gather(emb)
-    ref_labels = all_gather(labels)
+    ref_labels = all_gather(labels) if labels is not None else None
     return ref_emb, ref_labels
 
 
 def gather(emb, labels):
     device = emb.device
-    labels = c_f.to_device(labels, device=device)
+    if labels is not None:
+        labels = c_f.to_device(labels, device=device)
     dist_emb, dist_labels = all_gather_embeddings_and_labels(emb, labels)
     all_emb = torch.cat([emb, dist_emb], dim=0)
-    all_labels = torch.cat([labels, dist_labels], dim=0)
+    all_labels = torch.cat([labels, dist_labels], dim=0) if dist_labels is not None else None
     return all_emb, all_labels, labels
 
 
 def gather_emb_and_ref(emb, labels, ref_emb=None, ref_labels=None):
     all_emb, all_labels, labels = gather(emb, labels)
     all_ref_emb, all_ref_labels = None, None
-    if ref_emb is not None and ref_labels is not None:
+    if ref_emb is not None:
         all_ref_emb, all_ref_labels, _ = gather(ref_emb, ref_labels)
     return all_emb, all_labels, all_ref_emb, all_ref_labels, labels
+
+
+def gather_enqueue_mask(enqueue_mask, device):
+    if enqueue_mask is None:
+        return enqueue_mask
+    enqueue_mask = c_f.to_device(enqueue_mask, device=device)
+    return torch.cat([enqueue_mask, all_gather(enqueue_mask)], dim=0)
 
 
 def get_indices_tuple(labels, ref_labels, embeddings=None, ref_emb=None, miner=None):
@@ -884,11 +974,14 @@ class DistributedLossWrapper(torch.nn.Module):
         self.loss = loss
         self.efficient = efficient
 
-    def forward(self, emb, labels, indices_tuple=None, ref_emb=None, ref_labels=None):
+    def forward(self, embeddings, labels=None, indices_tuple=None, ref_emb=None, ref_labels=None, enqueue_mask=None):
+        if not is_distributed():
+            warnings.warn('DistributedLossWrapper is being used in a non-distributed setting. Returning the loss as is.')
+            return self.loss(embeddings, labels, indices_tuple, ref_emb, ref_labels)
         world_size = torch.distributed.get_world_size()
-        common_args = [emb, labels, indices_tuple, ref_emb, ref_labels, world_size]
+        common_args = [embeddings, labels, indices_tuple, ref_emb, ref_labels, world_size]
         if isinstance(self.loss, CrossBatchMemory):
-            return self.forward_cross_batch(*common_args)
+            return self.forward_cross_batch(*common_args, enqueue_mask)
         return self.forward_regular_loss(*common_args)
 
     def forward_regular_loss(self, emb, labels, indices_tuple, ref_emb, ref_labels, world_size):
@@ -896,7 +989,8 @@ class DistributedLossWrapper(torch.nn.Module):
             return self.loss(emb, labels, indices_tuple, ref_emb, ref_labels)
         all_emb, all_labels, all_ref_emb, all_ref_labels, labels = gather_emb_and_ref(emb, labels, ref_emb, ref_labels)
         if self.efficient:
-            all_labels = select_ref_or_regular(all_labels, all_ref_labels)
+            if all_labels is not None:
+                all_labels = select_ref_or_regular(all_labels, all_ref_labels)
             all_emb = select_ref_or_regular(all_emb, all_ref_emb)
             if indices_tuple is None:
                 indices_tuple = get_indices_tuple(labels, all_labels)
@@ -905,23 +999,46 @@ class DistributedLossWrapper(torch.nn.Module):
             loss = self.loss(all_emb, all_labels, indices_tuple, all_ref_emb, all_ref_labels)
         return loss * world_size
 
-    def forward_cross_batch(self, emb, labels, indices_tuple, ref_emb, ref_labels, world_size):
+    def forward_cross_batch(self, emb, labels, indices_tuple, ref_emb, ref_labels, world_size, enqueue_mask):
         if ref_emb is not None or ref_labels is not None:
             raise ValueError('CrossBatchMemory is not compatible with ref_emb and ref_labels')
         if world_size <= 1:
-            return self.loss(emb, labels, indices_tuple)
+            return self.loss(emb, labels, indices_tuple, enqueue_mask)
         all_emb, all_labels, _, _, _ = gather_emb_and_ref(emb, labels, ref_emb, ref_labels)
-        loss = self.loss(all_emb, all_labels, indices_tuple)
+        enqueue_mask = gather_enqueue_mask(enqueue_mask, emb.device)
+        loss = self.loss(all_emb, all_labels, indices_tuple, enqueue_mask)
         return loss * world_size
 
 
 class BaseMiner(ModuleWithRecordsAndDistance):
 
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
+        self.add_to_recordable_attributes(list_of_names=['num_pos_pairs', 'num_neg_pairs', 'num_triplets'], is_stat=True)
+
     def mine(self, embeddings, labels, ref_emb, ref_labels):
         raise NotImplementedError
 
     def output_assertion(self, output):
-        raise NotImplementedError
+        """
+        Args:
+            output: the output of self.mine
+        This asserts that the mining function is outputting
+        properly formatted indices. The default is to require a tuple representing
+        a,p,n indices or a1,p,a2,n indices within a batch of embeddings.
+        For example, a tuple of (anchors, positives, negatives) will be
+        (torch.tensor, torch.tensor, torch.tensor)
+        """
+        if len(output) == 3:
+            self.num_triplets = len(output[0])
+            assert self.num_triplets == len(output[1]) == len(output[2])
+        elif len(output) == 4:
+            self.num_pos_pairs = len(output[0])
+            self.num_neg_pairs = len(output[2])
+            assert self.num_pos_pairs == len(output[1])
+            assert self.num_neg_pairs == len(output[3])
+        else:
+            raise TypeError
 
     def forward(self, embeddings, labels, ref_emb=None, ref_labels=None):
         """
@@ -961,6 +1078,120 @@ class DistributedMinerWrapper(torch.nn.Module):
             return get_indices_tuple(labels, all_labels, emb, all_emb, self.miner)
         else:
             return self.miner(all_emb, all_labels, all_ref_emb, all_ref_labels)
+
+
+def compute_distance_matrix_unit_l2(a, b, eps=1e-06):
+    """
+    computes pairwise Euclidean distance and return a N x N matrix
+    """
+    dmat = torch.matmul(a, torch.transpose(b, 0, 1))
+    dmat = ((1.0 - dmat + eps) * 2.0).pow(0.5)
+    return dmat
+
+
+def find_hard_negatives(dmat, output_index=True, empirical_thresh=0.0):
+    """
+    a = A * P'
+    A: N * ndim
+    P: N * ndim
+
+    a1p1 a1p2 a1p3 a1p4 ...
+    a2p1 a2p2 a2p3 a2p4 ...
+    a3p1 a3p2 a3p3 a3p4 ...
+    a4p1 a4p2 a4p3 a4p4 ...
+    ...  ...  ...  ...
+    """
+    r, c = dmat.size()
+    if not output_index:
+        pos = torch.zeros(max(r, c))
+        pos[:min(r, c)] = dmat.diag()
+    dmat = dmat + torch.eye(r, c) * 99999
+    dmat[dmat < empirical_thresh] = 99999
+    min_a, min_p = torch.zeros(max(r, c)), torch.zeros(max(r, c))
+    min_a[:c], _ = torch.min(dmat, dim=0)
+    min_p[:r], _ = torch.min(dmat, dim=1)
+    if not output_index:
+        neg = torch.min(min_a, min_p)
+        return pos, neg
+
+
+class OriginalImplementationDynamicSoftMarginLoss(nn.Module):
+
+    def __init__(self, is_binary=False, momentum=0.01, max_dist=None, nbins=512):
+        """
+        is_binary: true if learning binary descriptor
+        momentum: weight assigned to the histogram computed from the current batch
+        max_dist: maximum possible distance in the feature space
+        nbins: number of bins to discretize the PDF
+        """
+        super(OriginalImplementationDynamicSoftMarginLoss, self).__init__()
+        self._is_binary = is_binary
+        if max_dist is None:
+            max_dist = 2.0
+        self._momentum = momentum
+        self._max_val = max_dist
+        self._min_val = -max_dist
+        self.register_buffer('histogram', torch.ones(nbins))
+        self._stats_initialized = False
+        self.current_step = None
+
+    def _compute_distances(self, x, labels=None):
+        return self._compute_l2_distances(x, labels=labels)
+
+    def _compute_l2_distances(self, x, labels=None):
+        if labels is None:
+            cnt = x.size(0) // 2
+            a = x[:cnt, :]
+            p = x[cnt:, :]
+            dmat = compute_distance_matrix_unit_l2(a, p)
+            return find_hard_negatives(dmat, output_index=False, empirical_thresh=0.008)
+        else:
+            dmat = compute_distance_matrix_unit_l2(x, x)
+            dmat.fill_diagonal_(0)
+            anchor_idx, positive_idx, negative_idx = lmu.convert_to_triplets(None, labels, labels, t_per_anchor='all')
+            return dmat[anchor_idx, positive_idx], dmat[anchor_idx, negative_idx]
+
+    def _compute_histogram(self, x, momentum):
+        """
+        update the histogram using the current batch
+        """
+        num_bins = self.histogram.size(0)
+        x_detached = x.detach()
+        self.bin_width = (self._max_val - self._min_val) / num_bins
+        lo = torch.floor((x_detached - self._min_val) / self.bin_width).long()
+        hi = (lo + 1).clamp(min=0, max=num_bins - 1)
+        hist = x.new_zeros(num_bins)
+        alpha = 1.0 - (x_detached - self._min_val - lo.float() * self.bin_width) / self.bin_width
+        hist.index_add_(0, lo, alpha)
+        hist.index_add_(0, hi, 1.0 - alpha)
+        hist = hist / (hist.sum() + 1e-06)
+        self.histogram = c_f.to_device(self.histogram, tensor=hist, dtype=hist.dtype)
+        self.histogram = (1.0 - momentum) * self.histogram + momentum * hist
+
+    def _compute_stats(self, pos_dist, neg_dist):
+        hist_val = pos_dist - neg_dist
+        if self._stats_initialized:
+            self._compute_histogram(hist_val, self._momentum)
+        else:
+            self._compute_histogram(hist_val, 1.0)
+            self._stats_initialized = True
+
+    def forward(self, x, labels=None):
+        distances = self._compute_distances(x, labels=labels)
+        if not self._is_binary:
+            pos_dist, neg_dist = distances
+            self._compute_stats(pos_dist, neg_dist)
+            hist_var = pos_dist - neg_dist
+        else:
+            pos_dist, neg_dist, pos_dist_b, neg_dist_b = distances
+            self._compute_stats(pos_dist_b, neg_dist_b)
+            hist_var = pos_dist_b - neg_dist_b
+        PDF = self.histogram / self.histogram.sum()
+        CDF = PDF.cumsum(0)
+        bin_idx = torch.floor((hist_var - self._min_val) / self.bin_width).long()
+        weight = CDF[bin_idx]
+        loss = (hist_var * weight).mean()
+        return loss
 
 
 def dSoftBinning(D, mid, Delta):
@@ -1103,6 +1334,64 @@ class OriginalImplementationFastAPLoss(torch.nn.Module):
         return OriginalImplementationFastAP.apply(batch, labels, self.num_bins)
 
 
+class OriginalImplementationHistogramLoss(torch.nn.Module):
+
+    def __init__(self, num_steps, cuda=True):
+        super(OriginalImplementationHistogramLoss, self).__init__()
+        self.step = 2 / (num_steps - 1)
+        self.eps = 1 / num_steps
+        self.cuda = cuda
+        self.t = torch.arange(-1, 1 + self.step, self.step).view(-1, 1)
+        self.tsize = self.t.size()[0]
+        if self.cuda:
+            self.t = self.t
+
+    def forward(self, features, classes):
+
+        def histogram(inds, size):
+            s_repeat_ = s_repeat.clone()
+            inds = c_f.to_device(inds, tensor=s_repeat_floor)
+            self.t = c_f.to_device(self.t, tensor=s_repeat_floor)
+            indsa = (s_repeat_floor - (self.t - self.step) > -self.eps) & (s_repeat_floor - (self.t - self.step) < self.eps) & inds
+            assert indsa.nonzero().size()[0] == size, 'Another number of bins should be used'
+            zeros = torch.zeros((1, indsa.size()[1]))
+            if self.cuda:
+                zeros = zeros
+            indsb = torch.cat((indsa, zeros))[1:, :]
+            s_repeat_[~(indsb | indsa)] = 0
+            self.t = self.t
+            s_repeat_[indsa] = (s_repeat_ - self.t + self.step)[indsa] / self.step
+            s_repeat_[indsb] = (-s_repeat_ + self.t + self.step)[indsb] / self.step
+            return s_repeat_.sum(1) / size
+        classes_size = classes.size()[0]
+        classes_eq = (classes.repeat(classes_size, 1) == classes.view(-1, 1).repeat(1, classes_size)).data
+        dists = torch.mm(features, features.transpose(0, 1))
+        assert (dists > 1 + self.eps).sum().item() + (dists < -1 - self.eps).sum().item() == 0, 'L2 normalization should be used'
+        s_inds = torch.triu(torch.ones(classes_eq.size()), 1).byte()
+        if self.cuda:
+            s_inds = s_inds
+        classes_eq = classes_eq
+        pos_inds = classes_eq[s_inds].repeat(self.tsize, 1)
+        neg_inds = ~classes_eq[s_inds].repeat(self.tsize, 1)
+        pos_size = classes_eq[s_inds].sum().item()
+        neg_size = (~classes_eq[s_inds]).sum().item()
+        s = dists[s_inds].view(1, -1)
+        s_repeat = s.repeat(self.tsize, 1)
+        s_repeat_floor = (torch.floor(s_repeat.data / self.step) * self.step).float()
+        histogram_pos = histogram(pos_inds, pos_size)
+        assert_almost_equal(histogram_pos.sum().item(), 1, decimal=1, err_msg='Not good positive histogram', verbose=True)
+        histogram_neg = histogram(neg_inds, neg_size)
+        assert_almost_equal(histogram_neg.sum().item(), 1, decimal=1, err_msg='Not good negative histogram', verbose=True)
+        histogram_pos_repeat = histogram_pos.view(-1, 1).repeat(1, histogram_pos.size()[0])
+        histogram_pos_inds = torch.tril(torch.ones(histogram_pos_repeat.size()), -1).bool()
+        if self.cuda:
+            histogram_pos_inds = histogram_pos_inds
+        histogram_pos_repeat[histogram_pos_inds] = 0
+        histogram_pos_cdf = histogram_pos_repeat.sum(0)
+        loss = torch.sum(histogram_neg * histogram_pos_cdf)
+        return loss
+
+
 def l2_norm(input):
     input_size = input.size()
     buffer = torch.pow(input, 2)
@@ -1128,6 +1417,237 @@ class OriginalInstanceLoss(nn.Module):
             _, sim_label = torch.unique(label, return_inverse=True)
         loss = F.cross_entropy(sim1, sim_label)
         return loss
+
+
+def pairwise_similarity(x, y=None):
+    if y is not None:
+        y_t = torch.transpose(y, 0, 1)
+    else:
+        y_t = torch.transpose(x, 0, 1)
+    dist = torch.mm(x, y_t)
+    return torch.clamp(dist, 0.0, np.inf)
+
+
+class OriginalImplementationManifoldLoss(Module):
+
+    def __init__(self, proxies, alpha, lambdaC=1.0, distance=F.cosine_similarity):
+        """
+        proxies : P x D , proxy embeddings (one proxy per class randomly initialized, instance of nn.Parameter)
+        alpha : float, random walk parameter
+        lambdaC : float, regularization weight
+        distance : func, distance function to use
+        """
+        super(OriginalImplementationManifoldLoss, self).__init__()
+        self.alpha = alpha
+        self.lambdaC = lambdaC
+        self.proxy = proxies / proxies.norm(p=2)
+        self.nb_proxy = proxies.size(0)
+        self.d = distance
+
+    def get_Matrix(self, x):
+        """
+        x : B x D , feature embeddings
+        return
+            A: B x B the approximated rank matrix
+        """
+        W = pairwise_similarity(x)
+        W = torch.exp(W / 0.5)
+        Y = torch.eye(len(W), dtype=W.dtype, device=x.device)
+        W = W - W * Y
+        D = torch.diag(torch.pow(torch.sum(W, dim=1), -0.5))
+        D[D == float('Inf')] = 0.0
+        S = torch.mm(torch.mm(D, W), D)
+        dt = S.dtype
+        L = torch.inverse(Y.float() - self.alpha * S.float())
+        L = L
+        A = (1 - self.alpha) * torch.mm(L, Y)
+        return A
+
+    def forward(self, fvec, fLvec, fvecs_add=None):
+        """
+        fvec : B1 x D , current batch of feature embedding
+        fLvec : B1 , current batch of GT labels
+        fvecs_add : B2 x D , batch of additionnal contextual features to fill the manifold
+        """
+        fLvec = fLvec.tolist()
+        N = len(fLvec)
+        if fvecs_add is not None:
+            fvec = torch.cat((fvec, self.proxy, fvecs_add), 0)
+        else:
+            fvec = torch.cat((fvec, self.proxy), 0)
+        fvec = fvec / fvec.norm(p=2, dim=1).view(-1, 1)
+        A = self.get_Matrix(fvec)
+        A_p = A[N:N + self.nb_proxy].clone()
+        A = A[:N]
+        loss_intrinsic = torch.zeros(1, dtype=fvec.dtype, device=fvec.device)
+        loss_context = torch.zeros(1, dtype=fvec.dtype, device=fvec.device)
+        for i in range(N):
+            loss_neg1_intrinsic = torch.zeros(1, dtype=fvec.dtype, device=fvec.device)
+            loss_neg1_context = torch.zeros(1, dtype=fvec.dtype, device=fvec.device)
+            dist_pos = self.d(torch.unsqueeze(A[i], 0), torch.unsqueeze(A_p[fLvec[i]], 0))
+            for j in range(self.nb_proxy):
+                if fLvec[i] != j:
+                    val1_context = self.d(torch.unsqueeze(A[i], 0), torch.unsqueeze(A_p[j], 0)) - dist_pos
+                    val1_intrinsic = A[i, N + j] - A[i, N + fLvec[i]]
+                    if val1_context > 0:
+                        loss_neg1_context += torch.exp(val1_context)
+                    if val1_intrinsic > 0:
+                        loss_neg1_intrinsic += torch.exp(val1_intrinsic)
+            loss_intrinsic += torch.log(1.0 + loss_neg1_intrinsic)
+            loss_context += torch.log(1.0 + loss_neg1_context)
+        loss_intrinsic /= N
+        loss_context /= N
+        return loss_intrinsic + self.lambdaC * loss_context
+
+
+class TrustedImplementationP2SActivationLayer(nn.Module):
+    """Output layer that produces cos	heta between activation vector x
+    and class vector w_j
+
+    in_dim:     dimension of input feature vectors
+    output_dim: dimension of output feature vectors
+                (i.e., number of classes)
+
+    Usage example:
+      batch_size = 64
+      input_dim = 10
+      class_num = 5
+
+      l_layer = P2SActivationLayer(input_dim, class_num)
+      l_loss = P2SGradLoss()
+
+      data = torch.rand(batch_size, input_dim, requires_grad=True)
+      target = (torch.rand(batch_size) * class_num).clamp(0, class_num-1)
+      target = target.to(torch.long)
+
+      scores = l_layer(data)
+      loss = l_loss(scores, target)
+
+      loss.backward()
+    """
+
+    def __init__(self, in_dim, out_dim):
+        super(TrustedImplementationP2SActivationLayer, self).__init__()
+        self.in_dim = in_dim
+        self.out_dim = out_dim
+        self.weight = nn.Parameter(torch.Tensor(in_dim, out_dim), requires_grad=True)
+        self.weight.data.uniform_(-1, 1).renorm_(2, 1, 1e-05).mul_(100000.0)
+        return
+
+    def forward(self, input_feat):
+        """
+        Compute P2SGrad activation
+
+        input:
+        ------
+          input_feat: tensor (batch_size, input_dim)
+
+        output:
+        -------
+          tensor (batch_size, output_dim)
+
+        """
+        w = self.weight.renorm(2, 1, 1e-05).mul(100000.0)
+        w = c_f.to_device(w, tensor=input_feat, dtype=input_feat.dtype)
+        x_modulus = input_feat.pow(2).sum(1).pow(0.5)
+        inner_wx = input_feat.mm(w)
+        cos_theta = inner_wx / x_modulus.view(-1, 1)
+        cos_theta = cos_theta.clamp(-1, 1)
+        return cos_theta
+
+
+class TrustedImplementationP2SGradLoss(nn.Module):
+    """P2SGradLoss() MSE loss between output and target one-hot vectors
+
+    See usage in __doc__ of P2SActivationLayer
+    """
+
+    def __init__(self):
+        super(TrustedImplementationP2SGradLoss, self).__init__()
+        self.m_loss = nn.MSELoss()
+
+    def forward(self, input_score, target):
+        """
+        input
+        -----
+          input_score: tensor (batch_size, class_num)
+                 cos \\theta given by P2SActivationLayer(input_feat)
+          target: tensor (batch_size)
+                 target[i] is the target class index of the i-th sample
+
+        output
+        ------
+          loss: scaler
+        """
+        with torch.no_grad():
+            index = torch.zeros_like(input_score)
+            index = c_f.to_device(index, tensor=input_score, dtype=torch.long)
+            target = c_f.to_device(target, tensor=input_score, dtype=torch.long)
+            index.scatter_(1, target.data.view(-1, 1), 1)
+        index = index
+        loss = self.m_loss(input_score, index)
+        return loss
+
+
+class OriginalImplementationPNP(torch.nn.Module):
+
+    def __init__(self, b, alpha, anneal, variant, bs, classes):
+        super(OriginalImplementationPNP, self).__init__()
+        self.b = b
+        self.alpha = alpha
+        self.anneal = anneal
+        self.variant = variant
+        self.batch_size = bs
+        self.num_id = classes
+        self.samples_per_class = int(bs / classes)
+        mask = 1.0 - torch.eye(self.batch_size)
+        for i in range(self.num_id):
+            mask[i * self.samples_per_class:(i + 1) * self.samples_per_class, i * self.samples_per_class:(i + 1) * self.samples_per_class] = 0
+        self.mask = mask.unsqueeze(dim=0).repeat(self.batch_size, 1, 1)
+
+    def forward(self, batch):
+        dtype, device = batch.dtype, batch.device
+        self.mask = self.mask.type(dtype)
+        sim_all = self.compute_aff(batch)
+        sim_all_repeat = sim_all.unsqueeze(dim=1).repeat(1, self.batch_size, 1)
+        sim_diff = sim_all_repeat - sim_all_repeat.permute(0, 2, 1)
+        sim_sg = self.sigmoid(sim_diff, temp=self.anneal) * self.mask
+        sim_all_rk = torch.sum(sim_sg, dim=-1)
+        if self.variant == 'PNP-D_s':
+            sim_all_rk = torch.log(1 + sim_all_rk)
+        elif self.variant == 'PNP-D_q':
+            sim_all_rk = 1 / (1 + sim_all_rk) ** self.alpha
+        elif self.variant == 'PNP-I_u':
+            sim_all_rk = (1 + sim_all_rk) * torch.log(1 + sim_all_rk)
+        elif self.variant == 'PNP-I_b':
+            b = self.b
+            sim_all_rk = 1 / b ** 2 * (b * sim_all_rk - torch.log(1 + b * sim_all_rk))
+        elif self.variant == 'PNP-O':
+            pass
+        else:
+            raise Exception('variantation <{}> not available!'.format(self.variant))
+        loss = torch.zeros(1).type(dtype)
+        group = int(self.batch_size / self.num_id)
+        for ind in range(self.num_id):
+            neg_divide = torch.sum(sim_all_rk[ind * group:(ind + 1) * group, ind * group:(ind + 1) * group] / group)
+            loss = loss + neg_divide / self.batch_size
+        if self.variant == 'PNP-D_q':
+            return 1 - loss
+        else:
+            return loss
+
+    def sigmoid(self, tensor, temp=1.0):
+        """temperature controlled sigmoid
+        takes as input a torch tensor (tensor) and passes it through a sigmoid, controlled by temperature: temp
+        """
+        exponent = -tensor / temp
+        exponent = torch.clamp(exponent, min=-50, max=50)
+        y = 1.0 / (1.0 + torch.exp(exponent))
+        return y
+
+    def compute_aff(self, x):
+        """computes the affinity matrix between an input vector and itself"""
+        return torch.mm(x, x.t())
 
 
 def binarize(T, nb_classes):
@@ -1224,32 +1744,16 @@ class TextModel(torch.nn.Module):
 
 import torch
 from torch.nn import MSELoss, ReLU
-from paritybench._paritybench_helpers import _mock_config, _mock_layer, _paritybench_base, _fails_compile
+from types import SimpleNamespace
 
 
 TESTCASES = [
-    # (nn.Module, init_args, forward_args, jit_compiles)
-    (Identity,
-     lambda: ([], {}),
-     lambda: ([torch.rand([4, 4, 4, 4])], {}),
-     True),
+    # (nn.Module, init_args, forward_args)
     (OriginalInstanceLoss,
      lambda: ([], {}),
-     lambda: ([torch.rand([4, 4])], {}),
-     True),
+     lambda: ([torch.rand([4, 4])], {})),
     (TextModel,
      lambda: ([], {}),
-     lambda: ([torch.rand([4, 4, 4, 4])], {}),
-     True),
+     lambda: ([torch.rand([4, 4, 4, 4])], {})),
 ]
-
-class Test_KevinMusgrave_pytorch_metric_learning(_paritybench_base):
-    def test_000(self):
-        self._check(*TESTCASES[0])
-
-    def test_001(self):
-        self._check(*TESTCASES[1])
-
-    def test_002(self):
-        self._check(*TESTCASES[2])
 

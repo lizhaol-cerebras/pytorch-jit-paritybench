@@ -4,6 +4,7 @@ del sys
 conf = _module
 onnx_sphinx = _module
 onnx = _module
+_custom_element_types = _module
 backend = _module
 base = _module
 sample = _module
@@ -19,11 +20,18 @@ shrink = _module
 sign = _module
 stringnormalizer = _module
 node = _module
+_image_decoder_data = _module
 acos = _module
 acosh = _module
 adagrad = _module
 adam = _module
 add = _module
+affinegrid = _module
+ai_onnx_ml = _module
+array_feature_extractor = _module
+binarizer = _module
+label_encoder = _module
+tree_ensemble = _module
 and = _module
 argmax = _module
 argmin = _module
@@ -57,6 +65,7 @@ convtranspose = _module
 cos = _module
 cosh = _module
 cumsum = _module
+deformconv = _module
 depthtospace = _module
 dequantizelinear = _module
 det = _module
@@ -75,6 +84,7 @@ floor = _module
 gather = _module
 gatherelements = _module
 gathernd = _module
+gelu = _module
 gemm = _module
 globalaveragepool = _module
 globalmaxpool = _module
@@ -89,6 +99,7 @@ hardmax = _module
 hardsigmoid = _module
 hardswish = _module
 identity = _module
+image_decoder = _module
 instancenorm = _module
 isinf = _module
 isnan = _module
@@ -99,6 +110,7 @@ less_equal = _module
 log = _module
 logsoftmax = _module
 loop = _module
+lppool = _module
 lrn = _module
 lstm = _module
 matmul = _module
@@ -124,7 +136,6 @@ optionalgetelement = _module
 optionalhaselement = _module
 or = _module
 pad = _module
-pool_op_common = _module
 pow = _module
 prelu = _module
 qlinearconv = _module
@@ -142,6 +153,7 @@ reducemin = _module
 reduceprod = _module
 reducesum = _module
 reducesumsquare = _module
+regex_full_match = _module
 relu = _module
 reshape = _module
 resize = _module
@@ -168,9 +180,12 @@ softplus = _module
 softsign = _module
 spacetodepth = _module
 split = _module
+splittosequence = _module
 sqrt = _module
 squeeze = _module
 stft = _module
+string_concat = _module
+string_split = _module
 sub = _module
 sum = _module
 tan = _module
@@ -206,12 +221,16 @@ frontend = _module
 gen_proto = _module
 helper = _module
 hub = _module
+inliner = _module
 mapping = _module
+model_container = _module
 numpy_helper = _module
 parser = _module
 printer = _module
 reference = _module
+custom_element_types = _module
 op_run = _module
+_helpers = _module
 _op = _module
 _op_common_indices = _module
 _op_common_pool = _module
@@ -223,6 +242,27 @@ _op_run_training = _module
 op_adagrad = _module
 op_adam = _module
 op_momentum = _module
+aionnxml = _module
+_common_classifier = _module
+_op_run_aionnxml = _module
+op_array_feature_extractor = _module
+op_binarizer = _module
+op_dict_vectorizer = _module
+op_feature_vectorizer = _module
+op_imputer = _module
+op_label_encoder = _module
+op_linear_classifier = _module
+op_linear_regressor = _module
+op_normalizer = _module
+op_one_hot_encoder = _module
+op_scaler = _module
+op_svm_classifier = _module
+op_svm_helper = _module
+op_svm_regressor = _module
+op_tree_ensemble = _module
+op_tree_ensemble_classifier = _module
+op_tree_ensemble_helper = _module
+op_tree_ensemble_regressor = _module
 experimental = _module
 _op_run_experimental = _module
 op_im2col = _module
@@ -230,6 +270,7 @@ op_abs = _module
 op_acos = _module
 op_acosh = _module
 op_add = _module
+op_affine_grid = _module
 op_and = _module
 op_argmax = _module
 op_argmin = _module
@@ -265,6 +306,7 @@ op_conv_transpose = _module
 op_cos = _module
 op_cosh = _module
 op_cum_sum = _module
+op_deform_conv = _module
 op_depth_to_space = _module
 op_dequantize_linear = _module
 op_det = _module
@@ -297,6 +339,7 @@ op_hard_sigmoid = _module
 op_hardmax = _module
 op_identity = _module
 op_if = _module
+op_image_decoder = _module
 op_instance_normalization = _module
 op_isinf = _module
 op_isnan = _module
@@ -308,6 +351,7 @@ op_log = _module
 op_log_softmax = _module
 op_loop = _module
 op_lp_normalization = _module
+op_lp_pool = _module
 op_lrn = _module
 op_lstm = _module
 op_matmul = _module
@@ -331,6 +375,7 @@ op_optional_get_element = _module
 op_optional_has_element = _module
 op_or = _module
 op_pad = _module
+op_pool_common = _module
 op_pow = _module
 op_prelu = _module
 op_qlinear_conv = _module
@@ -352,6 +397,7 @@ op_reduce_min = _module
 op_reduce_prod = _module
 op_reduce_sum = _module
 op_reduce_sum_square = _module
+op_regex_full_match = _module
 op_relu = _module
 op_reshape = _module
 op_resize = _module
@@ -388,7 +434,9 @@ op_split_to_sequence = _module
 op_sqrt = _module
 op_squeeze = _module
 op_stft = _module
+op_string_concat = _module
 op_string_normalizer = _module
+op_string_split = _module
 op_sub = _module
 op_sum = _module
 op_tan = _module
@@ -404,36 +452,53 @@ op_unsqueeze = _module
 op_upsample = _module
 op_where = _module
 op_xor = _module
+ops_optimized = _module
+op_conv_optimized = _module
 reference_evaluator = _module
+serialization = _module
 shape_inference = _module
-automatic_upgrade_test = _module
+subbyte = _module
 basic_test = _module
 checker_test = _module
 compose_test = _module
 data_propagation_test = _module
 elu_test = _module
+function_inference_test = _module
 function_test = _module
 helper_test = _module
 hub_test = _module
 inference_function_test = _module
+inliner_test = _module
+model_container_refeval_test = _module
+model_container_test = _module
+model_inference_test = _module
 numpy_helper_test = _module
 parser_test = _module
 printer_test = _module
-reference_evaluator_backend_test = _module
+reference_evaluator_ml_test = _module
+reference_evaluator_model_test = _module
 reference_evaluator_test = _module
 relu_test = _module
 schema_test = _module
+serialization_test = _module
 shape_inference_test = _module
 symbolic_shape_test = _module
+test_backend_onnxruntime = _module
+test_backend_reference = _module
 test_backend_test = _module
 test_external_data = _module
 test_with_ort = _module
 tools_test = _module
 training_tool_test = _module
 utils_test = _module
+automatic_conversion_test_base = _module
+automatic_downgrade_test = _module
+automatic_upgrade_test = _module
 version_converter_test = _module
+version_utils = _module
 tools = _module
 net_drawer = _module
+replace_constants = _module
 update_model_dims = _module
 version_converter = _module
 setup = _module
@@ -441,21 +506,14 @@ gen_coverage_report = _module
 config = _module
 test_model_zoo = _module
 
-from paritybench._paritybench_helpers import _mock_config, patch_functional
 from unittest.mock import mock_open, MagicMock
 from torch.autograd import Function
 from torch.nn import Module
 import abc, collections, copy, enum, functools, inspect, itertools, logging, math, matplotlib, numbers, numpy, pandas, queue, random, re, scipy, sklearn, string, tensorflow, time, torch, torchaudio, torchvision, types, typing, uuid, warnings
+import operator as op
+from dataclasses import dataclass
 import numpy as np
 from torch import Tensor
-patch_functional()
-open = mock_open()
-yaml = logging = sys = argparse = MagicMock()
-ArgumentParser = argparse.ArgumentParser
-_global_config = args = argv = cfg = config = params = _mock_config()
-argparse.ArgumentParser.return_value.parse_args.return_value = _global_config
-yaml.load.return_value = _global_config
-sys.argv = _global_config
 __version__ = '1.0.0'
 xrange = range
 wraps = functools.wraps
@@ -467,14 +525,20 @@ import warnings
 import numpy as np
 
 
+import itertools
+
+
+import math
+
+
+from typing import Sequence
+
+
 from functools import wraps
 
 
-from typing import Any
-
-
-from typing import List
-
-
 from numpy.testing import assert_allclose
+
+
+from numpy.testing import assert_almost_equal
 
