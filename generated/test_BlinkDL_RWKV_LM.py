@@ -1,61 +1,8 @@
-import sys
-_module = sys.modules[__name__]
-del sys
-src = _module
-model = _module
-trainer = _module
-utils = _module
-train = _module
-run = _module
-model = _module
-model_run = _module
-trainer = _module
-utils = _module
-train = _module
-run = _module
-model = _module
-model_run = _module
-trainer = _module
-utils = _module
-train = _module
-verify = _module
-run = _module
-binidx = _module
-model = _module
-model_run = _module
-trainer = _module
-utils = _module
-train = _module
-verify = _module
-chat = _module
-img_demoAE = _module
-run = _module
-run = _module
-binidx = _module
-dataset = _module
-model = _module
-model_img = _module
-model_run = _module
-trainer = _module
-utils = _module
-train = _module
-verify = _module
-make_data = _module
-rwkv_v6_demo = _module
-binidx = _module
-dataset = _module
-model = _module
-trainer = _module
-utils = _module
-tokenizer = _module
-rwkv_tokenizer = _module
-train = _module
-rwkv_v7_demo = _module
 
 from unittest.mock import mock_open, MagicMock
 from torch.autograd import Function
 from torch.nn import Module
-import abc, collections, copy, enum, functools, inspect, itertools, logging, math, matplotlib, numbers, numpy, pandas, queue, random, re, scipy, sklearn, string, tensorflow, time, torch, torchaudio, torchvision, types, typing, uuid, warnings
+import abc, collections, copy, enum, functools, inspect, itertools, logging, math, matplotlib, numbers, numpy, pandas, queue, random, re, scipy, sklearn, string, tensorflow, time, torch, torchvision, types, typing, uuid, warnings
 import operator as op
 from dataclasses import dataclass
 import numpy as np

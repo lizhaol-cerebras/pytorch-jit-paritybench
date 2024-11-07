@@ -1,47 +1,8 @@
-import sys
-_module = sys.modules[__name__]
-del sys
-conf = _module
-pix2tex = _module
-api = _module
-app = _module
-run = _module
-streamlit = _module
-cli = _module
-dataset = _module
-arxiv = _module
-dataset = _module
-demacro = _module
-extract_latex = _module
-latex2png = _module
-postprocess = _module
-preprocessing = _module
-generate_latex_vocab = _module
-preprocess_formulas = _module
-render = _module
-scraping = _module
-transforms = _module
-eval = _module
-gui = _module
-model = _module
-checkpoints = _module
-get_latest_checkpoint = _module
-models = _module
-hybrid = _module
-transformer = _module
-utils = _module
-vit = _module
-resources = _module
-setup_desktop = _module
-train = _module
-train_resizer = _module
-utils = _module
-setup = _module
 
 from unittest.mock import mock_open, MagicMock
 from torch.autograd import Function
 from torch.nn import Module
-import abc, collections, copy, enum, functools, inspect, itertools, logging, math, matplotlib, numbers, numpy, pandas, queue, random, re, scipy, sklearn, string, tensorflow, time, torch, torchaudio, torchvision, types, typing, uuid, warnings
+import abc, collections, copy, enum, functools, inspect, itertools, logging, math, matplotlib, numbers, numpy, pandas, queue, random, re, scipy, sklearn, string, tensorflow, time, torch, torchvision, types, typing, uuid, warnings
 import operator as op
 from dataclasses import dataclass
 import numpy as np

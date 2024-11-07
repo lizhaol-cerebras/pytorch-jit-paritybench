@@ -1,37 +1,8 @@
-import sys
-_module = sys.modules[__name__]
-del sys
-cog_predict = _module
-gfpgan = _module
-archs = _module
-arcface_arch = _module
-gfpgan_bilinear_arch = _module
-gfpganv1_arch = _module
-gfpganv1_clean_arch = _module
-restoreformer_arch = _module
-stylegan2_bilinear_arch = _module
-stylegan2_clean_arch = _module
-data = _module
-ffhq_degradation_dataset = _module
-models = _module
-gfpgan_model = _module
-train = _module
-utils = _module
-inference_gfpgan = _module
-convert_gfpganv_to_clean = _module
-parse_landmark = _module
-setup = _module
-test_arcface_arch = _module
-test_ffhq_degradation_dataset = _module
-test_gfpgan_arch = _module
-test_gfpgan_model = _module
-test_stylegan2_clean_arch = _module
-test_utils = _module
 
 from unittest.mock import mock_open, MagicMock
 from torch.autograd import Function
 from torch.nn import Module
-import abc, collections, copy, enum, functools, inspect, itertools, logging, math, matplotlib, numbers, numpy, pandas, queue, random, re, scipy, sklearn, string, tensorflow, time, torch, torchaudio, torchvision, types, typing, uuid, warnings
+import abc, collections, copy, enum, functools, inspect, itertools, logging, math, matplotlib, numbers, numpy, pandas, queue, random, re, scipy, sklearn, string, tensorflow, time, torch, torchvision, types, typing, uuid, warnings
 import operator as op
 from dataclasses import dataclass
 import numpy as np

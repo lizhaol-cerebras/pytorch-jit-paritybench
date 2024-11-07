@@ -1,51 +1,8 @@
-import sys
-_module = sys.modules[__name__]
-del sys
-clip_client = _module
-client = _module
-helper = _module
-setup = _module
-conf = _module
-benchmark = _module
-onnx_helper = _module
-clip_server = _module
-executors = _module
-clip_onnx = _module
-clip_tensorrt = _module
-clip_torch = _module
-helper = _module
-helper = _module
-model = _module
-clip = _module
-clip_model = _module
-clip_trt = _module
-cnclip_model = _module
-flash_attention = _module
-mclip_model = _module
-model = _module
-openclip_model = _module
-pretrained_models = _module
-simple_tokenizer = _module
-tokenization = _module
-trt_utils = _module
-setup = _module
-tests = _module
-conftest = _module
-test_asyncio = _module
-test_client = _module
-test_helper = _module
-test_model = _module
-test_ranker = _module
-test_search = _module
-test_server = _module
-test_simple = _module
-test_tensorrt = _module
-test_tokenization = _module
 
 from unittest.mock import mock_open, MagicMock
 from torch.autograd import Function
 from torch.nn import Module
-import abc, collections, copy, enum, functools, inspect, itertools, logging, math, matplotlib, numbers, numpy, pandas, queue, random, re, scipy, sklearn, string, tensorflow, time, torch, torchaudio, torchvision, types, typing, uuid, warnings
+import abc, collections, copy, enum, functools, inspect, itertools, logging, math, matplotlib, numbers, numpy, pandas, queue, random, re, scipy, sklearn, string, tensorflow, time, torch, torchvision, types, typing, uuid, warnings
 import operator as op
 from dataclasses import dataclass
 import numpy as np

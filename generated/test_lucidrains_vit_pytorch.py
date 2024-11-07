@@ -1,71 +1,8 @@
-import sys
-_module = sys.modules[__name__]
-del sys
-setup = _module
-test = _module
-vit_pytorch = _module
-ats_vit = _module
-cait = _module
-cct = _module
-cct_3d = _module
-cross_vit = _module
-crossformer = _module
-cvt = _module
-deepvit = _module
-dino = _module
-distill = _module
-efficient = _module
-es_vit = _module
-extractor = _module
-learnable_memory_vit = _module
-levit = _module
-local_vit = _module
-look_vit = _module
-mae = _module
-max_vit = _module
-max_vit_with_registers = _module
-mobile_vit = _module
-mp3 = _module
-mpp = _module
-na_vit = _module
-na_vit_nested_tensor = _module
-na_vit_nested_tensor_3d = _module
-nest = _module
-normalized_vit = _module
-parallel_vit = _module
-pit = _module
-recorder = _module
-regionvit = _module
-rvt = _module
-scalable_vit = _module
-sep_vit = _module
-simmim = _module
-simple_flash_attn_vit = _module
-simple_flash_attn_vit_3d = _module
-simple_uvit = _module
-simple_vit = _module
-simple_vit_1d = _module
-simple_vit_3d = _module
-simple_vit_with_fft = _module
-simple_vit_with_patch_dropout = _module
-simple_vit_with_qk_norm = _module
-simple_vit_with_register_tokens = _module
-simple_vit_with_value_residual = _module
-t2t = _module
-twins_svt = _module
-vit = _module
-vit_1d = _module
-vit_3d = _module
-vit_for_small_dataset = _module
-vit_with_patch_dropout = _module
-vit_with_patch_merger = _module
-vivit = _module
-xcit = _module
 
 from unittest.mock import mock_open, MagicMock
 from torch.autograd import Function
 from torch.nn import Module
-import abc, collections, copy, enum, functools, inspect, itertools, logging, math, matplotlib, numbers, numpy, pandas, queue, random, re, scipy, sklearn, string, tensorflow, time, torch, torchaudio, torchvision, types, typing, uuid, warnings
+import abc, collections, copy, enum, functools, inspect, itertools, logging, math, matplotlib, numbers, numpy, pandas, queue, random, re, scipy, sklearn, string, tensorflow, time, torch, torchvision, types, typing, uuid, warnings
 import operator as op
 from dataclasses import dataclass
 import numpy as np

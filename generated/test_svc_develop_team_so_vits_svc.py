@@ -1,132 +1,8 @@
-import sys
-_module = sys.modules[__name__]
-del sys
-cluster = _module
-kmeans = _module
-train_cluster = _module
-compress_model = _module
-data_utils = _module
-diffusion = _module
-data_loaders = _module
-diffusion = _module
-diffusion_onnx = _module
-dpm_solver_pytorch = _module
-infer_gt_mel = _module
-logger = _module
-saver = _module
-utils = _module
-onnx_export = _module
-solver = _module
-uni_pc = _module
-unit2mel = _module
-vocoder = _module
-wavenet = _module
-tts = _module
-tts_voices = _module
-export_index_for_onnx = _module
-flask_api = _module
-flask_api_full_song = _module
-inference = _module
-infer_tool = _module
-infer_tool_grad = _module
-slicer = _module
-inference_main = _module
-models = _module
-DSConv = _module
-CrepeF0Predictor = _module
-DioF0Predictor = _module
-F0Predictor = _module
-FCPEF0Predictor = _module
-HarvestF0Predictor = _module
-PMF0Predictor = _module
-RMVPEF0Predictor = _module
-crepe = _module
-fcpe = _module
-model = _module
-nvSTFT = _module
-pcmer = _module
-rmvpe = _module
-constants = _module
-deepunet = _module
-inference = _module
-model = _module
-seq = _module
-spec = _module
-utils = _module
-modules = _module
-attentions = _module
-commons = _module
-enhancer = _module
-losses = _module
-mel_processing = _module
-modules = _module
-onnx_export = _module
-onnx_export_old = _module
-model_onnx = _module
-model_onnx_speaker_mix = _module
-preprocess_flist_config = _module
-preprocess_hubert_f0 = _module
-pretrain = _module
-meta = _module
-resample = _module
-spkmix = _module
-train = _module
-train_diff = _module
-train_index = _module
-utils = _module
-vdecoder = _module
-env = _module
-models = _module
-nvSTFT = _module
-utils = _module
-alias = _module
-act = _module
-filter = _module
-resample = _module
-models = _module
-nvSTFT = _module
-utils = _module
-models = _module
-nvSTFT = _module
-utils = _module
-CNHubertLarge = _module
-ContentVec256L12_Onnx = _module
-ContentVec256L9 = _module
-ContentVec256L9_Onnx = _module
-ContentVec768L12 = _module
-ContentVec768L12_Onnx = _module
-ContentVec768L9_Onnx = _module
-DPHubert = _module
-HubertSoft = _module
-HubertSoft_Onnx = _module
-WavLMBasePlus = _module
-WhisperPPG = _module
-WhisperPPGLarge = _module
-vencoder = _module
-dphubert = _module
-components = _module
-hardconcrete = _module
-model = _module
-pruning_utils = _module
-import_huggingface_wavlm = _module
-encoder = _module
-hubert = _module
-hubert_model = _module
-hubert_model_onnx = _module
-WavLM = _module
-modules = _module
-whisper = _module
-audio = _module
-decoding = _module
-model = _module
-tokenizer = _module
-wav_upload = _module
-webUI = _module
 
 from unittest.mock import mock_open, MagicMock
 from torch.autograd import Function
 from torch.nn import Module
-import abc, collections, copy, enum, functools, inspect, itertools, logging, math, matplotlib, numbers, numpy, pandas, queue, random, re, scipy, sklearn, string, tensorflow, time, torch, torchaudio, torchvision, types, typing, uuid, warnings
+import abc, collections, copy, enum, functools, inspect, itertools, logging, math, matplotlib, numbers, numpy, pandas, queue, random, re, scipy, sklearn, string, tensorflow, time, torch, torchvision, types, typing, uuid, warnings
 import operator as op
 from dataclasses import dataclass
 import numpy as np
@@ -211,13 +87,7 @@ from torch import autocast
 from torch.cuda.amp import GradScaler
 
 
-from torchaudio.transforms import Resample
-
-
 from math import sqrt
-
-
-import torchaudio
 
 
 from torch.nn import Conv2d

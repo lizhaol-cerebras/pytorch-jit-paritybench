@@ -1,66 +1,8 @@
-import sys
-_module = sys.modules[__name__]
-del sys
-avg_spectra = _module
-calc_metrics = _module
-dataset_tool = _module
-dnnlib = _module
-util = _module
-gen_images = _module
-gen_video = _module
-gui_utils = _module
-gl_utils = _module
-glfw_window = _module
-imgui_utils = _module
-imgui_window = _module
-text_utils = _module
-legacy = _module
-metrics = _module
-equivariance = _module
-frechet_inception_distance = _module
-inception_score = _module
-kernel_inception_distance = _module
-metric_main = _module
-metric_utils = _module
-perceptual_path_length = _module
-precision_recall = _module
-torch_utils = _module
-custom_ops = _module
-misc = _module
-ops = _module
-bias_act = _module
-conv2d_gradfix = _module
-conv2d_resample = _module
-filtered_lrelu = _module
-fma = _module
-grid_sample_gradfix = _module
-upfirdn2d = _module
-persistence = _module
-training_stats = _module
-train = _module
-training = _module
-augment = _module
-dataset = _module
-loss = _module
-networks_stylegan2 = _module
-networks_stylegan3 = _module
-training_loop = _module
-visualizer = _module
-viz = _module
-capture_widget = _module
-equivariance_widget = _module
-latent_widget = _module
-layer_widget = _module
-performance_widget = _module
-pickle_widget = _module
-renderer = _module
-stylemix_widget = _module
-trunc_noise_widget = _module
 
 from unittest.mock import mock_open, MagicMock
 from torch.autograd import Function
 from torch.nn import Module
-import abc, collections, copy, enum, functools, inspect, itertools, logging, math, matplotlib, numbers, numpy, pandas, queue, random, re, scipy, sklearn, string, tensorflow, time, torch, torchaudio, torchvision, types, typing, uuid, warnings
+import abc, collections, copy, enum, functools, inspect, itertools, logging, math, matplotlib, numbers, numpy, pandas, queue, random, re, scipy, sklearn, string, tensorflow, time, torch, torchvision, types, typing, uuid, warnings
 import operator as op
 from dataclasses import dataclass
 import numpy as np

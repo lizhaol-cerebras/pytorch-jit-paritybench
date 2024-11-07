@@ -1,80 +1,8 @@
-import sys
-_module = sys.modules[__name__]
-del sys
-_init_paths = _module
-demo = _module
-datasets = _module
-coco = _module
-ds_utils = _module
-factory = _module
-imagenet = _module
-imdb = _module
-pascal_voc = _module
-pascal_voc_rbg = _module
-mcg_munge = _module
-vg = _module
-vg_eval = _module
-voc_eval = _module
-model = _module
-faster_rcnn = _module
-faster_rcnn = _module
-resnet = _module
-vgg16 = _module
-nms = _module
-_ext = _module
-nms = _module
-build = _module
-nms_cpu = _module
-nms_gpu = _module
-nms_wrapper = _module
-roi_align = _module
-roi_align = _module
-build = _module
-functions = _module
-roi_align = _module
-modules = _module
-roi_align = _module
-roi_crop = _module
-crop_resize = _module
-roi_crop = _module
-build = _module
-crop_resize = _module
-gridgen = _module
-roi_crop = _module
-gridgen = _module
-roi_crop = _module
-roi_pooling = _module
-roi_pooling = _module
-build = _module
-roi_pool = _module
-roi_pool = _module
-rpn = _module
-anchor_target_layer = _module
-bbox_transform = _module
-generate_anchors = _module
-proposal_layer = _module
-proposal_target_layer_cascade = _module
-rpn = _module
-utils = _module
-blob = _module
-config = _module
-logger = _module
-net_utils = _module
-pycocotools = _module
-cocoeval = _module
-mask = _module
-roi_data_layer = _module
-minibatch = _module
-roibatchLoader = _module
-roidb = _module
-setup = _module
-test_net = _module
-trainval_net = _module
 
 from unittest.mock import mock_open, MagicMock
 from torch.autograd import Function
 from torch.nn import Module
-import abc, collections, copy, enum, functools, inspect, itertools, logging, math, matplotlib, numbers, numpy, pandas, queue, random, re, scipy, sklearn, string, tensorflow, time, torch, torchaudio, torchvision, types, typing, uuid, warnings
+import abc, collections, copy, enum, functools, inspect, itertools, logging, math, matplotlib, numbers, numpy, pandas, queue, random, re, scipy, sklearn, string, tensorflow, time, torch, torchvision, types, typing, uuid, warnings
 import operator as op
 from dataclasses import dataclass
 import numpy as np

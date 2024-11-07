@@ -1,37 +1,8 @@
-import sys
-_module = sys.modules[__name__]
-del sys
-bert_pytorch = _module
-dataset = _module
-dataset = _module
-vocab = _module
-model = _module
-attention = _module
-multi_head = _module
-single = _module
-bert = _module
-embedding = _module
-bert = _module
-position = _module
-segment = _module
-token = _module
-language_model = _module
-transformer = _module
-utils = _module
-feed_forward = _module
-gelu = _module
-layer_norm = _module
-sublayer = _module
-trainer = _module
-optim_schedule = _module
-pretrain = _module
-setup = _module
-test = _module
 
 from unittest.mock import mock_open, MagicMock
 from torch.autograd import Function
 from torch.nn import Module
-import abc, collections, copy, enum, functools, inspect, itertools, logging, math, matplotlib, numbers, numpy, pandas, queue, random, re, scipy, sklearn, string, tensorflow, time, torch, torchaudio, torchvision, types, typing, uuid, warnings
+import abc, collections, copy, enum, functools, inspect, itertools, logging, math, matplotlib, numbers, numpy, pandas, queue, random, re, scipy, sklearn, string, tensorflow, time, torch, torchvision, types, typing, uuid, warnings
 import operator as op
 from dataclasses import dataclass
 import numpy as np

@@ -1,53 +1,8 @@
-import sys
-_module = sys.modules[__name__]
-del sys
-open_clip = _module
-coca_model = _module
-constants = _module
-convert = _module
-factory = _module
-hf_configs = _module
-hf_model = _module
-loss = _module
-model = _module
-modified_resnet = _module
-openai = _module
-pos_embed = _module
-pretrained = _module
-push_to_hf_hub = _module
-timm_model = _module
-tokenizer = _module
-transform = _module
-transformer = _module
-utils = _module
-version = _module
-zero_shot_classifier = _module
-zero_shot_metadata = _module
-open_clip_train = _module
-data = _module
-distributed = _module
-file_utils = _module
-logger = _module
-main = _module
-params = _module
-precision = _module
-profiler = _module
-scheduler = _module
-train = _module
-zero_shot = _module
-test_download_pretrained = _module
-test_hf_model = _module
-test_inference = _module
-test_inference_simple = _module
-test_num_shards = _module
-test_training_simple = _module
-test_wds = _module
-util_test = _module
 
 from unittest.mock import mock_open, MagicMock
 from torch.autograd import Function
 from torch.nn import Module
-import abc, collections, copy, enum, functools, inspect, itertools, logging, math, matplotlib, numbers, numpy, pandas, queue, random, re, scipy, sklearn, string, tensorflow, time, torch, torchaudio, torchvision, types, typing, uuid, warnings
+import abc, collections, copy, enum, functools, inspect, itertools, logging, math, matplotlib, numbers, numpy, pandas, queue, random, re, scipy, sklearn, string, tensorflow, time, torch, torchvision, types, typing, uuid, warnings
 import operator as op
 from dataclasses import dataclass
 import numpy as np

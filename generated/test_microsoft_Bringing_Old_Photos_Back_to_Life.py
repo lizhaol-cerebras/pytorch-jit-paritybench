@@ -1,68 +1,8 @@
-import sys
-_module = sys.modules[__name__]
-del sys
-align_warp_back_multiple_dlib = _module
-align_warp_back_multiple_dlib_HR = _module
-detect_all_dlib = _module
-detect_all_dlib_HR = _module
-data = _module
-base_dataset = _module
-custom_dataset = _module
-face_dataset = _module
-image_folder = _module
-pix2pix_dataset = _module
-models = _module
-networks = _module
-architecture = _module
-base_network = _module
-encoder = _module
-generator = _module
-normalization = _module
-pix2pix_model = _module
-options = _module
-base_options = _module
-test_options = _module
-test_face = _module
-util = _module
-iter_counter = _module
-util = _module
-visualizer = _module
-GUI = _module
-Create_Bigfile = _module
-Load_Bigfile = _module
-base_data_loader = _module
-base_dataset = _module
-custom_dataset_data_loader = _module
-data_loader = _module
-image_folder = _module
-online_dataset_for_old_photos = _module
-detection = _module
-detection_models = _module
-antialiasing = _module
-networks = _module
-util = _module
-NonLocal_feature_mapping_model = _module
-base_model = _module
-mapping_model = _module
-models = _module
-networks = _module
-pix2pixHD_model = _module
-pix2pixHD_model_DA = _module
-base_options = _module
-train_options = _module
-test = _module
-train_domain_A = _module
-train_domain_B = _module
-train_mapping = _module
-image_pool = _module
-util = _module
-predict = _module
-run = _module
 
 from unittest.mock import mock_open, MagicMock
 from torch.autograd import Function
 from torch.nn import Module
-import abc, collections, copy, enum, functools, inspect, itertools, logging, math, matplotlib, numbers, numpy, pandas, queue, random, re, scipy, sklearn, string, tensorflow, time, torch, torchaudio, torchvision, types, typing, uuid, warnings
+import abc, collections, copy, enum, functools, inspect, itertools, logging, math, matplotlib, numbers, numpy, pandas, queue, random, re, scipy, sklearn, string, tensorflow, time, torch, torchvision, types, typing, uuid, warnings
 import operator as op
 from dataclasses import dataclass
 import numpy as np

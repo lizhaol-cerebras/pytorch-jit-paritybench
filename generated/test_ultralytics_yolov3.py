@@ -1,59 +1,8 @@
-import sys
-_module = sys.modules[__name__]
-del sys
-benchmarks = _module
-predict = _module
-train = _module
-val = _module
-detect = _module
-export = _module
-hubconf = _module
-models = _module
-common = _module
-experimental = _module
-tf = _module
-yolo = _module
-predict = _module
-train = _module
-val = _module
-train = _module
-utils = _module
-activations = _module
-augmentations = _module
-autoanchor = _module
-autobatch = _module
-aws = _module
-resume = _module
-callbacks = _module
-dataloaders = _module
-downloads = _module
-example_request = _module
-restapi = _module
-general = _module
-loggers = _module
-clearml = _module
-clearml_utils = _module
-hpo = _module
-comet = _module
-comet_utils = _module
-wandb = _module
-wandb_utils = _module
-loss = _module
-metrics = _module
-plots = _module
-segment = _module
-dataloaders = _module
-general = _module
-loss = _module
-plots = _module
-torch_utils = _module
-triton = _module
-val = _module
 
 from unittest.mock import mock_open, MagicMock
 from torch.autograd import Function
 from torch.nn import Module
-import abc, collections, copy, enum, functools, inspect, itertools, logging, math, matplotlib, numbers, numpy, pandas, queue, random, re, scipy, sklearn, string, tensorflow, time, torch, torchaudio, torchvision, types, typing, uuid, warnings
+import abc, collections, copy, enum, functools, inspect, itertools, logging, math, matplotlib, numbers, numpy, pandas, queue, random, re, scipy, sklearn, string, tensorflow, time, torch, torchvision, types, typing, uuid, warnings
 import operator as op
 from dataclasses import dataclass
 import numpy as np

@@ -1,60 +1,8 @@
-import sys
-_module = sys.modules[__name__]
-del sys
-dataset = _module
-experiment = _module
-models = _module
-base = _module
-beta_vae = _module
-betatc_vae = _module
-cat_vae = _module
-cvae = _module
-dfcvae = _module
-dip_vae = _module
-fvae = _module
-gamma_vae = _module
-hvae = _module
-info_vae = _module
-iwae = _module
-joint_vae = _module
-logcosh_vae = _module
-lvae = _module
-miwae = _module
-mssim_vae = _module
-swae = _module
-twostage_vae = _module
-types_ = _module
-vampvae = _module
-vanilla_vae = _module
-vq_vae = _module
-wae_mmd = _module
-run = _module
-bvae = _module
-test_betatcvae = _module
-test_cat_vae = _module
-test_dfc = _module
-test_dipvae = _module
-test_fvae = _module
-test_gvae = _module
-test_hvae = _module
-test_iwae = _module
-test_joint_Vae = _module
-test_logcosh = _module
-test_lvae = _module
-test_miwae = _module
-test_mssimvae = _module
-test_swae = _module
-test_vae = _module
-test_vq_vae = _module
-test_wae = _module
-text_cvae = _module
-text_vamp = _module
-utils = _module
 
 from unittest.mock import mock_open, MagicMock
 from torch.autograd import Function
 from torch.nn import Module
-import abc, collections, copy, enum, functools, inspect, itertools, logging, math, matplotlib, numbers, numpy, pandas, queue, random, re, scipy, sklearn, string, tensorflow, time, torch, torchaudio, torchvision, types, typing, uuid, warnings
+import abc, collections, copy, enum, functools, inspect, itertools, logging, math, matplotlib, numbers, numpy, pandas, queue, random, re, scipy, sklearn, string, tensorflow, time, torch, torchvision, types, typing, uuid, warnings
 import operator as op
 from dataclasses import dataclass
 import numpy as np

@@ -1,45 +1,8 @@
-import sys
-_module = sys.modules[__name__]
-del sys
-imagenet_eval = _module
-imagenet_logits = _module
-visu_arch = _module
-voc2007_extract = _module
-pretrainedmodels = _module
-datasets = _module
-utils = _module
-voc = _module
-models = _module
-bninception = _module
-cafferesnet = _module
-dpn = _module
-fbresnet = _module
-resnet152_load = _module
-inceptionresnetv2 = _module
-inceptionv4 = _module
-nasnet = _module
-nasnet_mobile = _module
-pnasnet = _module
-polynet = _module
-resnext = _module
-resnext_features = _module
-resnext101_32x4d_features = _module
-resnext101_64x4d_features = _module
-senet = _module
-torchvision_models = _module
-vggm = _module
-wideresnet = _module
-xception = _module
-utils = _module
-version = _module
-setup = _module
-test_pm_imagenet = _module
-test_torch_save = _module
 
 from unittest.mock import mock_open, MagicMock
 from torch.autograd import Function
 from torch.nn import Module
-import abc, collections, copy, enum, functools, inspect, itertools, logging, math, matplotlib, numbers, numpy, pandas, queue, random, re, scipy, sklearn, string, tensorflow, time, torch, torchaudio, torchvision, types, typing, uuid, warnings
+import abc, collections, copy, enum, functools, inspect, itertools, logging, math, matplotlib, numbers, numpy, pandas, queue, random, re, scipy, sklearn, string, tensorflow, time, torch, torchvision, types, typing, uuid, warnings
 import operator as op
 from dataclasses import dataclass
 import numpy as np

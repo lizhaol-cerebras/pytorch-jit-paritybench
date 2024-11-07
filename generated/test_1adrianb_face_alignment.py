@@ -1,36 +1,8 @@
-import sys
-_module = sys.modules[__name__]
-del sys
-detect_landmarks_in_image = _module
-face_alignment = _module
-api = _module
-detection = _module
-blazeface = _module
-blazeface_detector = _module
-detect = _module
-net_blazeface = _module
-utils = _module
-core = _module
-dlib = _module
-dlib_detector = _module
-folder = _module
-folder_detector = _module
-sfd = _module
-bbox = _module
-detect = _module
-net_s3fd = _module
-sfd_detector = _module
-folder_data = _module
-utils = _module
-setup = _module
-facealignment_test = _module
-smoke_test = _module
-test_utils = _module
 
 from unittest.mock import mock_open, MagicMock
 from torch.autograd import Function
 from torch.nn import Module
-import abc, collections, copy, enum, functools, inspect, itertools, logging, math, matplotlib, numbers, numpy, pandas, queue, random, re, scipy, sklearn, string, tensorflow, time, torch, torchaudio, torchvision, types, typing, uuid, warnings
+import abc, collections, copy, enum, functools, inspect, itertools, logging, math, matplotlib, numbers, numpy, pandas, queue, random, re, scipy, sklearn, string, tensorflow, time, torch, torchvision, types, typing, uuid, warnings
 import operator as op
 from dataclasses import dataclass
 import numpy as np

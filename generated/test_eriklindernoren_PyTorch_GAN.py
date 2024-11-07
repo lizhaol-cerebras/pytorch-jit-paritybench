@@ -1,71 +1,8 @@
-import sys
-_module = sys.modules[__name__]
-del sys
-aae = _module
-acgan = _module
-began = _module
-bgan = _module
-bicyclegan = _module
-datasets = _module
-models = _module
-ccgan = _module
-datasets = _module
-models = _module
-cgan = _module
-clustergan = _module
-cogan = _module
-mnistm = _module
-context_encoder = _module
-datasets = _module
-models = _module
-cyclegan = _module
-datasets = _module
-models = _module
-utils = _module
-dcgan = _module
-datasets = _module
-discogan = _module
-models = _module
-dragan = _module
-datasets = _module
-dualgan = _module
-models = _module
-ebgan = _module
-datasets = _module
-esrgan = _module
-models = _module
-test_on_image = _module
-gan = _module
-infogan = _module
-lsgan = _module
-datasets = _module
-models = _module
-munit = _module
-datasets = _module
-models = _module
-pix2pix = _module
-mnistm = _module
-pixelda = _module
-relativistic_gan = _module
-sgan = _module
-softmax_gan = _module
-datasets = _module
-models = _module
-srgan = _module
-datasets = _module
-models = _module
-stargan = _module
-datasets = _module
-models = _module
-unit = _module
-wgan = _module
-wgan_div = _module
-wgan_gp = _module
 
 from unittest.mock import mock_open, MagicMock
 from torch.autograd import Function
 from torch.nn import Module
-import abc, collections, copy, enum, functools, inspect, itertools, logging, math, matplotlib, numbers, numpy, pandas, queue, random, re, scipy, sklearn, string, tensorflow, time, torch, torchaudio, torchvision, types, typing, uuid, warnings
+import abc, collections, copy, enum, functools, inspect, itertools, logging, math, matplotlib, numbers, numpy, pandas, queue, random, re, scipy, sklearn, string, tensorflow, time, torch, torchvision, types, typing, uuid, warnings
 import operator as op
 from dataclasses import dataclass
 import numpy as np

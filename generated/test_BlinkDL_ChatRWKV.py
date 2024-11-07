@@ -1,33 +1,8 @@
-import sys
-_module = sys.modules[__name__]
-del sys
-API_DEMO = _module
-API_DEMO_CHAT = _module
-API_DEMO_WORLD = _module
-RWKV_in_150_lines = _module
-RWKV_v5_demo = _module
-RWKV_v6_demo = _module
-RWKV_v6_demo_cuda_bf16 = _module
-chat = _module
-run = _module
-run_lm_eval = _module
-rwkv = _module
-model = _module
-rwkv_tokenizer = _module
-utils = _module
-rwkv_state_merger = _module
-model_run = _module
-utils = _module
-benchmark = _module
-benchmark_more = _module
-benchmark_world = _module
-chat = _module
-convert_model = _module
 
 from unittest.mock import mock_open, MagicMock
 from torch.autograd import Function
 from torch.nn import Module
-import abc, collections, copy, enum, functools, inspect, itertools, logging, math, matplotlib, numbers, numpy, pandas, queue, random, re, scipy, sklearn, string, tensorflow, time, torch, torchaudio, torchvision, types, typing, uuid, warnings
+import abc, collections, copy, enum, functools, inspect, itertools, logging, math, matplotlib, numbers, numpy, pandas, queue, random, re, scipy, sklearn, string, tensorflow, time, torch, torchvision, types, typing, uuid, warnings
 import operator as op
 from dataclasses import dataclass
 import numpy as np

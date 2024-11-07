@@ -1,41 +1,8 @@
-import sys
-_module = sys.modules[__name__]
-del sys
-utils = _module
-einops = _module
-_backends = _module
-_torch_specific = _module
-array_api = _module
-einops = _module
-experimental = _module
-indexing = _module
-layers = _module
-_einmix = _module
-flax = _module
-keras = _module
-oneflow = _module
-paddle = _module
-tensorflow = _module
-packing = _module
-parsing = _module
-tests = _module
-run_tests = _module
-test_einsum = _module
-test_examples = _module
-test_layers = _module
-test_ops = _module
-test_other = _module
-test_packing = _module
-test_parsing = _module
-convert_readme = _module
-converter = _module
-setup = _module
-test_notebooks = _module
 
 from unittest.mock import mock_open, MagicMock
 from torch.autograd import Function
 from torch.nn import Module
-import abc, collections, copy, enum, functools, inspect, itertools, logging, math, matplotlib, numbers, numpy, pandas, queue, random, re, scipy, sklearn, string, tensorflow, time, torch, torchaudio, torchvision, types, typing, uuid, warnings
+import abc, collections, copy, enum, functools, inspect, itertools, logging, math, matplotlib, numbers, numpy, pandas, queue, random, re, scipy, sklearn, string, tensorflow, time, torch, torchvision, types, typing, uuid, warnings
 import operator as op
 from dataclasses import dataclass
 import numpy as np

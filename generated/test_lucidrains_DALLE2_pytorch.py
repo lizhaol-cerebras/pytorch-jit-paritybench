@@ -1,30 +1,8 @@
-import sys
-_module = sys.modules[__name__]
-del sys
-dalle2_pytorch = _module
-cli = _module
-dalle2_pytorch = _module
-dataloaders = _module
-decoder_loader = _module
-prior_loader = _module
-simple_image_only_dataloader = _module
-optimizer = _module
-tokenizer = _module
-trackers = _module
-train_configs = _module
-trainer = _module
-utils = _module
-version = _module
-vqgan_vae = _module
-vqgan_vae_trainer = _module
-setup = _module
-train_decoder = _module
-train_diffusion_prior = _module
 
 from unittest.mock import mock_open, MagicMock
 from torch.autograd import Function
 from torch.nn import Module
-import abc, collections, copy, enum, functools, inspect, itertools, logging, math, matplotlib, numbers, numpy, pandas, queue, random, re, scipy, sklearn, string, tensorflow, time, torch, torchaudio, torchvision, types, typing, uuid, warnings
+import abc, collections, copy, enum, functools, inspect, itertools, logging, math, matplotlib, numbers, numpy, pandas, queue, random, re, scipy, sklearn, string, tensorflow, time, torch, torchvision, types, typing, uuid, warnings
 import operator as op
 from dataclasses import dataclass
 import numpy as np

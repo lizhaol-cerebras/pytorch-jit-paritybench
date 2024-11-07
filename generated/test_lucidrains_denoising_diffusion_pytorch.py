@@ -1,30 +1,8 @@
-import sys
-_module = sys.modules[__name__]
-del sys
-denoising_diffusion_pytorch = _module
-attend = _module
-classifier_free_guidance = _module
-continuous_time_gaussian_diffusion = _module
-denoising_diffusion_pytorch = _module
-denoising_diffusion_pytorch_1d = _module
-elucidated_diffusion = _module
-fid_evaluation = _module
-guided_diffusion = _module
-karras_unet = _module
-karras_unet_1d = _module
-karras_unet_3d = _module
-learned_gaussian_diffusion = _module
-repaint = _module
-simple_diffusion = _module
-v_param_continuous_time_gaussian_diffusion = _module
-version = _module
-weighted_objective_gaussian_diffusion = _module
-setup = _module
 
 from unittest.mock import mock_open, MagicMock
 from torch.autograd import Function
 from torch.nn import Module
-import abc, collections, copy, enum, functools, inspect, itertools, logging, math, matplotlib, numbers, numpy, pandas, queue, random, re, scipy, sklearn, string, tensorflow, time, torch, torchaudio, torchvision, types, typing, uuid, warnings
+import abc, collections, copy, enum, functools, inspect, itertools, logging, math, matplotlib, numbers, numpy, pandas, queue, random, re, scipy, sklearn, string, tensorflow, time, torch, torchvision, types, typing, uuid, warnings
 import operator as op
 from dataclasses import dataclass
 import numpy as np

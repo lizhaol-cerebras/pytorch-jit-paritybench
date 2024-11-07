@@ -1,25 +1,8 @@
-import sys
-_module = sys.modules[__name__]
-del sys
-imagen_pytorch = _module
-cli = _module
-configs = _module
-data = _module
-elucidated_imagen = _module
-imagen_pytorch = _module
-imagen_video = _module
-t5 = _module
-test = _module
-test_trainer = _module
-trainer = _module
-utils = _module
-version = _module
-setup = _module
 
 from unittest.mock import mock_open, MagicMock
 from torch.autograd import Function
 from torch.nn import Module
-import abc, collections, copy, enum, functools, inspect, itertools, logging, math, matplotlib, numbers, numpy, pandas, queue, random, re, scipy, sklearn, string, tensorflow, time, torch, torchaudio, torchvision, types, typing, uuid, warnings
+import abc, collections, copy, enum, functools, inspect, itertools, logging, math, matplotlib, numbers, numpy, pandas, queue, random, re, scipy, sklearn, string, tensorflow, time, torch, torchvision, types, typing, uuid, warnings
 import operator as op
 from dataclasses import dataclass
 import numpy as np

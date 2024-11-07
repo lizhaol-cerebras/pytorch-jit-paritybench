@@ -1,21 +1,8 @@
-import sys
-_module = sys.modules[__name__]
-del sys
-palm_rlhf_pytorch = _module
-attention = _module
-lora = _module
-optimizer = _module
-palm = _module
-ppo = _module
-reward = _module
-utils = _module
-setup = _module
-train = _module
 
 from unittest.mock import mock_open, MagicMock
 from torch.autograd import Function
 from torch.nn import Module
-import abc, collections, copy, enum, functools, inspect, itertools, logging, math, matplotlib, numbers, numpy, pandas, queue, random, re, scipy, sklearn, string, tensorflow, time, torch, torchaudio, torchvision, types, typing, uuid, warnings
+import abc, collections, copy, enum, functools, inspect, itertools, logging, math, matplotlib, numbers, numpy, pandas, queue, random, re, scipy, sklearn, string, tensorflow, time, torch, torchvision, types, typing, uuid, warnings
 import operator as op
 from dataclasses import dataclass
 import numpy as np

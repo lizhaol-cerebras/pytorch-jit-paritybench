@@ -1,23 +1,8 @@
-import sys
-_module = sys.modules[__name__]
-del sys
-eval_copy_detection = _module
-eval_image_retrieval = _module
-eval_knn = _module
-eval_linear = _module
-eval_video_segmentation = _module
-hubconf = _module
-main_dino = _module
-run_with_submitit = _module
-utils = _module
-video_generation = _module
-vision_transformer = _module
-visualize_attention = _module
 
 from unittest.mock import mock_open, MagicMock
 from torch.autograd import Function
 from torch.nn import Module
-import abc, collections, copy, enum, functools, inspect, itertools, logging, math, matplotlib, numbers, numpy, pandas, queue, random, re, scipy, sklearn, string, tensorflow, time, torch, torchaudio, torchvision, types, typing, uuid, warnings
+import abc, collections, copy, enum, functools, inspect, itertools, logging, math, matplotlib, numbers, numpy, pandas, queue, random, re, scipy, sklearn, string, tensorflow, time, torch, torchvision, types, typing, uuid, warnings
 import operator as op
 from dataclasses import dataclass
 import numpy as np

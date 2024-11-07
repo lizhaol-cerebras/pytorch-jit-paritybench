@@ -1,203 +1,8 @@
-import sys
-_module = sys.modules[__name__]
-del sys
-update = _module
-api_server = _module
-routes = _module
-internal = _module
-internal_routes = _module
-services = _module
-file_service = _module
-file_operations = _module
-app = _module
-app_settings = _module
-frontend_management = _module
-logger = _module
-user_manager = _module
-checkpoint_pickle = _module
-cldm = _module
-control_types = _module
-mmdit = _module
-cli_args = _module
-clip_model = _module
-clip_vision = _module
-comfy_types = _module
-conds = _module
-controlnet = _module
-diffusers_convert = _module
-diffusers_load = _module
-uni_pc = _module
-float = _module
-gligen = _module
-deis = _module
-sampling = _module
-utils = _module
-latent_formats = _module
-autoencoder = _module
-dit = _module
-embedders = _module
-mmdit = _module
-common = _module
-controlnet = _module
-stage_a = _module
-stage_b = _module
-stage_c = _module
-stage_c_coder = _module
-common_dit = _module
-controlnet = _module
-layers = _module
-math = _module
-model = _module
-asymm_models_joint = _module
-layers = _module
-rope_mixed = _module
-temporal_rope = _module
-utils = _module
-model = _module
-attn_layers = _module
-controlnet = _module
-models = _module
-poolers = _module
-posemb_layers = _module
-autoencoder = _module
-attention = _module
-diffusionmodules = _module
-mmdit = _module
-model = _module
-openaimodel = _module
-upscaling = _module
-util = _module
-distributions = _module
-distributions = _module
-ema = _module
-encoders = _module
-noise_aug_modules = _module
-sub_quadratic_attention = _module
-temporal_ae = _module
-util = _module
-lora = _module
-model_base = _module
-model_detection = _module
-model_management = _module
-model_patcher = _module
-model_sampling = _module
-ops = _module
-options = _module
-sample = _module
-sampler_helpers = _module
-samplers = _module
-sd = _module
-sd1_clip = _module
-sdxl_clip = _module
-supported_models = _module
-supported_models_base = _module
-adapter = _module
-taesd = _module
-aura_t5 = _module
-bert = _module
-flux = _module
-genmo = _module
-hydit = _module
-long_clipl = _module
-sa_t5 = _module
-sd2_clip = _module
-sd3_clip = _module
-spiece_tokenizer = _module
-t5 = _module
-utils = _module
-caching = _module
-graph = _module
-graph_utils = _module
-model_loading = _module
-nodes_advanced_samplers = _module
-nodes_align_your_steps = _module
-nodes_attention_multiply = _module
-nodes_audio = _module
-nodes_canny = _module
-nodes_clip_sdxl = _module
-nodes_compositing = _module
-nodes_cond = _module
-nodes_controlnet = _module
-nodes_custom_sampler = _module
-nodes_differential_diffusion = _module
-nodes_flux = _module
-nodes_freelunch = _module
-nodes_gits = _module
-nodes_hunyuan = _module
-nodes_hypernetwork = _module
-nodes_hypertile = _module
-nodes_images = _module
-nodes_ip2p = _module
-nodes_latent = _module
-nodes_lora_extract = _module
-nodes_mask = _module
-nodes_mochi = _module
-nodes_model_advanced = _module
-nodes_model_downscale = _module
-nodes_model_merging = _module
-nodes_model_merging_model_specific = _module
-nodes_morphology = _module
-nodes_pag = _module
-nodes_perpneg = _module
-nodes_photomaker = _module
-nodes_post_processing = _module
-nodes_rebatch = _module
-nodes_sag = _module
-nodes_sd3 = _module
-nodes_sdupscale = _module
-nodes_stable3d = _module
-nodes_stable_cascade = _module
-nodes_tomesd = _module
-nodes_torch_compile = _module
-nodes_upscale_model = _module
-nodes_video_model = _module
-nodes_webcam = _module
-cuda_malloc = _module
-websocket_image_save = _module
-execution = _module
-fix_torch = _module
-folder_paths = _module
-latent_preview = _module
-main = _module
-model_filemanager = _module
-download_models = _module
-new_updater = _module
-node_helpers = _module
-nodes = _module
-basic_api_example = _module
-websockets_api_example = _module
-websockets_api_example_ws_images = _module
-server = _module
-app_test = _module
-frontend_manager_test = _module
-folder_path_test = _module
-folder_paths_test = _module
-filter_by_content_types_test = _module
-prompt_server_test = _module
-download_models_test = _module
-user_manager_test = _module
-internal_routes_test = _module
-file_service_test = _module
-file_operations_test = _module
-extra_config_test = _module
-tests = _module
-conftest = _module
-test_quality = _module
-inference = _module
-test_execution = _module
-test_inference = _module
-pack = _module
-conditions = _module
-flow_control = _module
-specific_tests = _module
-stubs = _module
-tools = _module
-extra_config = _module
 
 from unittest.mock import mock_open, MagicMock
 from torch.autograd import Function
 from torch.nn import Module
-import abc, collections, copy, enum, functools, inspect, itertools, logging, math, matplotlib, numbers, numpy, pandas, queue, random, re, scipy, sklearn, string, tensorflow, time, torch, torchaudio, torchvision, types, typing, uuid, warnings
+import abc, collections, copy, enum, functools, inspect, itertools, logging, math, matplotlib, numbers, numpy, pandas, queue, random, re, scipy, sklearn, string, tensorflow, time, torch, torchvision, types, typing, uuid, warnings
 import operator as op
 from dataclasses import dataclass
 import numpy as np
@@ -358,9 +163,6 @@ import numbers
 
 
 import itertools
-
-
-import torchaudio
 
 
 import random
@@ -1109,64 +911,10 @@ class ControlLora(ControlNet):
         return comfy.utils.calculate_parameters(self.control_weights) * comfy.model_management.dtype_size(dtype) + ControlBase.inference_memory_requirements(self, dtype)
 
 
-class GEGLU(nn.Module):
-
-    def __init__(self, dim_in, dim_out, dtype=None, device=None, operations=ops):
-        super().__init__()
-        self.proj = operations.Linear(dim_in, dim_out * 2, dtype=dtype, device=device)
-
-    def forward(self, x):
-        x, gate = self.proj(x).chunk(2, dim=-1)
-        return x * F.gelu(gate)
-
-
 def default(val, d):
     if exists(val):
         return val
     return d() if isfunction(d) else d
-
-
-class FeedForward(nn.Module):
-
-    def __init__(self, dim, dim_out=None, mult=4, glu=False, dropout=0.0, dtype=None, device=None, operations=ops):
-        super().__init__()
-        inner_dim = int(dim * mult)
-        dim_out = default(dim_out, dim)
-        project_in = nn.Sequential(operations.Linear(dim, inner_dim, dtype=dtype, device=device), nn.GELU()) if not glu else GEGLU(dim, inner_dim, dtype=dtype, device=device, operations=operations)
-        self.net = nn.Sequential(project_in, nn.Dropout(dropout), operations.Linear(inner_dim, dim_out, dtype=dtype, device=device))
-
-    def forward(self, x):
-        return self.net(x)
-
-
-class CrossAttention(nn.Module):
-
-    def __init__(self, query_dim, context_dim=None, heads=8, dim_head=64, dropout=0.0, attn_precision=None, dtype=None, device=None, operations=ops):
-        super().__init__()
-        inner_dim = dim_head * heads
-        context_dim = default(context_dim, query_dim)
-        self.attn_precision = attn_precision
-        self.heads = heads
-        self.dim_head = dim_head
-        self.to_q = operations.Linear(query_dim, inner_dim, bias=False, dtype=dtype, device=device)
-        self.to_k = operations.Linear(context_dim, inner_dim, bias=False, dtype=dtype, device=device)
-        self.to_v = operations.Linear(context_dim, inner_dim, bias=False, dtype=dtype, device=device)
-        self.to_out = nn.Sequential(operations.Linear(inner_dim, query_dim, dtype=dtype, device=device), nn.Dropout(dropout))
-
-    def forward(self, x, context=None, value=None, mask=None):
-        q = self.to_q(x)
-        context = default(context, x)
-        k = self.to_k(context)
-        if value is not None:
-            v = self.to_v(value)
-            del value
-        else:
-            v = self.to_v(context)
-        if mask is None:
-            out = optimized_attention(q, k, v, self.heads, attn_precision=self.attn_precision)
-        else:
-            out = optimized_attention_masked(q, k, v, self.heads, mask, attn_precision=self.attn_precision)
-        return self.to_out(out)
 
 
 class GatedCrossAttentionDense(nn.Module):
@@ -3071,136 +2819,6 @@ class TimestepBlock(nn.Module):
         """
 
 
-class Upsample(nn.Module):
-    """
-    An upsampling layer with an optional convolution.
-    :param channels: channels in the inputs and outputs.
-    :param use_conv: a bool determining if a convolution is applied.
-    :param dims: determines if the signal is 1D, 2D, or 3D. If 3D, then
-                 upsampling occurs in the inner-two dimensions.
-    """
-
-    def __init__(self, channels, use_conv, dims=2, out_channels=None, padding=1, dtype=None, device=None, operations=ops):
-        super().__init__()
-        self.channels = channels
-        self.out_channels = out_channels or channels
-        self.use_conv = use_conv
-        self.dims = dims
-        if use_conv:
-            self.conv = operations.conv_nd(dims, self.channels, self.out_channels, 3, padding=padding, dtype=dtype, device=device)
-
-    def forward(self, x, output_shape=None):
-        assert x.shape[1] == self.channels
-        if self.dims == 3:
-            shape = [x.shape[2], x.shape[3] * 2, x.shape[4] * 2]
-            if output_shape is not None:
-                shape[1] = output_shape[3]
-                shape[2] = output_shape[4]
-        else:
-            shape = [x.shape[2] * 2, x.shape[3] * 2]
-            if output_shape is not None:
-                shape[0] = output_shape[2]
-                shape[1] = output_shape[3]
-        x = F.interpolate(x, size=shape, mode='nearest')
-        if self.use_conv:
-            x = self.conv(x)
-        return x
-
-
-class ResBlock(TimestepBlock):
-    """
-    A residual block that can optionally change the number of channels.
-    :param channels: the number of input channels.
-    :param emb_channels: the number of timestep embedding channels.
-    :param dropout: the rate of dropout.
-    :param out_channels: if specified, the number of out channels.
-    :param use_conv: if True and out_channels is specified, use a spatial
-        convolution instead of a smaller 1x1 convolution to change the
-        channels in the skip connection.
-    :param dims: determines if the signal is 1D, 2D, or 3D.
-    :param use_checkpoint: if True, use gradient checkpointing on this module.
-    :param up: if True, use this block for upsampling.
-    :param down: if True, use this block for downsampling.
-    """
-
-    def __init__(self, channels, emb_channels, dropout, out_channels=None, use_conv=False, use_scale_shift_norm=False, dims=2, use_checkpoint=False, up=False, down=False, kernel_size=3, exchange_temb_dims=False, skip_t_emb=False, dtype=None, device=None, operations=ops):
-        super().__init__()
-        self.channels = channels
-        self.emb_channels = emb_channels
-        self.dropout = dropout
-        self.out_channels = out_channels or channels
-        self.use_conv = use_conv
-        self.use_checkpoint = use_checkpoint
-        self.use_scale_shift_norm = use_scale_shift_norm
-        self.exchange_temb_dims = exchange_temb_dims
-        if isinstance(kernel_size, list):
-            padding = [(k // 2) for k in kernel_size]
-        else:
-            padding = kernel_size // 2
-        self.in_layers = nn.Sequential(operations.GroupNorm(32, channels, dtype=dtype, device=device), nn.SiLU(), operations.conv_nd(dims, channels, self.out_channels, kernel_size, padding=padding, dtype=dtype, device=device))
-        self.updown = up or down
-        if up:
-            self.h_upd = Upsample(channels, False, dims, dtype=dtype, device=device)
-            self.x_upd = Upsample(channels, False, dims, dtype=dtype, device=device)
-        elif down:
-            self.h_upd = Downsample(channels, False, dims, dtype=dtype, device=device)
-            self.x_upd = Downsample(channels, False, dims, dtype=dtype, device=device)
-        else:
-            self.h_upd = self.x_upd = nn.Identity()
-        self.skip_t_emb = skip_t_emb
-        if self.skip_t_emb:
-            self.emb_layers = None
-            self.exchange_temb_dims = False
-        else:
-            self.emb_layers = nn.Sequential(nn.SiLU(), operations.Linear(emb_channels, 2 * self.out_channels if use_scale_shift_norm else self.out_channels, dtype=dtype, device=device))
-        self.out_layers = nn.Sequential(operations.GroupNorm(32, self.out_channels, dtype=dtype, device=device), nn.SiLU(), nn.Dropout(p=dropout), operations.conv_nd(dims, self.out_channels, self.out_channels, kernel_size, padding=padding, dtype=dtype, device=device))
-        if self.out_channels == channels:
-            self.skip_connection = nn.Identity()
-        elif use_conv:
-            self.skip_connection = operations.conv_nd(dims, channels, self.out_channels, kernel_size, padding=padding, dtype=dtype, device=device)
-        else:
-            self.skip_connection = operations.conv_nd(dims, channels, self.out_channels, 1, dtype=dtype, device=device)
-
-    def forward(self, x, emb):
-        """
-        Apply the block to a Tensor, conditioned on a timestep embedding.
-        :param x: an [N x C x ...] Tensor of features.
-        :param emb: an [N x emb_channels] Tensor of timestep embeddings.
-        :return: an [N x C x ...] Tensor of outputs.
-        """
-        return checkpoint(self._forward, (x, emb), self.parameters(), self.use_checkpoint)
-
-    def _forward(self, x, emb):
-        if self.updown:
-            in_rest, in_conv = self.in_layers[:-1], self.in_layers[-1]
-            h = in_rest(x)
-            h = self.h_upd(h)
-            x = self.x_upd(x)
-            h = in_conv(h)
-        else:
-            h = self.in_layers(x)
-        emb_out = None
-        if not self.skip_t_emb:
-            emb_out = self.emb_layers(emb).type(h.dtype)
-            while len(emb_out.shape) < len(h.shape):
-                emb_out = emb_out[..., None]
-        if self.use_scale_shift_norm:
-            out_norm, out_rest = self.out_layers[0], self.out_layers[1:]
-            h = out_norm(h)
-            if emb_out is not None:
-                scale, shift = th.chunk(emb_out, 2, dim=1)
-                h *= 1 + scale
-                h += shift
-            h = out_rest(h)
-        else:
-            if emb_out is not None:
-                if self.exchange_temb_dims:
-                    emb_out = emb_out.movedim(1, 2)
-                h = h + emb_out
-            h = self.out_layers(h)
-        return self.skip_connection(x) + h
-
-
 def Normalize(in_channels, num_groups=32):
     return ops.GroupNorm(num_groups=num_groups, num_channels=in_channels, eps=1e-06, affine=True)
 
@@ -4274,6 +3892,98 @@ def create_position_matrix(T: 'int', pH: 'int', pW: 'int', device: 'torch.device
     return pos
 
 
+class AsymmDiTJoint(nn.Module):
+    """
+    Diffusion model with a Transformer backbone.
+
+    Ingests text embeddings instead of a label.
+    """
+
+    def __init__(self, *, patch_size=2, in_channels=4, hidden_size_x=1152, hidden_size_y=1152, depth=48, num_heads=16, mlp_ratio_x=8.0, mlp_ratio_y=4.0, use_t5: bool=False, t5_feat_dim: int=4096, t5_token_length: int=256, learn_sigma=True, patch_embed_bias: bool=True, timestep_mlp_bias: bool=True, attend_to_padding: bool=False, timestep_scale: Optional[float]=None, use_extended_posenc: bool=False, posenc_preserve_area: bool=False, rope_theta: float=10000.0, image_model=None, device: Optional[torch.device]=None, dtype=None, operations=None, **block_kwargs):
+        super().__init__()
+        self.dtype = dtype
+        self.learn_sigma = learn_sigma
+        self.in_channels = in_channels
+        self.out_channels = in_channels * 2 if learn_sigma else in_channels
+        self.patch_size = patch_size
+        self.num_heads = num_heads
+        self.hidden_size_x = hidden_size_x
+        self.hidden_size_y = hidden_size_y
+        self.head_dim = hidden_size_x // num_heads
+        self.attend_to_padding = attend_to_padding
+        self.use_extended_posenc = use_extended_posenc
+        self.posenc_preserve_area = posenc_preserve_area
+        self.use_t5 = use_t5
+        self.t5_token_length = t5_token_length
+        self.t5_feat_dim = t5_feat_dim
+        self.rope_theta = rope_theta
+        self.x_embedder = PatchEmbed(patch_size=patch_size, in_chans=in_channels, embed_dim=hidden_size_x, bias=patch_embed_bias, dtype=dtype, device=device, operations=operations)
+        self.t_embedder = TimestepEmbedder(hidden_size_x, bias=timestep_mlp_bias, timestep_scale=timestep_scale, dtype=dtype, device=device, operations=operations)
+        if self.use_t5:
+            self.t5_y_embedder = AttentionPool(t5_feat_dim, num_heads=8, output_dim=hidden_size_x, dtype=dtype, device=device, operations=operations)
+            self.t5_yproj = operations.Linear(t5_feat_dim, hidden_size_y, bias=True, dtype=dtype, device=device)
+        self.pos_frequencies = nn.Parameter(torch.empty(3, self.num_heads, self.head_dim // 2, dtype=dtype, device=device))
+        assert not self.attend_to_padding
+        blocks = []
+        for b in range(depth):
+            update_y = b < depth - 1
+            block = AsymmetricJointBlock(hidden_size_x, hidden_size_y, num_heads, mlp_ratio_x=mlp_ratio_x, mlp_ratio_y=mlp_ratio_y, update_y=update_y, attend_to_padding=attend_to_padding, device=device, dtype=dtype, operations=operations, **block_kwargs)
+            blocks.append(block)
+        self.blocks = nn.ModuleList(blocks)
+        self.final_layer = FinalLayer(hidden_size_x, patch_size, self.out_channels, dtype=dtype, device=device, operations=operations)
+
+    def embed_x(self, x: 'torch.Tensor') ->torch.Tensor:
+        """
+        Args:
+            x: (B, C=12, T, H, W) tensor of visual tokens
+
+        Returns:
+            x: (B, C=3072, N) tensor of visual tokens with positional embedding.
+        """
+        return self.x_embedder(x)
+
+    def prepare(self, x: 'torch.Tensor', sigma: 'torch.Tensor', t5_feat: 'torch.Tensor', t5_mask: 'torch.Tensor'):
+        """Prepare input and conditioning embeddings."""
+        T, H, W = x.shape[-3:]
+        pH, pW = H // self.patch_size, W // self.patch_size
+        x = self.embed_x(x)
+        assert x.ndim == 3
+        B = x.size(0)
+        pH, pW = H // self.patch_size, W // self.patch_size
+        N = T * pH * pW
+        assert x.size(1) == N
+        pos = create_position_matrix(T, pH=pH, pW=pW, device=x.device, dtype=torch.float32)
+        rope_cos, rope_sin = compute_mixed_rotation(freqs=comfy.ops.cast_to(self.pos_frequencies, dtype=x.dtype, device=x.device), pos=pos)
+        c_t = self.t_embedder(1 - sigma, out_dtype=x.dtype)
+        t5_y_pool = self.t5_y_embedder(t5_feat, t5_mask)
+        c = c_t + t5_y_pool
+        y_feat = self.t5_yproj(t5_feat)
+        return x, c, y_feat, rope_cos, rope_sin
+
+    def forward(self, x: 'torch.Tensor', timestep: 'torch.Tensor', context: 'List[torch.Tensor]', attention_mask: 'List[torch.Tensor]', num_tokens=256, packed_indices: 'Dict[str, torch.Tensor]'=None, rope_cos: 'torch.Tensor'=None, rope_sin: 'torch.Tensor'=None, control=None, **kwargs):
+        y_feat = context
+        y_mask = attention_mask
+        sigma = timestep
+        """Forward pass of DiT.
+
+        Args:
+            x: (B, C, T, H, W) tensor of spatial inputs (images or latent representations of images)
+            sigma: (B,) tensor of noise standard deviations
+            y_feat: List((B, L, y_feat_dim) tensor of caption token features. For SDXL text encoders: L=77, y_feat_dim=2048)
+            y_mask: List((B, L) boolean tensor indicating which tokens are not padding)
+            packed_indices: Dict with keys for Flash Attention. Result of compute_packed_indices.
+        """
+        B, _, T, H, W = x.shape
+        x, c, y_feat, rope_cos, rope_sin = self.prepare(x, sigma, y_feat, y_mask)
+        del y_mask
+        for i, block in enumerate(self.blocks):
+            x, y_feat = block(x, c, y_feat, rope_cos=rope_cos, rope_sin=rope_sin, crop_y=num_tokens)
+        del y_feat
+        x = self.final_layer(x, c)
+        x = rearrange(x, 'B (T hp wp) (p1 p2 c) -> B c T (hp p1) (wp p2)', T=T, hp=H // self.patch_size, wp=W // self.patch_size, p1=self.patch_size, p2=self.patch_size, c=self.out_channels)
+        return -x
+
+
 class DepthToSpaceTime(nn.Module):
 
     def __init__(self, temporal_expansion: 'int', spatial_expansion: 'int'):
@@ -5020,189 +4730,6 @@ def instantiate_from_config(config):
     return get_obj_from_str(config['target'])(**config.get('params', dict()))
 
 
-class BasicTransformerBlock(nn.Module):
-
-    def __init__(self, dim, n_heads, d_head, dropout=0.0, context_dim=None, gated_ff=True, checkpoint=True, ff_in=False, inner_dim=None, disable_self_attn=False, disable_temporal_crossattention=False, switch_temporal_ca_to_sa=False, attn_precision=None, dtype=None, device=None, operations=ops):
-        super().__init__()
-        self.ff_in = ff_in or inner_dim is not None
-        if inner_dim is None:
-            inner_dim = dim
-        self.is_res = inner_dim == dim
-        self.attn_precision = attn_precision
-        if self.ff_in:
-            self.norm_in = operations.LayerNorm(dim, dtype=dtype, device=device)
-            self.ff_in = FeedForward(dim, dim_out=inner_dim, dropout=dropout, glu=gated_ff, dtype=dtype, device=device, operations=operations)
-        self.disable_self_attn = disable_self_attn
-        self.attn1 = CrossAttention(query_dim=inner_dim, heads=n_heads, dim_head=d_head, dropout=dropout, context_dim=context_dim if self.disable_self_attn else None, attn_precision=self.attn_precision, dtype=dtype, device=device, operations=operations)
-        self.ff = FeedForward(inner_dim, dim_out=dim, dropout=dropout, glu=gated_ff, dtype=dtype, device=device, operations=operations)
-        if disable_temporal_crossattention:
-            if switch_temporal_ca_to_sa:
-                raise ValueError
-            else:
-                self.attn2 = None
-        else:
-            context_dim_attn2 = None
-            if not switch_temporal_ca_to_sa:
-                context_dim_attn2 = context_dim
-            self.attn2 = CrossAttention(query_dim=inner_dim, context_dim=context_dim_attn2, heads=n_heads, dim_head=d_head, dropout=dropout, attn_precision=self.attn_precision, dtype=dtype, device=device, operations=operations)
-            self.norm2 = operations.LayerNorm(inner_dim, dtype=dtype, device=device)
-        self.norm1 = operations.LayerNorm(inner_dim, dtype=dtype, device=device)
-        self.norm3 = operations.LayerNorm(inner_dim, dtype=dtype, device=device)
-        self.n_heads = n_heads
-        self.d_head = d_head
-        self.switch_temporal_ca_to_sa = switch_temporal_ca_to_sa
-
-    def forward(self, x, context=None, transformer_options={}):
-        extra_options = {}
-        block = transformer_options.get('block', None)
-        block_index = transformer_options.get('block_index', 0)
-        transformer_patches = {}
-        transformer_patches_replace = {}
-        for k in transformer_options:
-            if k == 'patches':
-                transformer_patches = transformer_options[k]
-            elif k == 'patches_replace':
-                transformer_patches_replace = transformer_options[k]
-            else:
-                extra_options[k] = transformer_options[k]
-        extra_options['n_heads'] = self.n_heads
-        extra_options['dim_head'] = self.d_head
-        extra_options['attn_precision'] = self.attn_precision
-        if self.ff_in:
-            x_skip = x
-            x = self.ff_in(self.norm_in(x))
-            if self.is_res:
-                x += x_skip
-        n = self.norm1(x)
-        if self.disable_self_attn:
-            context_attn1 = context
-        else:
-            context_attn1 = None
-        value_attn1 = None
-        if 'attn1_patch' in transformer_patches:
-            patch = transformer_patches['attn1_patch']
-            if context_attn1 is None:
-                context_attn1 = n
-            value_attn1 = context_attn1
-            for p in patch:
-                n, context_attn1, value_attn1 = p(n, context_attn1, value_attn1, extra_options)
-        if block is not None:
-            transformer_block = block[0], block[1], block_index
-        else:
-            transformer_block = None
-        attn1_replace_patch = transformer_patches_replace.get('attn1', {})
-        block_attn1 = transformer_block
-        if block_attn1 not in attn1_replace_patch:
-            block_attn1 = block
-        if block_attn1 in attn1_replace_patch:
-            if context_attn1 is None:
-                context_attn1 = n
-                value_attn1 = n
-            n = self.attn1.to_q(n)
-            context_attn1 = self.attn1.to_k(context_attn1)
-            value_attn1 = self.attn1.to_v(value_attn1)
-            n = attn1_replace_patch[block_attn1](n, context_attn1, value_attn1, extra_options)
-            n = self.attn1.to_out(n)
-        else:
-            n = self.attn1(n, context=context_attn1, value=value_attn1)
-        if 'attn1_output_patch' in transformer_patches:
-            patch = transformer_patches['attn1_output_patch']
-            for p in patch:
-                n = p(n, extra_options)
-        x += n
-        if 'middle_patch' in transformer_patches:
-            patch = transformer_patches['middle_patch']
-            for p in patch:
-                x = p(x, extra_options)
-        if self.attn2 is not None:
-            n = self.norm2(x)
-            if self.switch_temporal_ca_to_sa:
-                context_attn2 = n
-            else:
-                context_attn2 = context
-            value_attn2 = None
-            if 'attn2_patch' in transformer_patches:
-                patch = transformer_patches['attn2_patch']
-                value_attn2 = context_attn2
-                for p in patch:
-                    n, context_attn2, value_attn2 = p(n, context_attn2, value_attn2, extra_options)
-            attn2_replace_patch = transformer_patches_replace.get('attn2', {})
-            block_attn2 = transformer_block
-            if block_attn2 not in attn2_replace_patch:
-                block_attn2 = block
-            if block_attn2 in attn2_replace_patch:
-                if value_attn2 is None:
-                    value_attn2 = context_attn2
-                n = self.attn2.to_q(n)
-                context_attn2 = self.attn2.to_k(context_attn2)
-                value_attn2 = self.attn2.to_v(value_attn2)
-                n = attn2_replace_patch[block_attn2](n, context_attn2, value_attn2, extra_options)
-                n = self.attn2.to_out(n)
-            else:
-                n = self.attn2(n, context=context_attn2, value=value_attn2)
-        if 'attn2_output_patch' in transformer_patches:
-            patch = transformer_patches['attn2_output_patch']
-            for p in patch:
-                n = p(n, extra_options)
-        x += n
-        if self.is_res:
-            x_skip = x
-        x = self.ff(self.norm3(x))
-        if self.is_res:
-            x += x_skip
-        return x
-
-
-class SpatialTransformer(nn.Module):
-    """
-    Transformer block for image-like data.
-    First, project the input (aka embedding)
-    and reshape to b, t, d.
-    Then apply standard transformer action.
-    Finally, reshape to image
-    NEW: use_linear for more efficiency instead of the 1x1 convs
-    """
-
-    def __init__(self, in_channels, n_heads, d_head, depth=1, dropout=0.0, context_dim=None, disable_self_attn=False, use_linear=False, use_checkpoint=True, attn_precision=None, dtype=None, device=None, operations=ops):
-        super().__init__()
-        if exists(context_dim) and not isinstance(context_dim, list):
-            context_dim = [context_dim] * depth
-        self.in_channels = in_channels
-        inner_dim = n_heads * d_head
-        self.norm = operations.GroupNorm(num_groups=32, num_channels=in_channels, eps=1e-06, affine=True, dtype=dtype, device=device)
-        if not use_linear:
-            self.proj_in = operations.Conv2d(in_channels, inner_dim, kernel_size=1, stride=1, padding=0, dtype=dtype, device=device)
-        else:
-            self.proj_in = operations.Linear(in_channels, inner_dim, dtype=dtype, device=device)
-        self.transformer_blocks = nn.ModuleList([BasicTransformerBlock(inner_dim, n_heads, d_head, dropout=dropout, context_dim=context_dim[d], disable_self_attn=disable_self_attn, checkpoint=use_checkpoint, attn_precision=attn_precision, dtype=dtype, device=device, operations=operations) for d in range(depth)])
-        if not use_linear:
-            self.proj_out = operations.Conv2d(inner_dim, in_channels, kernel_size=1, stride=1, padding=0, dtype=dtype, device=device)
-        else:
-            self.proj_out = operations.Linear(in_channels, inner_dim, dtype=dtype, device=device)
-        self.use_linear = use_linear
-
-    def forward(self, x, context=None, transformer_options={}):
-        if not isinstance(context, list):
-            context = [context] * len(self.transformer_blocks)
-        b, c, h, w = x.shape
-        x_in = x
-        x = self.norm(x)
-        if not self.use_linear:
-            x = self.proj_in(x)
-        x = x.movedim(1, 3).flatten(1, 2).contiguous()
-        if self.use_linear:
-            x = self.proj_in(x)
-        for i, block in enumerate(self.transformer_blocks):
-            transformer_options['block_index'] = i
-            x = block(x, context=context[i], transformer_options=transformer_options)
-        if self.use_linear:
-            x = self.proj_out(x)
-        x = x.reshape(x.shape[0], h, w, x.shape[-1]).movedim(3, 1).contiguous()
-        if not self.use_linear:
-            x = self.proj_out(x)
-        return x + x_in
-
-
 class AlphaBlender(nn.Module):
     strategies = ['learned', 'fixed', 'learned_with_images']
 
@@ -5237,74 +4764,6 @@ class AlphaBlender(nn.Module):
         alpha = self.get_alpha(image_only_indicator, x_spatial.device)
         x = alpha * x_spatial + (1.0 - alpha) * x_temporal
         return x
-
-
-class SpatialVideoTransformer(SpatialTransformer):
-
-    def __init__(self, in_channels, n_heads, d_head, depth=1, dropout=0.0, use_linear=False, context_dim=None, use_spatial_context=False, timesteps=None, merge_strategy: 'str'='fixed', merge_factor: 'float'=0.5, time_context_dim=None, ff_in=False, checkpoint=False, time_depth=1, disable_self_attn=False, disable_temporal_crossattention=False, max_time_embed_period: 'int'=10000, attn_precision=None, dtype=None, device=None, operations=ops):
-        super().__init__(in_channels, n_heads, d_head, depth=depth, dropout=dropout, use_checkpoint=checkpoint, context_dim=context_dim, use_linear=use_linear, disable_self_attn=disable_self_attn, attn_precision=attn_precision, dtype=dtype, device=device, operations=operations)
-        self.time_depth = time_depth
-        self.depth = depth
-        self.max_time_embed_period = max_time_embed_period
-        time_mix_d_head = d_head
-        n_time_mix_heads = n_heads
-        time_mix_inner_dim = int(time_mix_d_head * n_time_mix_heads)
-        inner_dim = n_heads * d_head
-        if use_spatial_context:
-            time_context_dim = context_dim
-        self.time_stack = nn.ModuleList([BasicTransformerBlock(inner_dim, n_time_mix_heads, time_mix_d_head, dropout=dropout, context_dim=time_context_dim, checkpoint=checkpoint, ff_in=ff_in, inner_dim=time_mix_inner_dim, disable_self_attn=disable_self_attn, disable_temporal_crossattention=disable_temporal_crossattention, attn_precision=attn_precision, dtype=dtype, device=device, operations=operations) for _ in range(self.depth)])
-        assert len(self.time_stack) == len(self.transformer_blocks)
-        self.use_spatial_context = use_spatial_context
-        self.in_channels = in_channels
-        time_embed_dim = self.in_channels * 4
-        self.time_pos_embed = nn.Sequential(operations.Linear(self.in_channels, time_embed_dim, dtype=dtype, device=device), nn.SiLU(), operations.Linear(time_embed_dim, self.in_channels, dtype=dtype, device=device))
-        self.time_mixer = AlphaBlender(alpha=merge_factor, merge_strategy=merge_strategy)
-
-    def forward(self, x: 'torch.Tensor', context: 'Optional[torch.Tensor]'=None, time_context: 'Optional[torch.Tensor]'=None, timesteps: 'Optional[int]'=None, image_only_indicator: 'Optional[torch.Tensor]'=None, transformer_options={}) ->torch.Tensor:
-        _, _, h, w = x.shape
-        x_in = x
-        spatial_context = None
-        if exists(context):
-            spatial_context = context
-        if self.use_spatial_context:
-            assert context.ndim == 3, f'n dims of spatial context should be 3 but are {context.ndim}'
-            if time_context is None:
-                time_context = context
-            time_context_first_timestep = time_context[::timesteps]
-            time_context = repeat(time_context_first_timestep, 'b ... -> (b n) ...', n=h * w)
-        elif time_context is not None and not self.use_spatial_context:
-            time_context = repeat(time_context, 'b ... -> (b n) ...', n=h * w)
-            if time_context.ndim == 2:
-                time_context = rearrange(time_context, 'b c -> b 1 c')
-        x = self.norm(x)
-        if not self.use_linear:
-            x = self.proj_in(x)
-        x = rearrange(x, 'b c h w -> b (h w) c')
-        if self.use_linear:
-            x = self.proj_in(x)
-        num_frames = torch.arange(timesteps, device=x.device)
-        num_frames = repeat(num_frames, 't -> b t', b=x.shape[0] // timesteps)
-        num_frames = rearrange(num_frames, 'b t -> (b t)')
-        t_emb = timestep_embedding(num_frames, self.in_channels, repeat_only=False, max_period=self.max_time_embed_period)
-        emb = self.time_pos_embed(t_emb)
-        emb = emb[:, None, :]
-        for it_, (block, mix_block) in enumerate(zip(self.transformer_blocks, self.time_stack)):
-            transformer_options['block_index'] = it_
-            x = block(x, context=spatial_context, transformer_options=transformer_options)
-            x_mix = x
-            x_mix = x_mix + emb
-            B, S, C = x_mix.shape
-            x_mix = rearrange(x_mix, '(b t) s c -> (b s) t c', t=timesteps)
-            x_mix = mix_block(x_mix, context=time_context)
-            x_mix = rearrange(x_mix, '(b s) t c -> (b t) s c', s=S, b=B // timesteps, c=C, t=timesteps)
-            x = self.time_mixer(x_spatial=x, x_temporal=x_mix, image_only_indicator=image_only_indicator)
-        if self.use_linear:
-            x = self.proj_out(x)
-        x = rearrange(x, 'b (h w) c -> b c h w', h=h, w=w)
-        if not self.use_linear:
-            x = self.proj_out(x)
-        out = x + x_in
-        return out
 
 
 class OpenAISignatureMMDITWrapper(MMDiT):
@@ -5567,239 +5026,6 @@ def apply_control(h, control, name):
             except:
                 logging.warning('warning control could not be applied {} {}'.format(h.shape, ctrl.shape))
     return h
-
-
-class UNetModel(nn.Module):
-    """
-    The full UNet model with attention and timestep embedding.
-    :param in_channels: channels in the input Tensor.
-    :param model_channels: base channel count for the model.
-    :param out_channels: channels in the output Tensor.
-    :param num_res_blocks: number of residual blocks per downsample.
-    :param dropout: the dropout probability.
-    :param channel_mult: channel multiplier for each level of the UNet.
-    :param conv_resample: if True, use learned convolutions for upsampling and
-        downsampling.
-    :param dims: determines if the signal is 1D, 2D, or 3D.
-    :param num_classes: if specified (as an int), then this model will be
-        class-conditional with `num_classes` classes.
-    :param use_checkpoint: use gradient checkpointing to reduce memory usage.
-    :param num_heads: the number of attention heads in each attention layer.
-    :param num_heads_channels: if specified, ignore num_heads and instead use
-                               a fixed channel width per attention head.
-    :param num_heads_upsample: works with num_heads to set a different number
-                               of heads for upsampling. Deprecated.
-    :param use_scale_shift_norm: use a FiLM-like conditioning mechanism.
-    :param resblock_updown: use residual blocks for up/downsampling.
-    :param use_new_attention_order: use a different attention pattern for potentially
-                                    increased efficiency.
-    """
-
-    def __init__(self, image_size, in_channels, model_channels, out_channels, num_res_blocks, dropout=0, channel_mult=(1, 2, 4, 8), conv_resample=True, dims=2, num_classes=None, use_checkpoint=False, dtype=th.float32, num_heads=-1, num_head_channels=-1, num_heads_upsample=-1, use_scale_shift_norm=False, resblock_updown=False, use_new_attention_order=False, use_spatial_transformer=False, transformer_depth=1, context_dim=None, n_embed=None, legacy=True, disable_self_attentions=None, num_attention_blocks=None, disable_middle_self_attn=False, use_linear_in_transformer=False, adm_in_channels=None, transformer_depth_middle=None, transformer_depth_output=None, use_temporal_resblock=False, use_temporal_attention=False, time_context_dim=None, extra_ff_mix_layer=False, use_spatial_context=False, merge_strategy=None, merge_factor=0.0, video_kernel_size=None, disable_temporal_crossattention=False, max_ddpm_temb_period=10000, attn_precision=None, device=None, operations=ops):
-        super().__init__()
-        if context_dim is not None:
-            assert use_spatial_transformer, 'Fool!! You forgot to use the spatial transformer for your cross-attention conditioning...'
-        if num_heads_upsample == -1:
-            num_heads_upsample = num_heads
-        if num_heads == -1:
-            assert num_head_channels != -1, 'Either num_heads or num_head_channels has to be set'
-        if num_head_channels == -1:
-            assert num_heads != -1, 'Either num_heads or num_head_channels has to be set'
-        self.in_channels = in_channels
-        self.model_channels = model_channels
-        self.out_channels = out_channels
-        if isinstance(num_res_blocks, int):
-            self.num_res_blocks = len(channel_mult) * [num_res_blocks]
-        else:
-            if len(num_res_blocks) != len(channel_mult):
-                raise ValueError('provide num_res_blocks either as an int (globally constant) or as a list/tuple (per-level) with the same length as channel_mult')
-            self.num_res_blocks = num_res_blocks
-        if disable_self_attentions is not None:
-            assert len(disable_self_attentions) == len(channel_mult)
-        if num_attention_blocks is not None:
-            assert len(num_attention_blocks) == len(self.num_res_blocks)
-        transformer_depth = transformer_depth[:]
-        transformer_depth_output = transformer_depth_output[:]
-        self.dropout = dropout
-        self.channel_mult = channel_mult
-        self.conv_resample = conv_resample
-        self.num_classes = num_classes
-        self.use_checkpoint = use_checkpoint
-        self.dtype = dtype
-        self.num_heads = num_heads
-        self.num_head_channels = num_head_channels
-        self.num_heads_upsample = num_heads_upsample
-        self.use_temporal_resblocks = use_temporal_resblock
-        self.predict_codebook_ids = n_embed is not None
-        self.default_num_video_frames = None
-        time_embed_dim = model_channels * 4
-        self.time_embed = nn.Sequential(operations.Linear(model_channels, time_embed_dim, dtype=self.dtype, device=device), nn.SiLU(), operations.Linear(time_embed_dim, time_embed_dim, dtype=self.dtype, device=device))
-        if self.num_classes is not None:
-            if isinstance(self.num_classes, int):
-                self.label_emb = nn.Embedding(num_classes, time_embed_dim, dtype=self.dtype, device=device)
-            elif self.num_classes == 'continuous':
-                logging.debug('setting up linear c_adm embedding layer')
-                self.label_emb = nn.Linear(1, time_embed_dim)
-            elif self.num_classes == 'sequential':
-                assert adm_in_channels is not None
-                self.label_emb = nn.Sequential(nn.Sequential(operations.Linear(adm_in_channels, time_embed_dim, dtype=self.dtype, device=device), nn.SiLU(), operations.Linear(time_embed_dim, time_embed_dim, dtype=self.dtype, device=device)))
-            else:
-                raise ValueError()
-        self.input_blocks = nn.ModuleList([TimestepEmbedSequential(operations.conv_nd(dims, in_channels, model_channels, 3, padding=1, dtype=self.dtype, device=device))])
-        self._feature_size = model_channels
-        input_block_chans = [model_channels]
-        ch = model_channels
-        ds = 1
-
-        def get_attention_layer(ch, num_heads, dim_head, depth=1, context_dim=None, use_checkpoint=False, disable_self_attn=False):
-            if use_temporal_attention:
-                return SpatialVideoTransformer(ch, num_heads, dim_head, depth=depth, context_dim=context_dim, time_context_dim=time_context_dim, dropout=dropout, ff_in=extra_ff_mix_layer, use_spatial_context=use_spatial_context, merge_strategy=merge_strategy, merge_factor=merge_factor, checkpoint=use_checkpoint, use_linear=use_linear_in_transformer, disable_self_attn=disable_self_attn, disable_temporal_crossattention=disable_temporal_crossattention, max_time_embed_period=max_ddpm_temb_period, attn_precision=attn_precision, dtype=self.dtype, device=device, operations=operations)
-            else:
-                return SpatialTransformer(ch, num_heads, dim_head, depth=depth, context_dim=context_dim, disable_self_attn=disable_self_attn, use_linear=use_linear_in_transformer, use_checkpoint=use_checkpoint, attn_precision=attn_precision, dtype=self.dtype, device=device, operations=operations)
-
-        def get_resblock(merge_factor, merge_strategy, video_kernel_size, ch, time_embed_dim, dropout, out_channels, dims, use_checkpoint, use_scale_shift_norm, down=False, up=False, dtype=None, device=None, operations=ops):
-            if self.use_temporal_resblocks:
-                return VideoResBlock(merge_factor=merge_factor, merge_strategy=merge_strategy, video_kernel_size=video_kernel_size, channels=ch, emb_channels=time_embed_dim, dropout=dropout, out_channels=out_channels, dims=dims, use_checkpoint=use_checkpoint, use_scale_shift_norm=use_scale_shift_norm, down=down, up=up, dtype=dtype, device=device, operations=operations)
-            else:
-                return ResBlock(channels=ch, emb_channels=time_embed_dim, dropout=dropout, out_channels=out_channels, use_checkpoint=use_checkpoint, dims=dims, use_scale_shift_norm=use_scale_shift_norm, down=down, up=up, dtype=dtype, device=device, operations=operations)
-        for level, mult in enumerate(channel_mult):
-            for nr in range(self.num_res_blocks[level]):
-                layers = [get_resblock(merge_factor=merge_factor, merge_strategy=merge_strategy, video_kernel_size=video_kernel_size, ch=ch, time_embed_dim=time_embed_dim, dropout=dropout, out_channels=mult * model_channels, dims=dims, use_checkpoint=use_checkpoint, use_scale_shift_norm=use_scale_shift_norm, dtype=self.dtype, device=device, operations=operations)]
-                ch = mult * model_channels
-                num_transformers = transformer_depth.pop(0)
-                if num_transformers > 0:
-                    if num_head_channels == -1:
-                        dim_head = ch // num_heads
-                    else:
-                        num_heads = ch // num_head_channels
-                        dim_head = num_head_channels
-                    if legacy:
-                        dim_head = ch // num_heads if use_spatial_transformer else num_head_channels
-                    if exists(disable_self_attentions):
-                        disabled_sa = disable_self_attentions[level]
-                    else:
-                        disabled_sa = False
-                    if not exists(num_attention_blocks) or nr < num_attention_blocks[level]:
-                        layers.append(get_attention_layer(ch, num_heads, dim_head, depth=num_transformers, context_dim=context_dim, disable_self_attn=disabled_sa, use_checkpoint=use_checkpoint))
-                self.input_blocks.append(TimestepEmbedSequential(*layers))
-                self._feature_size += ch
-                input_block_chans.append(ch)
-            if level != len(channel_mult) - 1:
-                out_ch = ch
-                self.input_blocks.append(TimestepEmbedSequential(get_resblock(merge_factor=merge_factor, merge_strategy=merge_strategy, video_kernel_size=video_kernel_size, ch=ch, time_embed_dim=time_embed_dim, dropout=dropout, out_channels=out_ch, dims=dims, use_checkpoint=use_checkpoint, use_scale_shift_norm=use_scale_shift_norm, down=True, dtype=self.dtype, device=device, operations=operations) if resblock_updown else Downsample(ch, conv_resample, dims=dims, out_channels=out_ch, dtype=self.dtype, device=device, operations=operations)))
-                ch = out_ch
-                input_block_chans.append(ch)
-                ds *= 2
-                self._feature_size += ch
-        if num_head_channels == -1:
-            dim_head = ch // num_heads
-        else:
-            num_heads = ch // num_head_channels
-            dim_head = num_head_channels
-        if legacy:
-            dim_head = ch // num_heads if use_spatial_transformer else num_head_channels
-        mid_block = [get_resblock(merge_factor=merge_factor, merge_strategy=merge_strategy, video_kernel_size=video_kernel_size, ch=ch, time_embed_dim=time_embed_dim, dropout=dropout, out_channels=None, dims=dims, use_checkpoint=use_checkpoint, use_scale_shift_norm=use_scale_shift_norm, dtype=self.dtype, device=device, operations=operations)]
-        self.middle_block = None
-        if transformer_depth_middle >= -1:
-            if transformer_depth_middle >= 0:
-                mid_block += [get_attention_layer(ch, num_heads, dim_head, depth=transformer_depth_middle, context_dim=context_dim, disable_self_attn=disable_middle_self_attn, use_checkpoint=use_checkpoint), get_resblock(merge_factor=merge_factor, merge_strategy=merge_strategy, video_kernel_size=video_kernel_size, ch=ch, time_embed_dim=time_embed_dim, dropout=dropout, out_channels=None, dims=dims, use_checkpoint=use_checkpoint, use_scale_shift_norm=use_scale_shift_norm, dtype=self.dtype, device=device, operations=operations)]
-            self.middle_block = TimestepEmbedSequential(*mid_block)
-        self._feature_size += ch
-        self.output_blocks = nn.ModuleList([])
-        for level, mult in list(enumerate(channel_mult))[::-1]:
-            for i in range(self.num_res_blocks[level] + 1):
-                ich = input_block_chans.pop()
-                layers = [get_resblock(merge_factor=merge_factor, merge_strategy=merge_strategy, video_kernel_size=video_kernel_size, ch=ch + ich, time_embed_dim=time_embed_dim, dropout=dropout, out_channels=model_channels * mult, dims=dims, use_checkpoint=use_checkpoint, use_scale_shift_norm=use_scale_shift_norm, dtype=self.dtype, device=device, operations=operations)]
-                ch = model_channels * mult
-                num_transformers = transformer_depth_output.pop()
-                if num_transformers > 0:
-                    if num_head_channels == -1:
-                        dim_head = ch // num_heads
-                    else:
-                        num_heads = ch // num_head_channels
-                        dim_head = num_head_channels
-                    if legacy:
-                        dim_head = ch // num_heads if use_spatial_transformer else num_head_channels
-                    if exists(disable_self_attentions):
-                        disabled_sa = disable_self_attentions[level]
-                    else:
-                        disabled_sa = False
-                    if not exists(num_attention_blocks) or i < num_attention_blocks[level]:
-                        layers.append(get_attention_layer(ch, num_heads, dim_head, depth=num_transformers, context_dim=context_dim, disable_self_attn=disabled_sa, use_checkpoint=use_checkpoint))
-                if level and i == self.num_res_blocks[level]:
-                    out_ch = ch
-                    layers.append(get_resblock(merge_factor=merge_factor, merge_strategy=merge_strategy, video_kernel_size=video_kernel_size, ch=ch, time_embed_dim=time_embed_dim, dropout=dropout, out_channels=out_ch, dims=dims, use_checkpoint=use_checkpoint, use_scale_shift_norm=use_scale_shift_norm, up=True, dtype=self.dtype, device=device, operations=operations) if resblock_updown else Upsample(ch, conv_resample, dims=dims, out_channels=out_ch, dtype=self.dtype, device=device, operations=operations))
-                    ds //= 2
-                self.output_blocks.append(TimestepEmbedSequential(*layers))
-                self._feature_size += ch
-        self.out = nn.Sequential(operations.GroupNorm(32, ch, dtype=self.dtype, device=device), nn.SiLU(), operations.conv_nd(dims, model_channels, out_channels, 3, padding=1, dtype=self.dtype, device=device))
-        if self.predict_codebook_ids:
-            self.id_predictor = nn.Sequential(operations.GroupNorm(32, ch, dtype=self.dtype, device=device), operations.conv_nd(dims, model_channels, n_embed, 1, dtype=self.dtype, device=device))
-
-    def forward(self, x, timesteps=None, context=None, y=None, control=None, transformer_options={}, **kwargs):
-        """
-        Apply the model to an input batch.
-        :param x: an [N x C x ...] Tensor of inputs.
-        :param timesteps: a 1-D batch of timesteps.
-        :param context: conditioning plugged in via crossattn
-        :param y: an [N] Tensor of labels, if class-conditional.
-        :return: an [N x C x ...] Tensor of outputs.
-        """
-        transformer_options['original_shape'] = list(x.shape)
-        transformer_options['transformer_index'] = 0
-        transformer_patches = transformer_options.get('patches', {})
-        num_video_frames = kwargs.get('num_video_frames', self.default_num_video_frames)
-        image_only_indicator = kwargs.get('image_only_indicator', None)
-        time_context = kwargs.get('time_context', None)
-        assert (y is not None) == (self.num_classes is not None), 'must specify y if and only if the model is class-conditional'
-        hs = []
-        t_emb = timestep_embedding(timesteps, self.model_channels, repeat_only=False)
-        emb = self.time_embed(t_emb)
-        if 'emb_patch' in transformer_patches:
-            patch = transformer_patches['emb_patch']
-            for p in patch:
-                emb = p(emb, self.model_channels, transformer_options)
-        if self.num_classes is not None:
-            assert y.shape[0] == x.shape[0]
-            emb = emb + self.label_emb(y)
-        h = x
-        for id, module in enumerate(self.input_blocks):
-            transformer_options['block'] = 'input', id
-            h = forward_timestep_embed(module, h, emb, context, transformer_options, time_context=time_context, num_video_frames=num_video_frames, image_only_indicator=image_only_indicator)
-            h = apply_control(h, control, 'input')
-            if 'input_block_patch' in transformer_patches:
-                patch = transformer_patches['input_block_patch']
-                for p in patch:
-                    h = p(h, transformer_options)
-            hs.append(h)
-            if 'input_block_patch_after_skip' in transformer_patches:
-                patch = transformer_patches['input_block_patch_after_skip']
-                for p in patch:
-                    h = p(h, transformer_options)
-        transformer_options['block'] = 'middle', 0
-        if self.middle_block is not None:
-            h = forward_timestep_embed(self.middle_block, h, emb, context, transformer_options, time_context=time_context, num_video_frames=num_video_frames, image_only_indicator=image_only_indicator)
-        h = apply_control(h, control, 'middle')
-        for id, module in enumerate(self.output_blocks):
-            transformer_options['block'] = 'output', id
-            hsp = hs.pop()
-            hsp = apply_control(hsp, control, 'output')
-            if 'output_block_patch' in transformer_patches:
-                patch = transformer_patches['output_block_patch']
-                for p in patch:
-                    h, hsp = p(h, hsp, transformer_options)
-            h = th.cat([h, hsp], dim=1)
-            del hsp
-            if len(hs) > 0:
-                output_shape = hs[-1].shape
-            else:
-                output_shape = None
-            h = forward_timestep_embed(module, h, emb, context, transformer_options, output_shape, time_context=time_context, num_video_frames=num_video_frames, image_only_indicator=image_only_indicator)
-        h = h.type(x.dtype)
-        if self.predict_codebook_ids:
-            return self.id_predictor(h)
-        else:
-            return self.out(h)
 
 
 def extract_into_tensor(a, t, x_shape):
@@ -6253,178 +5479,6 @@ def model_sampling(model_config, model_type):
     return ModelSampling(model_config)
 
 
-class BaseModel(torch.nn.Module):
-
-    def __init__(self, model_config, model_type=ModelType.EPS, device=None, unet_model=UNetModel):
-        super().__init__()
-        unet_config = model_config.unet_config
-        self.latent_format = model_config.latent_format
-        self.model_config = model_config
-        self.manual_cast_dtype = model_config.manual_cast_dtype
-        self.device = device
-        if not unet_config.get('disable_unet_model_creation', False):
-            if model_config.custom_operations is None:
-                fp8 = model_config.optimizations.get('fp8', model_config.scaled_fp8 is not None)
-                operations = comfy.ops.pick_operations(unet_config.get('dtype', None), self.manual_cast_dtype, fp8_optimizations=fp8, scaled_fp8=model_config.scaled_fp8)
-            else:
-                operations = model_config.custom_operations
-            self.diffusion_model = unet_model(**unet_config, device=device, operations=operations)
-            if comfy.model_management.force_channels_last():
-                self.diffusion_model
-                logging.debug('using channels last mode for diffusion model')
-            logging.info('model weight dtype {}, manual cast: {}'.format(self.get_dtype(), self.manual_cast_dtype))
-        self.model_type = model_type
-        self.model_sampling = model_sampling(model_config, model_type)
-        self.adm_channels = unet_config.get('adm_in_channels', None)
-        if self.adm_channels is None:
-            self.adm_channels = 0
-        self.concat_keys = ()
-        logging.info('model_type {}'.format(model_type.name))
-        logging.debug('adm {}'.format(self.adm_channels))
-        self.memory_usage_factor = model_config.memory_usage_factor
-
-    def apply_model(self, x, t, c_concat=None, c_crossattn=None, control=None, transformer_options={}, **kwargs):
-        sigma = t
-        xc = self.model_sampling.calculate_input(sigma, x)
-        if c_concat is not None:
-            xc = torch.cat([xc] + [c_concat], dim=1)
-        context = c_crossattn
-        dtype = self.get_dtype()
-        if self.manual_cast_dtype is not None:
-            dtype = self.manual_cast_dtype
-        xc = xc
-        t = self.model_sampling.timestep(t).float()
-        context = context
-        extra_conds = {}
-        for o in kwargs:
-            extra = kwargs[o]
-            if hasattr(extra, 'dtype'):
-                if extra.dtype != torch.int and extra.dtype != torch.long:
-                    extra = extra
-            extra_conds[o] = extra
-        model_output = self.diffusion_model(xc, t, context=context, control=control, transformer_options=transformer_options, **extra_conds).float()
-        return self.model_sampling.calculate_denoised(sigma, model_output, x)
-
-    def get_dtype(self):
-        return self.diffusion_model.dtype
-
-    def is_adm(self):
-        return self.adm_channels > 0
-
-    def encode_adm(self, **kwargs):
-        return None
-
-    def extra_conds(self, **kwargs):
-        out = {}
-        if len(self.concat_keys) > 0:
-            cond_concat = []
-            denoise_mask = kwargs.get('concat_mask', kwargs.get('denoise_mask', None))
-            concat_latent_image = kwargs.get('concat_latent_image', None)
-            if concat_latent_image is None:
-                concat_latent_image = kwargs.get('latent_image', None)
-            else:
-                concat_latent_image = self.process_latent_in(concat_latent_image)
-            noise = kwargs.get('noise', None)
-            device = kwargs['device']
-            if concat_latent_image.shape[1:] != noise.shape[1:]:
-                concat_latent_image = utils.common_upscale(concat_latent_image, noise.shape[-1], noise.shape[-2], 'bilinear', 'center')
-            concat_latent_image = utils.resize_to_batch_size(concat_latent_image, noise.shape[0])
-            if denoise_mask is not None:
-                if len(denoise_mask.shape) == len(noise.shape):
-                    denoise_mask = denoise_mask[:, :1]
-                denoise_mask = denoise_mask.reshape((-1, 1, denoise_mask.shape[-2], denoise_mask.shape[-1]))
-                if denoise_mask.shape[-2:] != noise.shape[-2:]:
-                    denoise_mask = utils.common_upscale(denoise_mask, noise.shape[-1], noise.shape[-2], 'bilinear', 'center')
-                denoise_mask = utils.resize_to_batch_size(denoise_mask.round(), noise.shape[0])
-            for ck in self.concat_keys:
-                if denoise_mask is not None:
-                    if ck == 'mask':
-                        cond_concat.append(denoise_mask)
-                    elif ck == 'masked_image':
-                        cond_concat.append(concat_latent_image)
-                elif ck == 'mask':
-                    cond_concat.append(torch.ones_like(noise)[:, :1])
-                elif ck == 'masked_image':
-                    cond_concat.append(self.blank_inpaint_image_like(noise))
-            data = torch.cat(cond_concat, dim=1)
-            out['c_concat'] = comfy.conds.CONDNoiseShape(data)
-        adm = self.encode_adm(**kwargs)
-        if adm is not None:
-            out['y'] = comfy.conds.CONDRegular(adm)
-        cross_attn = kwargs.get('cross_attn', None)
-        if cross_attn is not None:
-            out['c_crossattn'] = comfy.conds.CONDCrossAttn(cross_attn)
-        cross_attn_cnet = kwargs.get('cross_attn_controlnet', None)
-        if cross_attn_cnet is not None:
-            out['crossattn_controlnet'] = comfy.conds.CONDCrossAttn(cross_attn_cnet)
-        c_concat = kwargs.get('noise_concat', None)
-        if c_concat is not None:
-            out['c_concat'] = comfy.conds.CONDNoiseShape(c_concat)
-        return out
-
-    def load_model_weights(self, sd, unet_prefix=''):
-        to_load = {}
-        keys = list(sd.keys())
-        for k in keys:
-            if k.startswith(unet_prefix):
-                to_load[k[len(unet_prefix):]] = sd.pop(k)
-        to_load = self.model_config.process_unet_state_dict(to_load)
-        m, u = self.diffusion_model.load_state_dict(to_load, strict=False)
-        if len(m) > 0:
-            logging.warning('unet missing: {}'.format(m))
-        if len(u) > 0:
-            logging.warning('unet unexpected: {}'.format(u))
-        del to_load
-        return self
-
-    def process_latent_in(self, latent):
-        return self.latent_format.process_in(latent)
-
-    def process_latent_out(self, latent):
-        return self.latent_format.process_out(latent)
-
-    def state_dict_for_saving(self, clip_state_dict=None, vae_state_dict=None, clip_vision_state_dict=None):
-        extra_sds = []
-        if clip_state_dict is not None:
-            extra_sds.append(self.model_config.process_clip_state_dict_for_saving(clip_state_dict))
-        if vae_state_dict is not None:
-            extra_sds.append(self.model_config.process_vae_state_dict_for_saving(vae_state_dict))
-        if clip_vision_state_dict is not None:
-            extra_sds.append(self.model_config.process_clip_vision_state_dict_for_saving(clip_vision_state_dict))
-        unet_state_dict = self.diffusion_model.state_dict()
-        if self.model_config.scaled_fp8 is not None:
-            unet_state_dict['scaled_fp8'] = torch.tensor([], dtype=self.model_config.scaled_fp8)
-        unet_state_dict = self.model_config.process_unet_state_dict_for_saving(unet_state_dict)
-        if self.model_type == ModelType.V_PREDICTION:
-            unet_state_dict['v_pred'] = torch.tensor([])
-        for sd in extra_sds:
-            unet_state_dict.update(sd)
-        return unet_state_dict
-
-    def set_inpaint(self):
-        self.concat_keys = 'mask', 'masked_image'
-
-        def blank_inpaint_image_like(latent_image):
-            blank_image = torch.ones_like(latent_image)
-            blank_image[:, 0] *= 0.8223
-            blank_image[:, 1] *= -0.6876
-            blank_image[:, 2] *= 0.6364
-            blank_image[:, 3] *= 0.138
-            return blank_image
-        self.blank_inpaint_image_like = blank_inpaint_image_like
-
-    def memory_required(self, input_shape):
-        if comfy.model_management.xformers_enabled() or comfy.model_management.pytorch_attention_flash_attention():
-            dtype = self.get_dtype()
-            if self.manual_cast_dtype is not None:
-                dtype = self.manual_cast_dtype
-            area = input_shape[0] * math.prod(input_shape[2:])
-            return area * comfy.model_management.dtype_size(dtype) * 0.01 * self.memory_usage_factor * (1024 * 1024)
-        else:
-            area = input_shape[0] * math.prod(input_shape[2:])
-            return area * 0.15 * self.memory_usage_factor * (1024 * 1024)
-
-
 def unclip_adm(unclip_conditioning, device, noise_augmentor, noise_augment_merge=0.0, seed=None):
     adm_inputs = []
     weights = []
@@ -6446,102 +5500,6 @@ def unclip_adm(unclip_conditioning, device, noise_augmentor, noise_augment_merge
         c_adm, noise_level_emb = noise_augmentor(adm_out[:, :noise_augmentor.time_embed.dim], noise_level=torch.tensor([noise_level], device=device))
         adm_out = torch.cat((c_adm, noise_level_emb), 1)
     return adm_out
-
-
-class SD21UNCLIP(BaseModel):
-
-    def __init__(self, model_config, noise_aug_config, model_type=ModelType.V_PREDICTION, device=None):
-        super().__init__(model_config, model_type, device=device)
-        self.noise_augmentor = CLIPEmbeddingNoiseAugmentation(**noise_aug_config)
-
-    def encode_adm(self, **kwargs):
-        unclip_conditioning = kwargs.get('unclip_conditioning', None)
-        device = kwargs['device']
-        if unclip_conditioning is None:
-            return torch.zeros((1, self.adm_channels))
-        else:
-            return unclip_adm(unclip_conditioning, device, self.noise_augmentor, kwargs.get('unclip_noise_augment_merge', 0.05), kwargs.get('seed', 0) - 10)
-
-
-class StableCascade_C(BaseModel):
-
-    def __init__(self, model_config, model_type=ModelType.STABLE_CASCADE, device=None):
-        super().__init__(model_config, model_type, device=device, unet_model=StageC)
-        self.diffusion_model.eval().requires_grad_(False)
-
-    def extra_conds(self, **kwargs):
-        out = {}
-        clip_text_pooled = kwargs['pooled_output']
-        if clip_text_pooled is not None:
-            out['clip_text_pooled'] = comfy.conds.CONDRegular(clip_text_pooled)
-        if 'unclip_conditioning' in kwargs:
-            embeds = []
-            for unclip_cond in kwargs['unclip_conditioning']:
-                weight = unclip_cond['strength']
-                embeds.append(unclip_cond['clip_vision_output'].image_embeds.unsqueeze(0) * weight)
-            clip_img = torch.cat(embeds, dim=1)
-        else:
-            clip_img = torch.zeros((1, 1, 768))
-        out['clip_img'] = comfy.conds.CONDRegular(clip_img)
-        out['sca'] = comfy.conds.CONDRegular(torch.zeros((1,)))
-        out['crp'] = comfy.conds.CONDRegular(torch.zeros((1,)))
-        cross_attn = kwargs.get('cross_attn', None)
-        if cross_attn is not None:
-            out['clip_text'] = comfy.conds.CONDCrossAttn(cross_attn)
-        return out
-
-
-class StableCascade_B(BaseModel):
-
-    def __init__(self, model_config, model_type=ModelType.STABLE_CASCADE, device=None):
-        super().__init__(model_config, model_type, device=device, unet_model=StageB)
-        self.diffusion_model.eval().requires_grad_(False)
-
-    def extra_conds(self, **kwargs):
-        out = {}
-        noise = kwargs.get('noise', None)
-        clip_text_pooled = kwargs['pooled_output']
-        if clip_text_pooled is not None:
-            out['clip'] = comfy.conds.CONDRegular(clip_text_pooled)
-        prior = kwargs.get('stable_cascade_prior', torch.zeros((1, 16, noise.shape[2] * 4 // 42, noise.shape[3] * 4 // 42), dtype=noise.dtype, layout=noise.layout, device=noise.device))
-        out['effnet'] = comfy.conds.CONDRegular(prior)
-        out['sca'] = comfy.conds.CONDRegular(torch.zeros((1,)))
-        return out
-
-
-class StableAudio1(BaseModel):
-
-    def __init__(self, model_config, seconds_start_embedder_weights, seconds_total_embedder_weights, model_type=ModelType.V_PREDICTION_CONTINUOUS, device=None):
-        super().__init__(model_config, model_type, device=device, unet_model=comfy.ldm.audio.dit.AudioDiffusionTransformer)
-        self.seconds_start_embedder = comfy.ldm.audio.embedders.NumberConditioner(768, min_val=0, max_val=512)
-        self.seconds_total_embedder = comfy.ldm.audio.embedders.NumberConditioner(768, min_val=0, max_val=512)
-        self.seconds_start_embedder.load_state_dict(seconds_start_embedder_weights)
-        self.seconds_total_embedder.load_state_dict(seconds_total_embedder_weights)
-
-    def extra_conds(self, **kwargs):
-        out = {}
-        noise = kwargs.get('noise', None)
-        device = kwargs['device']
-        seconds_start = kwargs.get('seconds_start', 0)
-        seconds_total = kwargs.get('seconds_total', int(noise.shape[-1] / 21.53))
-        seconds_start_embed = self.seconds_start_embedder([seconds_start])[0]
-        seconds_total_embed = self.seconds_total_embedder([seconds_total])[0]
-        global_embed = torch.cat([seconds_start_embed, seconds_total_embed], dim=-1).reshape((1, -1))
-        out['global_embed'] = comfy.conds.CONDRegular(global_embed)
-        cross_attn = kwargs.get('cross_attn', None)
-        if cross_attn is not None:
-            cross_attn = torch.cat([cross_attn, seconds_start_embed.repeat((cross_attn.shape[0], 1, 1)), seconds_total_embed.repeat((cross_attn.shape[0], 1, 1))], dim=1)
-            out['c_crossattn'] = comfy.conds.CONDRegular(cross_attn)
-        return out
-
-    def state_dict_for_saving(self, clip_state_dict=None, vae_state_dict=None, clip_vision_state_dict=None):
-        sd = super().state_dict_for_saving(clip_state_dict=clip_state_dict, vae_state_dict=vae_state_dict, clip_vision_state_dict=clip_vision_state_dict)
-        d = {'conditioner.conditioners.seconds_start.': self.seconds_start_embedder.state_dict(), 'conditioner.conditioners.seconds_total.': self.seconds_total_embedder.state_dict()}
-        for k in d:
-            s = d[k]
-            for l in s:
-                sd['{}{}'.format(k, l)] = s[l]
-        return sd
 
 
 class ModelSamplingDiscreteEDM(ModelSamplingDiscrete):
@@ -7526,9 +6484,6 @@ TESTCASES = [
     (TimestepEmbedSequential,
      lambda: ([], {}),
      lambda: ([], {'x': 4, 'emb': 4})),
-    (Upsample,
-     lambda: ([], {'channels': 4, 'use_conv': 4}),
-     lambda: ([torch.rand([4, 4, 4, 4])], {})),
     (VectorQuantize,
      lambda: ([], {'embedding_size': 4, 'k': 4}),
      lambda: ([torch.rand([4, 4, 4, 4])], {})),

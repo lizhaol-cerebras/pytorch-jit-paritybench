@@ -1,680 +1,8 @@
-import sys
-_module = sys.modules[__name__]
-del sys
-conftest = _module
-gray_test = _module
-conftest = _module
-generate_examples = _module
-image_registration = _module
-conf = _module
-kornia = _module
-_2d = _module
-base = _module
-geometric = _module
-affine = _module
-center_crop = _module
-crop = _module
-elastic_transform = _module
-fisheye = _module
-horizontal_flip = _module
-pad = _module
-perspective = _module
-resize = _module
-resized_crop = _module
-rotation = _module
-shear = _module
-thin_plate_spline = _module
-translate = _module
-vertical_flip = _module
-intensity = _module
-auto_contrast = _module
-base = _module
-box_blur = _module
-brightness = _module
-channel_dropout = _module
-channel_shuffle = _module
-clahe = _module
-color_jiggle = _module
-color_jitter = _module
-contrast = _module
-denormalize = _module
-dissolving = _module
-equalize = _module
-erasing = _module
-gamma = _module
-gaussian_blur = _module
-gaussian_illumination = _module
-gaussian_noise = _module
-grayscale = _module
-hue = _module
-invert = _module
-jpeg = _module
-linear_illumination = _module
-median_blur = _module
-motion_blur = _module
-normalize = _module
-planckian_jitter = _module
-plasma = _module
-posterize = _module
-random_rain = _module
-random_rgb_shift = _module
-random_snow = _module
-salt_pepper_noise = _module
-saturation = _module
-sharpness = _module
-solarize = _module
-mix = _module
-base = _module
-cutmix = _module
-jigsaw = _module
-mixup = _module
-mosaic = _module
-transplantation = _module
-_3d = _module
-base = _module
-affine = _module
-center_crop = _module
-crop = _module
-depthical_flip = _module
-horizontal_flip = _module
-perspective = _module
-rotation = _module
-vertical_flip = _module
-equalize = _module
-motion_blur = _module
-augmentation = _module
-auto = _module
-autoaugment = _module
-autoaugment = _module
-ops = _module
-base = _module
-operations = _module
-base = _module
-policy = _module
-rand_augment = _module
-rand_augment = _module
-trivial_augment = _module
-trivial_augment = _module
-base = _module
-container = _module
-augment = _module
-base = _module
-dispatcher = _module
-image = _module
-ops = _module
-params = _module
-patch = _module
-video = _module
-affine = _module
-channel_dropout = _module
-color_jiggle = _module
-color_jitter = _module
-crop = _module
-cutmix = _module
-gaussian_blur = _module
-gaussian_illumination = _module
-jigsaw = _module
-jpeg = _module
-linear_illumination = _module
-mixup = _module
-mosaic = _module
-motion_blur = _module
-perspective = _module
-plain_uniform = _module
-planckian_jitter = _module
-posterize = _module
-probability = _module
-random_rain = _module
-rectangle_earase = _module
-resize = _module
-salt_pepper_noise = _module
-shear = _module
-translate = _module
-affine = _module
-crop = _module
-motion_blur = _module
-perspective = _module
-rotation = _module
-random_generator = _module
-base = _module
-utils = _module
-helpers = _module
-param_validation = _module
-color = _module
-_colormap_data = _module
-colormap = _module
-gray = _module
-hls = _module
-hsv = _module
-lab = _module
-luv = _module
-raw = _module
-rgb = _module
-sepia = _module
-xyz = _module
-ycbcr = _module
-yuv = _module
-config = _module
-constants = _module
-contrib = _module
-classification = _module
-connected_components = _module
-diamond_square = _module
-distance_transform = _module
-edge_detection = _module
-extract_patches = _module
-face_detection = _module
-histogram_matching = _module
-image_stitching = _module
-kmeans = _module
-lambda_module = _module
-models = _module
-base = _module
-common = _module
-efficient_vit = _module
-backbone = _module
-model = _module
-nn = _module
-act = _module
-norm = _module
-ops = _module
-list = _module
-network = _module
-rt_detr = _module
-architecture = _module
-hgnetv2 = _module
-hybrid_encoder = _module
-resnet_d = _module
-rtdetr_head = _module
-model = _module
-post_processor = _module
-sam = _module
-common = _module
-image_encoder = _module
-mask_decoder = _module
-prompt_encoder = _module
-transformer = _module
-model = _module
-structures = _module
-tiny_vit = _module
-object_detection = _module
-visual_prompter = _module
-vit = _module
-vit_mobile = _module
-core = _module
-_backend = _module
-check = _module
-external = _module
-mixin = _module
-image_module = _module
-onnx = _module
-module = _module
-tensor_wrapper = _module
-enhance = _module
-adjust = _module
-core = _module
-equalization = _module
-histogram = _module
-integral = _module
-jpeg = _module
-normalize = _module
-rescale = _module
-shift_rgb = _module
-zca = _module
-feature = _module
-adalam = _module
-adalam = _module
-core = _module
-ransac = _module
-utils = _module
-affine_shape = _module
-dedode = _module
-decoder = _module
-dedode = _module
-dedode_models = _module
-descriptor = _module
-detector = _module
-encoder = _module
-dinov2 = _module
-layers = _module
-attention = _module
-block = _module
-dino_head = _module
-drop_path = _module
-layer_scale = _module
-mlp = _module
-patch_embed = _module
-swiglu_ffn = _module
-utils = _module
-vgg = _module
-defmo = _module
-disk = _module
-_unets = _module
-blocks = _module
-unet = _module
-detector = _module
-disk = _module
-structs = _module
-hardnet = _module
-hynet = _module
-integrated = _module
-keynet = _module
-laf = _module
-lightglue = _module
-lightglue_onnx = _module
-lightglue = _module
-download = _module
-keypoints = _module
-loftr = _module
-resnet_fpn = _module
-loftr = _module
-loftr_module = _module
-fine_preprocess = _module
-linear_attention = _module
-transformer = _module
-coarse_matching = _module
-fine_matching = _module
-geometry = _module
-position_encoding = _module
-supervision = _module
-matching = _module
-mkd = _module
-orientation = _module
-responses = _module
-scale_space_detector = _module
-siftdesc = _module
-sold2 = _module
-backbones = _module
-sold2 = _module
-sold2_detector = _module
-sosnet = _module
-steerers = _module
-tfeat = _module
-filters = _module
-bilateral = _module
-blur = _module
-blur_pool = _module
-canny = _module
-dexined = _module
-dissolving = _module
-filter = _module
-gaussian = _module
-guided = _module
-in_range = _module
-kernels = _module
-kernels_geometry = _module
-laplacian = _module
-median = _module
-motion = _module
-sobel = _module
-unsharp = _module
-bbox = _module
-boxes = _module
-calibration = _module
-distort = _module
-pnp = _module
-undistort = _module
-camera = _module
-distortion_affine = _module
-distortion_kannala_brandt = _module
-perspective = _module
-pinhole = _module
-projection_orthographic = _module
-projection_z1 = _module
-stereo = _module
-conversions = _module
-depth = _module
-epipolar = _module
-_metrics = _module
-essential = _module
-fundamental = _module
-numeric = _module
-projection = _module
-scene = _module
-triangulation = _module
-homography = _module
-keypoints = _module
-liegroup = _module
-_utils = _module
-se2 = _module
-se3 = _module
-so2 = _module
-so3 = _module
-linalg = _module
-line = _module
-plane = _module
-pose = _module
-quaternion = _module
-ransac = _module
-ray = _module
-solvers = _module
-polynomial_solver = _module
-subpix = _module
-dsnt = _module
-nms = _module
-spatial_soft_argmax = _module
-transform = _module
-affwarp = _module
-crop2d = _module
-crop3d = _module
-elastic_transform = _module
-flips = _module
-homography_warper = _module
-image_registrator = _module
-imgwarp = _module
-pyramid = _module
-thin_plate_spline = _module
-vector = _module
-grad_estimator = _module
-ste = _module
-image = _module
-io = _module
-io = _module
-losses = _module
-_utils = _module
-cauchy = _module
-charbonnier = _module
-depth_smooth = _module
-dice = _module
-divergence = _module
-focal = _module
-geman_mcclure = _module
-hausdorff = _module
-lovasz_hinge = _module
-lovasz_softmax = _module
-ms_ssim = _module
-psnr = _module
-ssim = _module
-ssim3d = _module
-total_variation = _module
-tversky = _module
-welsch = _module
-metrics = _module
-accuracy = _module
-average_meter = _module
-confusion_matrix = _module
-endpoint_error = _module
-mean_average_precision = _module
-mean_iou = _module
-psnr = _module
-ssim = _module
-ssim3d = _module
-_hf_models = _module
-hf_onnx_community = _module
-preprocessor = _module
-base = _module
-depth_estimation = _module
-base = _module
-depth_anything = _module
-detection = _module
-base = _module
-rtdetr = _module
-base = _module
-dexined = _module
-segmentation = _module
-base = _module
-segmentation_models = _module
-super_resolution = _module
-base = _module
-rrdbnet = _module
-small_sr = _module
-tracking = _module
-boxmot_tracker = _module
-utils = _module
-morphology = _module
-morphology = _module
-nerf = _module
-camera_utils = _module
-data_utils = _module
-nerf_model = _module
-nerf_solver = _module
-positional_encoder = _module
-samplers = _module
-volume_renderer = _module
-sequential = _module
-sensors = _module
-camera_model = _module
-distortion_model = _module
-projection_model = _module
-testing = _module
-planar_tracker = _module
-transpiler = _module
-transpiler = _module
-_compat = _module
-draw = _module
-grid = _module
-helpers = _module
-image = _module
-image_print = _module
-memory = _module
-misc = _module
-one_hot = _module
-pointcloud_io = _module
-sample = _module
-x = _module
-callbacks = _module
-trainer = _module
-trainers = _module
-utils = _module
-datasets = _module
-base = _module
-casts = _module
-error = _module
-create = _module
-linalg = _module
-overwrite = _module
-tests = _module
-test_augmentation = _module
-test_augmentation_3d = _module
-test_augmentation_mix = _module
-test_auto_operation = _module
-test_backward = _module
-test_backward_3d = _module
-test_base = _module
-test_container = _module
-test_dist_mapper = _module
-test_motionblur = _module
-test_perspective_rand = _module
-test_random_generator = _module
-test_random_generator_3d = _module
-benchmark = _module
-test_colormap = _module
-test_gray = _module
-test_hls = _module
-test_hsv = _module
-test_lab = _module
-test_luv = _module
-test_raw = _module
-test_rgb = _module
-test_sepia = _module
-test_xyz = _module
-test_ycbcr = _module
-test_yuv = _module
-test_efficient_vit = _module
-test_rt_detr = _module
-test_sam = _module
-test_tiny_vit = _module
-test_classification_head = _module
-test_combine_tensor_patch = _module
-test_connected_component = _module
-test_conv_distance_transformer = _module
-test_diamond_square = _module
-test_edge_detector = _module
-test_extract_tensor_patch = _module
-test_face_detection = _module
-test_hist_match = _module
-test_image_stitcher = _module
-test_kmeans = _module
-test_lambda_module = _module
-test_mobile_vit = _module
-test_object_detector = _module
-test_prompter = _module
-test_vision_transformer = _module
-test_check = _module
-test_lazyloader = _module
-test_module = _module
-test_tensor_wrapper = _module
-test_adjust = _module
-test_core = _module
-test_equalization = _module
-test_histogram = _module
-test_integral = _module
-test_jpeg = _module
-test_normalize = _module
-test_shift_rgb = _module
-test_zca = _module
-test_affine_shape_estimator = _module
-test_dedode = _module
-test_defmo = _module
-test_disk = _module
-test_hardnet = _module
-test_hynet = _module
-test_integrated = _module
-test_keynet = _module
-test_laf = _module
-test_lightglue_onnx = _module
-test_local_features_orientation = _module
-test_loftr = _module
-test_matching = _module
-test_mkd = _module
-test_responces_local_features = _module
-test_scale_space_detector = _module
-test_siftdesc = _module
-test_sold2 = _module
-test_sosnet = _module
-test_steerer = _module
-test_tfeat = _module
-test_bilateral = _module
-test_blur = _module
-test_blur_pool = _module
-test_canny = _module
-test_dissolving = _module
-test_filters = _module
-test_gaussian = _module
-test_guided = _module
-test_hanning = _module
-test_in_range = _module
-test_laplacian = _module
-test_median = _module
-test_motion = _module
-test_sobel = _module
-test_unsharp_mask = _module
-test_distort = _module
-test_pnp = _module
-test_undistort = _module
-test_distortion = _module
-test_perspective = _module
-test_pinhole = _module
-test_projections = _module
-test_stereo = _module
-test_epipolar_metrics = _module
-test_essential = _module
-test_fundamental = _module
-test_numeric = _module
-test_projection = _module
-test_triangulation = _module
-test_se2 = _module
-test_se3 = _module
-test_so2 = _module
-test_so3 = _module
-test_polynomial_solver = _module
-test_dsnt = _module
-test_nms = _module
-test_spatial_softargmax = _module
-test_bbox = _module
-test_boxes = _module
-test_conversions = _module
-test_depth = _module
-test_depth_warper = _module
-test_homography = _module
-test_linalg = _module
-test_line = _module
-test_plane = _module
-test_pose = _module
-test_quaternion = _module
-test_ransac = _module
-test_vector = _module
-test_affine = _module
-test_crop2d = _module
-test_crop3d = _module
-test_elastic_transform = _module
-test_flip = _module
-test_homography_warper = _module
-test_image_registrator = _module
-test_imgwarp = _module
-test_imgwarp3d = _module
-test_pyramid = _module
-test_thin_plate_spline = _module
-test_ste = _module
-test_image = _module
-test_conversions = _module
-test_focal = _module
-test_soft_argmax2d = _module
-test_warp = _module
-test_io_image = _module
-test_cauchy = _module
-test_charbonnier = _module
-test_depth_smoothness = _module
-test_dice = _module
-test_divergence = _module
-test_focal_loss = _module
-test_geman_macclure = _module
-test_hd = _module
-test_lovaz_hinge = _module
-test_lovaz_softmax = _module
-test_psnr = _module
-test_ssim = _module
-test_total_variation = _module
-test_tversky = _module
-test_welcsh = _module
-test_aepe = _module
-test_confusion = _module
-test_map = _module
-test_mean_iou = _module
-test_psnr_metric = _module
-test_ssim3d = _module
-box_filtering = _module
-test_bottom_hat = _module
-test_closing = _module
-test_dilation = _module
-test_erosion = _module
-test_gradient = _module
-test_opening = _module
-test_top_hat = _module
-test_camera_utils = _module
-test_data_utils = _module
-test_nerf_model = _module
-test_nerf_solver = _module
-test_positional_encoder = _module
-test_rays = _module
-test_renderer = _module
-test_sequential = _module
-test_utils = _module
-test_imgwarp_speed = _module
-test_project_points_speed = _module
-test_camera_model = _module
-test_distortion_model = _module
-test_projection_model = _module
-smoke_test = _module
-test_planar_tracking = _module
-test_draw = _module
-test_grid = _module
-test_helpers = _module
-test_image_utils = _module
-test_memory = _module
-test_misc = _module
-test_one_hot = _module
-test_pointcloud_io = _module
-test_print = _module
-test_detection = _module
-test_image_classification = _module
-test_segmentation = _module
-test_x = _module
 
 from unittest.mock import mock_open, MagicMock
 from torch.autograd import Function
 from torch.nn import Module
-import abc, collections, copy, enum, functools, inspect, itertools, logging, math, matplotlib, numbers, numpy, pandas, queue, random, re, scipy, sklearn, string, tensorflow, time, torch, torchaudio, torchvision, types, typing, uuid, warnings
+import abc, collections, copy, enum, functools, inspect, itertools, logging, math, matplotlib, numbers, numpy, pandas, queue, random, re, scipy, sklearn, string, tensorflow, time, torch, torchvision, types, typing, uuid, warnings
 import operator as op
 from dataclasses import dataclass
 import numpy as np
@@ -1098,6 +426,19 @@ def _boxes_to_quadrilaterals(boxes: 'torch.Tensor', mode: 'str'='xyxy', validate
 
 def _is_floating_point_dtype(dtype: 'torch.dtype') ->bool:
     return dtype in (torch.float16, torch.float32, torch.float64, torch.bfloat16, torch.half)
+
+
+def _merge_box_list(boxes: 'list[torch.Tensor]', method: 'str'='pad') ->tuple[torch.Tensor, list[int]]:
+    """Merge a list of boxes into one tensor."""
+    if not all(box.shape[-2:] == torch.Size([4, 2]) and box.dim() == 3 for box in boxes):
+        raise TypeError(f'Input boxes must be a list of (N, 4, 2) shaped. Got: {[box.shape for box in boxes]}.')
+    if method == 'pad':
+        max_N = max(box.shape[0] for box in boxes)
+        stats = [(max_N - box.shape[0]) for box in boxes]
+        output = torch.nn.utils.rnn.pad_sequence(boxes, batch_first=True)
+    else:
+        raise NotImplementedError(f'`{method}` is not implemented.')
+    return output, stats
 
 
 where = torch.where
@@ -5939,6 +5280,21 @@ _VALID_BORDERS = {'constant', 'reflect', 'replicate', 'circular'}
 _VALID_PADDING = {'valid', 'same'}
 
 
+def _compute_padding(kernel_size: 'list[int]') ->list[int]:
+    """Compute padding tuple."""
+    if len(kernel_size) < 2:
+        raise AssertionError(kernel_size)
+    computed = [(k - 1) for k in kernel_size]
+    out_padding = 2 * len(kernel_size) * [0]
+    for i in range(len(kernel_size)):
+        computed_tmp = computed[-(i + 1)]
+        pad_front = computed_tmp // 2
+        pad_rear = computed_tmp - pad_front
+        out_padding[2 * i + 0] = pad_front
+        out_padding[2 * i + 1] = pad_rear
+    return out_padding
+
+
 def normalize_kernel2d(input: 'Tensor') ->Tensor:
     """Normalize both derivative and smoothing kernel."""
     KORNIA_CHECK_SHAPE(input, ['*', 'H', 'W'])
@@ -8973,6 +8329,12 @@ class ConvLayer(Module):
         return x
 
 
+def val2list(x: 'Union[list[Any], tuple[Any, ...], Any]', repeat_time: 'int'=1) ->list[Any]:
+    if isinstance(x, (list, tuple)):
+        return list(x)
+    return [x for _ in range(repeat_time)]
+
+
 def val2tuple(x: 'Union[list[Any], tuple[Any, ...], Any]', min_len: 'int'=1, idx_repeat: 'int'=-1) ->tuple[Any, ...]:
     x = val2list(x)
     if len(x) > 0:
@@ -9464,6 +8826,55 @@ class TransformerEncoder(Module):
         return out
 
 
+class CCFM(Module):
+
+    def __init__(self, num_fmaps: 'int', hidden_dim: 'int', expansion: 'float'=1.0) ->None:
+        super().__init__()
+        self.lateral_convs = nn.ModuleList()
+        self.fpn_blocks = nn.ModuleList()
+        for _ in range(num_fmaps - 1):
+            self.lateral_convs.append(ConvNormAct(hidden_dim, hidden_dim, 1, 1, 'silu'))
+            self.fpn_blocks.append(CSPRepLayer(hidden_dim * 2, hidden_dim, 3, expansion))
+        self.downsample_convs = nn.ModuleList()
+        self.pan_blocks = nn.ModuleList()
+        for _ in range(num_fmaps - 1):
+            self.downsample_convs.append(ConvNormAct(hidden_dim, hidden_dim, 3, 2, 'silu'))
+            self.pan_blocks.append(CSPRepLayer(hidden_dim * 2, hidden_dim, 3, expansion))
+
+    def forward(self, fmaps: 'list[Tensor]') ->list[Tensor]:
+        fmaps = list(fmaps)
+        new_fmaps = [fmaps.pop()]
+        while fmaps:
+            new_fmaps[-1] = self.lateral_convs[len(new_fmaps) - 1](new_fmaps[-1])
+            up_lowres_fmap = F.interpolate(new_fmaps[-1], scale_factor=2.0, mode='nearest')
+            hires_fmap = fmaps.pop()
+            concat_fmap = concatenate([up_lowres_fmap, hires_fmap], 1)
+            new_fmaps.append(self.fpn_blocks[len(new_fmaps) - 1](concat_fmap))
+        fmaps = [new_fmaps.pop()]
+        while new_fmaps:
+            down_hires_fmap = self.downsample_convs[len(fmaps) - 1](fmaps[-1])
+            lowres_fmap = new_fmaps.pop()
+            concat_fmap = concatenate([down_hires_fmap, lowres_fmap], 1)
+            fmaps.append(self.pan_blocks[len(fmaps) - 1](concat_fmap))
+        return fmaps
+
+
+class HybridEncoder(Module):
+
+    def __init__(self, in_channels: 'list[int]', hidden_dim: 'int', dim_feedforward: 'int', expansion: 'float'=1.0) ->None:
+        super().__init__()
+        self.input_proj = nn.ModuleList([ConvNormAct(in_ch, hidden_dim, 1, act='none', conv_naming='0', norm_naming='1', act_naming='2') for in_ch in in_channels])
+        encoder_layer = AIFI(hidden_dim, 8, dim_feedforward)
+        self.encoder = nn.Sequential(TransformerEncoder(encoder_layer, 1))
+        self.ccfm = CCFM(len(in_channels), hidden_dim, expansion)
+
+    def forward(self, fmaps: 'list[Tensor]') ->list[Tensor]:
+        projected_maps = [proj(fmap) for proj, fmap in zip(self.input_proj, fmaps)]
+        projected_maps[-1] = self.encoder(projected_maps[-1])
+        new_fmaps = self.ccfm(projected_maps)
+        return new_fmaps
+
+
 def _make_shortcut(in_channels: 'int', out_channels: 'int', stride: 'int') ->Module:
     return nn.Sequential(OrderedDict([('pool', nn.AvgPool2d(2, 2)), ('conv', ConvNormAct(in_channels, out_channels, 1, act='none'))])) if stride == 2 else ConvNormAct(in_channels, out_channels, 1, act='none')
 
@@ -9763,6 +9174,107 @@ class TransformerDecoder(Module):
         return torch.stack(dec_out_bboxes), torch.stack(dec_out_logits)
 
 
+class RTDETRHead(Module):
+
+    def __init__(self, num_classes: 'int', hidden_dim: 'int', num_queries: 'int', in_channels: 'list[int]', num_decoder_layers: 'int', num_heads: 'int'=8, num_decoder_points: 'int'=4, num_levels: 'int'=3, dropout: 'float'=0.0, num_denoising: 'int'=100) ->None:
+        super().__init__()
+        self.num_classes = num_classes
+        self.num_queries = num_queries
+        if len(in_channels) > num_levels:
+            raise ValueError(f'`num_levels` cannot be greater than {len(in_channels)}. Got {num_levels}.')
+        self.num_levels = num_levels
+        self.input_proj = nn.ModuleList()
+        for ch_in in in_channels:
+            self.input_proj.append(ConvNormAct(ch_in, hidden_dim, 1, act='none'))
+        decoder_layer = TransformerDecoderLayer(embed_dim=hidden_dim, num_heads=num_heads, dropout=dropout, num_levels=self.num_levels, num_points=num_decoder_points)
+        self.decoder = TransformerDecoder(hidden_dim=hidden_dim, decoder_layer=decoder_layer, num_layers=num_decoder_layers)
+        if num_denoising > 0:
+            self.denoising_class_embed = nn.Embedding(num_classes + 1, hidden_dim, padding_idx=num_classes)
+        self.query_pos_head = MLP(4, 2 * hidden_dim, hidden_dim, num_layers=2)
+        self.enc_output = nn.Sequential(nn.Linear(hidden_dim, hidden_dim), nn.LayerNorm(hidden_dim))
+        self.enc_score_head = nn.Linear(hidden_dim, num_classes)
+        self.enc_bbox_head = MLP(hidden_dim, hidden_dim, 4, num_layers=3)
+        self.dec_score_head = nn.ModuleList([nn.Linear(hidden_dim, num_classes) for _ in range(num_decoder_layers)])
+        self.dec_bbox_head = nn.ModuleList([MLP(hidden_dim, hidden_dim, 4, num_layers=3) for _ in range(num_decoder_layers)])
+
+    def forward(self, feats: 'Tensor') ->tuple[Tensor, Tensor]:
+        memory, spatial_shapes, level_start_index = self._get_encoder_input(feats)
+        denoising_class, denoising_bbox_unact, attn_mask = None, None, None
+        target, init_ref_points_unact, enc_topk_bboxes, enc_topk_logits = self._get_decoder_input(memory, spatial_shapes, denoising_class, denoising_bbox_unact)
+        out_bboxes, out_logits = self.decoder(target, init_ref_points_unact, memory, spatial_shapes, level_start_index, self.dec_bbox_head, self.dec_score_head, self.query_pos_head, attn_mask=attn_mask)
+        return out_logits[-1], out_bboxes[-1]
+
+    def _get_encoder_input(self, feats: 'Tensor') ->tuple[Tensor, list[tuple[int, int]], list[int]]:
+        proj_feats: 'list[Tensor]' = [self.input_proj[i](feat) for i, feat in enumerate(feats)]
+        if self.num_levels > len(proj_feats):
+            len_srcs = len(proj_feats)
+            for i in range(len_srcs, self.num_levels):
+                if i == len_srcs:
+                    proj_feats.append(self.input_proj[i](feats[-1]))
+                else:
+                    proj_feats.append(self.input_proj[i](proj_feats[-1]))
+        feat_flatten_list: 'list[Tensor]' = []
+        spatial_shapes: 'list[tuple[int, int]]' = []
+        level_start_index: 'list[int]' = [0]
+        for i, feat in enumerate(proj_feats):
+            _, _, h, w = feat.shape
+            feat_flatten_list.append(feat.flatten(2).permute(0, 2, 1))
+            spatial_shapes.append((h, w))
+            level_start_index.append(h * w + level_start_index[-1])
+        feat_flatten: 'Tensor' = concatenate(feat_flatten_list, 1)
+        level_start_index.pop()
+        return feat_flatten, spatial_shapes, level_start_index
+
+    def _get_decoder_input(self, memory: 'Tensor', spatial_shapes: 'list[tuple[int, int]]', denoising_class: 'Optional[Tensor]'=None, denoising_bbox_unact: 'Optional[Tensor]'=None) ->tuple[Tensor, Tensor, Tensor, Tensor]:
+        anchors, valid_mask = self._generate_anchors(spatial_shapes, device=memory.device, dtype=memory.dtype)
+        memory = valid_mask * memory
+        output_memory = self.enc_output(memory)
+        enc_outputs_class = self.enc_score_head(output_memory)
+        enc_outputs_coord_unact = self.enc_bbox_head(output_memory) + anchors
+        _, topk_ind = torch.topk(enc_outputs_class.max(-1).values, self.num_queries, dim=1)
+        reference_points_unact = enc_outputs_coord_unact.gather(dim=1, index=topk_ind.unsqueeze(-1).repeat(1, 1, enc_outputs_coord_unact.shape[-1]))
+        enc_topk_bboxes = torch.sigmoid(reference_points_unact)
+        if denoising_bbox_unact is not None:
+            reference_points_unact = torch.concat([denoising_bbox_unact, reference_points_unact], 1)
+        enc_topk_logits = enc_outputs_class.gather(dim=1, index=topk_ind.unsqueeze(-1).repeat(1, 1, enc_outputs_class.shape[-1]))
+        target = output_memory.gather(dim=1, index=topk_ind.unsqueeze(-1).repeat(1, 1, output_memory.shape[-1]))
+        if denoising_class is not None:
+            target = torch.concat([denoising_class, target], 1)
+        return target.detach(), reference_points_unact.detach(), enc_topk_bboxes, enc_topk_logits
+
+    @staticmethod
+    def _generate_anchors(spatial_shapes: 'list[tuple[int, int]]', grid_size: 'float'=0.05, eps: 'float'=0.01, device: 'Optional[torch.device]'=None, dtype: 'Optional[torch.dtype]'=None) ->tuple[Tensor, Tensor]:
+        """Generate anchors for RT-DETR.
+
+        Args:
+            spatial_shapes: shape (width, height) of the feature maps
+            grid_size: size of the grid
+            eps: specify the minimum and maximum size of the anchors
+            device: device to place the anchors
+            dtype: data type for the anchors
+
+        Returns:
+            logit of anchors and mask
+        """
+        anchors_list: 'list[Tensor]' = []
+        for i, (h, w) in enumerate(spatial_shapes):
+            grid_y, grid_x = torch_meshgrid([torch.arange(h, device=device, dtype=dtype), torch.arange(w, device=device, dtype=dtype)], indexing='ij')
+            grid_xy = torch.stack([grid_x, grid_y], -1)
+            wh = torch.empty(2, device=device, dtype=dtype)
+            wh[0] = w
+            wh[1] = h
+            grid_xy = (grid_xy + 0.5) / wh
+            grid_wh = torch.ones_like(grid_xy) * grid_size * 2.0 ** i
+            anchors_list.append(concatenate([grid_xy, grid_wh], -1).reshape(-1, h * w, 4))
+        anchors = concatenate(anchors_list, 1)
+        valid_mask = ((anchors > eps) * (anchors < 1 - eps)).all(-1, keepdim=True)
+        anchors = torch.log(anchors / (1 - anchors))
+        inf_t = torch.empty(1, device=device, dtype=dtype)
+        inf_t[0] = float('inf')
+        anchors = torch.where(valid_mask, anchors, inf_t)
+        return anchors, valid_mask
+
+
 def mod(a: 'Tensor', b: 'int') ->Tensor:
     """Compute the modulo operation for two numbers.
 
@@ -9781,6 +9293,46 @@ def mod(a: 'Tensor', b: 'int') ->Tensor:
         1
     """
     return a - a // b * b
+
+
+class DETRPostProcessor(Module):
+
+    def __init__(self, confidence_threshold: 'Optional[float]'=None, num_classes: 'int'=80, num_top_queries: 'int'=300, confidence_filtering: 'bool'=True, filter_as_zero: 'bool'=False) ->None:
+        super().__init__()
+        self.confidence_threshold = confidence_threshold
+        self.num_classes = num_classes
+        self.confidence_filtering = confidence_filtering
+        self.num_top_queries = num_top_queries
+        self.box_filtering = BoxFiltering(tensor(confidence_threshold) if confidence_threshold is not None else None, filter_as_zero=filter_as_zero)
+
+    def forward(self, logits: 'Tensor', boxes: 'Tensor', original_sizes: 'Tensor') ->Union[Tensor, list[Tensor]]:
+        """Post-process outputs from DETR.
+
+        Args:
+            logits: tensor with shape :math:`(N, Q, K)`, where :math:`N` is the batch size, :math:`Q` is the number of
+                queries, :math:`K` is the number of classes.
+            boxes: tensor with shape :math:`(N, Q, 4)`, where :math:`N` is the batch size, :math:`Q` is the number of
+                queries.
+            original_sizes: tensor with shape :math:`(N, 2)`, where :math:`N` is the batch size and each element
+                represents the image size of (img_height, img_width).
+
+        Returns:
+            Processed detections. For each image, the detections have shape (D, 6), where D is the number of detections
+            in that image, 6 represent (class_id, confidence_score, x, y, w, h).
+        """
+        cxcy, wh = boxes[..., :2], boxes[..., 2:]
+        boxes_xy = concatenate([cxcy - wh * 0.5, wh], -1)
+        sizes_wh = original_sizes[0].flip(0).unsqueeze(0).unsqueeze(0).repeat(1, 1, 2)
+        boxes_xy = boxes_xy * sizes_wh
+        scores = logits.sigmoid()
+        scores, index = torch.topk(scores.flatten(1), self.num_top_queries, dim=-1)
+        labels = mod(index, self.num_classes)
+        index = index // self.num_classes
+        boxes = boxes_xy.gather(dim=1, index=index.unsqueeze(-1).repeat(1, 1, boxes_xy.shape[-1]))
+        all_boxes = concatenate([labels[..., None], scores[..., None], boxes], -1)
+        if not self.confidence_filtering or self.confidence_threshold == 0:
+            return all_boxes
+        return self.box_filtering(all_boxes, self.confidence_threshold)
 
 
 class MLPBlock(Module):

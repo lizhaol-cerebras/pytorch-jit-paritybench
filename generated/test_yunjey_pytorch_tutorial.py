@@ -1,32 +1,8 @@
-import sys
-_module = sys.modules[__name__]
-del sys
-main = _module
-main = _module
-main = _module
-main = _module
-main = _module
-main = _module
-main = _module
-data_utils = _module
-main = _module
-main = _module
-main = _module
-build_vocab = _module
-data_loader = _module
-model = _module
-resize = _module
-sample = _module
-train = _module
-main = _module
-main = _module
-logger = _module
-main = _module
 
 from unittest.mock import mock_open, MagicMock
 from torch.autograd import Function
 from torch.nn import Module
-import abc, collections, copy, enum, functools, inspect, itertools, logging, math, matplotlib, numbers, numpy, pandas, queue, random, re, scipy, sklearn, string, tensorflow, time, torch, torchaudio, torchvision, types, typing, uuid, warnings
+import abc, collections, copy, enum, functools, inspect, itertools, logging, math, matplotlib, numbers, numpy, pandas, queue, random, re, scipy, sklearn, string, tensorflow, time, torch, torchvision, types, typing, uuid, warnings
 import operator as op
 from dataclasses import dataclass
 import numpy as np

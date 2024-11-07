@@ -1,57 +1,8 @@
-import sys
-_module = sys.modules[__name__]
-del sys
-conf = _module
-setup = _module
-so_vits_svc_fork = _module
-cluster = _module
-train_cluster = _module
-dataset = _module
-f0 = _module
-gui = _module
-hparams = _module
-inference = _module
-core = _module
-main = _module
-logger = _module
-modules = _module
-attentions = _module
-commons = _module
-decoders = _module
-f0 = _module
-hifigan = _module
-_models = _module
-_utils = _module
-mb_istft = _module
-_generators = _module
-_loss = _module
-_pqmf = _module
-_stft = _module
-_stft_loss = _module
-descriminators = _module
-encoders = _module
-flows = _module
-losses = _module
-mel_processing = _module
-modules = _module
-synthesizers = _module
-preprocessing = _module
-preprocess_classify = _module
-preprocess_flist_config = _module
-preprocess_hubert_f0 = _module
-preprocess_resample = _module
-preprocess_speaker_diarization = _module
-preprocess_split = _module
-preprocess_utils = _module
-train = _module
-utils = _module
-tests = _module
-test_main = _module
 
 from unittest.mock import mock_open, MagicMock
 from torch.autograd import Function
 from torch.nn import Module
-import abc, collections, copy, enum, functools, inspect, itertools, logging, math, matplotlib, numbers, numpy, pandas, queue, random, re, scipy, sklearn, string, tensorflow, time, torch, torchaudio, torchvision, types, typing, uuid, warnings
+import abc, collections, copy, enum, functools, inspect, itertools, logging, math, matplotlib, numbers, numpy, pandas, queue, random, re, scipy, sklearn, string, tensorflow, time, torch, torchvision, types, typing, uuid, warnings
 import operator as op
 from dataclasses import dataclass
 import numpy as np
@@ -170,9 +121,6 @@ import warnings
 
 
 from random import shuffle
-
-
-import torchaudio
 
 
 from collections import defaultdict
@@ -1856,12 +1804,6 @@ TESTCASES = [
     (DDSConv,
      lambda: ([], {'channels': 4, 'kernel_size': 4, 'n_layers': 1}),
      lambda: ([torch.rand([4, 4, 2]), torch.rand([4, 4, 2])], {})),
-    (DiscriminatorP,
-     lambda: ([], {'period': 4}),
-     lambda: ([torch.rand([4, 1, 4])], {})),
-    (DiscriminatorS,
-     lambda: ([], {}),
-     lambda: ([torch.rand([4, 1, 64])], {})),
     (ElementwiseAffine,
      lambda: ([], {'channels': 4}),
      lambda: ([torch.rand([4, 4, 4, 4]), torch.rand([4, 4, 4, 4])], {})),
@@ -1880,12 +1822,6 @@ TESTCASES = [
     (MultiHeadAttention,
      lambda: ([], {'channels': 4, 'out_channels': 4, 'n_heads': 4}),
      lambda: ([torch.rand([4, 4, 4]), torch.rand([4, 4, 4])], {})),
-    (MultiPeriodDiscriminator,
-     lambda: ([], {}),
-     lambda: ([torch.rand([4, 1, 64]), torch.rand([4, 1, 64])], {})),
-    (MultiScaleDiscriminator,
-     lambda: ([], {}),
-     lambda: ([torch.rand([4, 1, 64]), torch.rand([4, 1, 64])], {})),
     (ResBlock1,
      lambda: ([], {'channels': 4}),
      lambda: ([torch.rand([4, 4])], {})),

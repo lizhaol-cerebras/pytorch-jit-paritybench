@@ -1,61 +1,8 @@
-import sys
-_module = sys.modules[__name__]
-del sys
-ali_bigan_pytorch = _module
-ali_bigan_tensorflow = _module
-ac_gan_pytorch = _module
-ac_gan_tensorflow = _module
-began_pytorch = _module
-began_tensorflow = _module
-bgan_pytorch = _module
-bgan_tensorflow = _module
-cgan_pytorch = _module
-cgan_tensorflow = _module
-cogan_pytorch = _module
-cogan_tensorflow = _module
-discogan_pytorch = _module
-discogan_tensorflow = _module
-dualgan_pytorch = _module
-dualgan_tensorflow = _module
-ebgan_pytorch = _module
-ebgan_tensorflow = _module
-f_gan_pytorch = _module
-f_gan_tensorflow = _module
-gap_pytorch = _module
-gibbsnet_pytorch = _module
-wgan_gp_tensorflow = _module
-infogan_pytorch = _module
-infogan_tensorflow = _module
-lsgan_pytorch = _module
-lsgan_tensorflow = _module
-magan_pytorch = _module
-magan_tensorflow = _module
-mode_reg_gan_pytorch = _module
-mode_reg_gan_tensorflow = _module
-softmax_gan_pytorch = _module
-softmax_gan_tensorflow = _module
-gan_pytorch = _module
-gan_tensorflow = _module
-wgan_pytorch = _module
-wgan_tensorflow = _module
-helmholtz = _module
-rbm_binary_cd = _module
-rbm_binary_pcd = _module
-aae_pytorch = _module
-aae_tensorflow = _module
-avb_pytorch = _module
-avb_tensorflow = _module
-cvae_pytorch = _module
-cvae_tensorflow = _module
-dvae_pytorch = _module
-dvae_tensorflow = _module
-vae_pytorch = _module
-vae_tensorflow = _module
 
 from unittest.mock import mock_open, MagicMock
 from torch.autograd import Function
 from torch.nn import Module
-import abc, collections, copy, enum, functools, inspect, itertools, logging, math, matplotlib, numbers, numpy, pandas, queue, random, re, scipy, sklearn, string, tensorflow, time, torch, torchaudio, torchvision, types, typing, uuid, warnings
+import abc, collections, copy, enum, functools, inspect, itertools, logging, math, matplotlib, numbers, numpy, pandas, queue, random, re, scipy, sklearn, string, tensorflow, time, torch, torchvision, types, typing, uuid, warnings
 import operator as op
 from dataclasses import dataclass
 import numpy as np

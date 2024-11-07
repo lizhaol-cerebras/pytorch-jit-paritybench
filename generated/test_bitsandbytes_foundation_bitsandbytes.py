@@ -1,69 +1,8 @@
-import sys
-_module = sys.modules[__name__]
-del sys
-auditwheel_show = _module
-set_platform_tag = _module
-make_plot_with_jsonl = _module
-speed_benchmark = _module
-bitsandbytes = _module
-autograd = _module
-_functions = _module
-cextension = _module
-consts = _module
-cuda_specs = _module
-diagnostics = _module
-cuda = _module
-main = _module
-utils = _module
-functional = _module
-nn = _module
-modules = _module
-triton_based_modules = _module
-optim = _module
-adagrad = _module
-adam = _module
-adamw = _module
-ademamix = _module
-lamb = _module
-lars = _module
-lion = _module
-optimizer = _module
-rmsprop = _module
-sgd = _module
-research = _module
-_functions = _module
-modules = _module
-triton = _module
-dequantize_rowwise = _module
-int8_matmul_mixed_dequantize = _module
-int8_matmul_rowwise_dequantize = _module
-quantize_columnwise_and_transpose = _module
-quantize_global = _module
-quantize_rowwise = _module
-triton_utils = _module
-utils = _module
-check_bnb_install = _module
-int8_inference_huggingface = _module
-install_cuda = _module
-stale = _module
-setup = _module
-tests = _module
-conftest = _module
-helpers = _module
-test_autograd = _module
-test_cuda_setup_evaluator = _module
-test_functional = _module
-test_generation = _module
-test_linear4bit = _module
-test_linear8bitlt = _module
-test_modules = _module
-test_optim = _module
-test_triton = _module
 
 from unittest.mock import mock_open, MagicMock
 from torch.autograd import Function
 from torch.nn import Module
-import abc, collections, copy, enum, functools, inspect, itertools, logging, math, matplotlib, numbers, numpy, pandas, queue, random, re, scipy, sklearn, string, tensorflow, time, torch, torchaudio, torchvision, types, typing, uuid, warnings
+import abc, collections, copy, enum, functools, inspect, itertools, logging, math, matplotlib, numbers, numpy, pandas, queue, random, re, scipy, sklearn, string, tensorflow, time, torch, torchvision, types, typing, uuid, warnings
 import operator as op
 from dataclasses import dataclass
 import numpy as np

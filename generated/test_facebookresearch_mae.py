@@ -1,28 +1,8 @@
-import sys
-_module = sys.modules[__name__]
-del sys
-engine_finetune = _module
-engine_pretrain = _module
-main_finetune = _module
-main_linprobe = _module
-main_pretrain = _module
-models_mae = _module
-models_vit = _module
-submitit_finetune = _module
-submitit_linprobe = _module
-submitit_pretrain = _module
-crop = _module
-datasets = _module
-lars = _module
-lr_decay = _module
-lr_sched = _module
-misc = _module
-pos_embed = _module
 
 from unittest.mock import mock_open, MagicMock
 from torch.autograd import Function
 from torch.nn import Module
-import abc, collections, copy, enum, functools, inspect, itertools, logging, math, matplotlib, numbers, numpy, pandas, queue, random, re, scipy, sklearn, string, tensorflow, time, torch, torchaudio, torchvision, types, typing, uuid, warnings
+import abc, collections, copy, enum, functools, inspect, itertools, logging, math, matplotlib, numbers, numpy, pandas, queue, random, re, scipy, sklearn, string, tensorflow, time, torch, torchvision, types, typing, uuid, warnings
 import operator as op
 from dataclasses import dataclass
 import numpy as np

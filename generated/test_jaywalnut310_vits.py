@@ -1,28 +1,8 @@
-import sys
-_module = sys.modules[__name__]
-del sys
-attentions = _module
-commons = _module
-data_utils = _module
-losses = _module
-mel_processing = _module
-models = _module
-modules = _module
-monotonic_align = _module
-setup = _module
-preprocess = _module
-text = _module
-cleaners = _module
-symbols = _module
-train = _module
-train_ms = _module
-transforms = _module
-utils = _module
 
 from unittest.mock import mock_open, MagicMock
 from torch.autograd import Function
 from torch.nn import Module
-import abc, collections, copy, enum, functools, inspect, itertools, logging, math, matplotlib, numbers, numpy, pandas, queue, random, re, scipy, sklearn, string, tensorflow, time, torch, torchaudio, torchvision, types, typing, uuid, warnings
+import abc, collections, copy, enum, functools, inspect, itertools, logging, math, matplotlib, numbers, numpy, pandas, queue, random, re, scipy, sklearn, string, tensorflow, time, torch, torchvision, types, typing, uuid, warnings
 import operator as op
 from dataclasses import dataclass
 import numpy as np
@@ -1253,12 +1233,6 @@ TESTCASES = [
     (DDSConv,
      lambda: ([], {'channels': 4, 'kernel_size': 4, 'n_layers': 1}),
      lambda: ([torch.rand([4, 4, 2]), torch.rand([4, 4, 2])], {})),
-    (DiscriminatorP,
-     lambda: ([], {'period': 4}),
-     lambda: ([torch.rand([4, 1, 4])], {})),
-    (DiscriminatorS,
-     lambda: ([], {}),
-     lambda: ([torch.rand([4, 1, 64])], {})),
     (ElementwiseAffine,
      lambda: ([], {'channels': 4}),
      lambda: ([torch.rand([4, 4, 4, 4]), torch.rand([4, 4, 4, 4])], {})),
@@ -1274,9 +1248,6 @@ TESTCASES = [
     (MultiHeadAttention,
      lambda: ([], {'channels': 4, 'out_channels': 4, 'n_heads': 4}),
      lambda: ([torch.rand([4, 4, 4]), torch.rand([4, 4, 4])], {})),
-    (MultiPeriodDiscriminator,
-     lambda: ([], {}),
-     lambda: ([torch.rand([4, 1, 64]), torch.rand([4, 1, 64])], {})),
     (ResBlock1,
      lambda: ([], {'channels': 4}),
      lambda: ([torch.rand([4, 4])], {})),

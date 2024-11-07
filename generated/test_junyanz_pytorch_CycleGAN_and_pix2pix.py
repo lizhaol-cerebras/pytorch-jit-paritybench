@@ -1,46 +1,8 @@
-import sys
-_module = sys.modules[__name__]
-del sys
-data = _module
-aligned_dataset = _module
-base_dataset = _module
-colorization_dataset = _module
-image_folder = _module
-single_dataset = _module
-template_dataset = _module
-unaligned_dataset = _module
-combine_A_and_B = _module
-make_dataset_aligned = _module
-prepare_cityscapes_dataset = _module
-models = _module
-base_model = _module
-colorization_model = _module
-cycle_gan_model = _module
-networks = _module
-pix2pix_model = _module
-template_model = _module
-test_model = _module
-options = _module
-base_options = _module
-test_options = _module
-train_options = _module
-batch_hed = _module
-cityscapes = _module
-evaluate = _module
-util = _module
-test_before_push = _module
-test = _module
-train = _module
-get_data = _module
-html = _module
-image_pool = _module
-util = _module
-visualizer = _module
 
 from unittest.mock import mock_open, MagicMock
 from torch.autograd import Function
 from torch.nn import Module
-import abc, collections, copy, enum, functools, inspect, itertools, logging, math, matplotlib, numbers, numpy, pandas, queue, random, re, scipy, sklearn, string, tensorflow, time, torch, torchaudio, torchvision, types, typing, uuid, warnings
+import abc, collections, copy, enum, functools, inspect, itertools, logging, math, matplotlib, numbers, numpy, pandas, queue, random, re, scipy, sklearn, string, tensorflow, time, torch, torchvision, types, typing, uuid, warnings
 import operator as op
 from dataclasses import dataclass
 import numpy as np

@@ -1,36 +1,8 @@
-import sys
-_module = sys.modules[__name__]
-del sys
-cog_predict = _module
-inference_realesrgan = _module
-inference_realesrgan_video = _module
-realesrgan = _module
-archs = _module
-discriminator_arch = _module
-srvgg_arch = _module
-data = _module
-realesrgan_dataset = _module
-realesrgan_paired_dataset = _module
-models = _module
-realesrgan_model = _module
-realesrnet_model = _module
-train = _module
-utils = _module
-extract_subimages = _module
-generate_meta_info = _module
-generate_meta_info_pairdata = _module
-generate_multiscale_DF2K = _module
-pytorch2onnx = _module
-setup = _module
-test_dataset = _module
-test_discriminator_arch = _module
-test_model = _module
-test_utils = _module
 
 from unittest.mock import mock_open, MagicMock
 from torch.autograd import Function
 from torch.nn import Module
-import abc, collections, copy, enum, functools, inspect, itertools, logging, math, matplotlib, numbers, numpy, pandas, queue, random, re, scipy, sklearn, string, tensorflow, time, torch, torchaudio, torchvision, types, typing, uuid, warnings
+import abc, collections, copy, enum, functools, inspect, itertools, logging, math, matplotlib, numbers, numpy, pandas, queue, random, re, scipy, sklearn, string, tensorflow, time, torch, torchvision, types, typing, uuid, warnings
 import operator as op
 from dataclasses import dataclass
 import numpy as np

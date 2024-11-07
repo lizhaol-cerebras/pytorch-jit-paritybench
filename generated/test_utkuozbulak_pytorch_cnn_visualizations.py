@@ -1,28 +1,8 @@
-import sys
-_module = sys.modules[__name__]
-del sys
-LRP = _module
-cnn_layer_visualization = _module
-deep_dream = _module
-generate_class_specific_samples = _module
-generate_regularized_class_specific_samples = _module
-grad_times_image = _module
-gradcam = _module
-guided_backprop = _module
-guided_gradcam = _module
-integrated_gradients = _module
-inverted_representation = _module
-layer_activation_with_guided_backprop = _module
-layercam = _module
-misc_functions = _module
-scorecam = _module
-smooth_grad = _module
-vanilla_backprop = _module
 
 from unittest.mock import mock_open, MagicMock
 from torch.autograd import Function
 from torch.nn import Module
-import abc, collections, copy, enum, functools, inspect, itertools, logging, math, matplotlib, numbers, numpy, pandas, queue, random, re, scipy, sklearn, string, tensorflow, time, torch, torchaudio, torchvision, types, typing, uuid, warnings
+import abc, collections, copy, enum, functools, inspect, itertools, logging, math, matplotlib, numbers, numpy, pandas, queue, random, re, scipy, sklearn, string, tensorflow, time, torch, torchvision, types, typing, uuid, warnings
 import operator as op
 from dataclasses import dataclass
 import numpy as np

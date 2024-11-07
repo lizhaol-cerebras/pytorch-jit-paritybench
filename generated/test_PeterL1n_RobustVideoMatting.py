@@ -1,39 +1,8 @@
-import sys
-_module = sys.modules[__name__]
-del sys
-augmentation = _module
-coco = _module
-imagematte = _module
-spd = _module
-videomatte = _module
-youtubevis = _module
-spd_preprocess = _module
-evaluate_hr = _module
-evaluate_lr = _module
-generate_imagematte_with_background_image = _module
-generate_imagematte_with_background_video = _module
-generate_videomatte_with_background_image = _module
-generate_videomatte_with_background_video = _module
-hubconf = _module
-inference = _module
-inference_speed_test = _module
-inference_utils = _module
-model = _module
-decoder = _module
-deep_guided_filter = _module
-fast_guided_filter = _module
-lraspp = _module
-mobilenetv3 = _module
-model = _module
-resnet = _module
-train = _module
-train_config = _module
-train_loss = _module
 
 from unittest.mock import mock_open, MagicMock
 from torch.autograd import Function
 from torch.nn import Module
-import abc, collections, copy, enum, functools, inspect, itertools, logging, math, matplotlib, numbers, numpy, pandas, queue, random, re, scipy, sklearn, string, tensorflow, time, torch, torchaudio, torchvision, types, typing, uuid, warnings
+import abc, collections, copy, enum, functools, inspect, itertools, logging, math, matplotlib, numbers, numpy, pandas, queue, random, re, scipy, sklearn, string, tensorflow, time, torch, torchvision, types, typing, uuid, warnings
 import operator as op
 from dataclasses import dataclass
 import numpy as np
