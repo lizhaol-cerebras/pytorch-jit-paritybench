@@ -111,16 +111,16 @@ from torch.distributed.fsdp.fully_sharded_data_parallel import StateDictType
 from torch.distributed.fsdp import LocalStateDictConfig
 
 
-from torch.distributed._shard.checkpoint import FileSystemReader
+from torch.distributed.checkpoint import FileSystemReader
 
 
-from torch.distributed._shard.checkpoint import FileSystemWriter
+from torch.distributed.checkpoint import FileSystemWriter
 
 
-from torch.distributed._shard.checkpoint import save_state_dict
+from torch.distributed.checkpoint import save_state_dict
 
 
-from torch.distributed._shard.checkpoint import load_state_dict
+from torch.distributed.checkpoint import load_state_dict
 
 
 from torch.distributed.checkpoint.default_planner import DefaultSavePlanner
@@ -129,7 +129,7 @@ from torch.distributed.checkpoint.default_planner import DefaultSavePlanner
 from torch.distributed.checkpoint.default_planner import DefaultLoadPlanner
 
 
-import torch.distributed._shard.checkpoint as dist_cp
+import torch.distributed.checkpoint as dist_cp
 
 
 from torch.distributed.algorithms._checkpoint.checkpoint_wrapper import checkpoint_wrapper

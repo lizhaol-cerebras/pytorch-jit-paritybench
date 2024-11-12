@@ -117,6 +117,9 @@ import uuid
 from copy import copy
 
 
+from copy import deepcopy
+
+
 from torch import nn
 
 
@@ -166,9 +169,6 @@ from torch._prims_common import TensorLikeType
 
 
 from collections import OrderedDict
-
-
-from copy import deepcopy
 
 
 import types
@@ -232,6 +232,27 @@ from typing import Generator
 
 
 import torch.fx as fx
+
+
+from torch._higher_order_ops.auto_functionalize import auto_functionalized
+
+
+from torch._inductor.pattern_matcher import Match
+
+
+from torch._inductor.pattern_matcher import PatternMatcherPass
+
+
+from torch._inductor.pattern_matcher import fwd_only
+
+
+from torch._inductor.pattern_matcher import register_replacement
+
+
+import torch.fx
+
+
+from torch import SymInt
 
 
 from types import CodeType
@@ -452,82 +473,4 @@ def load_module_from_path(module_name, path):
 
 def get_torch_compile_backend() ->Optional[Union[Callable, str]]:
     return _torch_compile_backend
-
-
-def combine_fx_passes(passes: 'List[Callable]') ->Callable:
-
-    def combined_fx(graph) ->None:
-        for fx in passes:
-            fx(graph)
-    return combined_fx
-
-
-def fix_functionalization(graph: 'fx.Graph'):
-    """
-    Rewrite the graph module to replace the pattern involving
-    torch._higher_order_ops.auto_functionalize.auto_functionalized
-    with a direct call to the inplace custom op.
-
-    # TODO: check if PyTorch nightly has fixed this issue
-    """
-    nodes_to_remove = []
-    for node in graph.nodes:
-        if node.op == 'call_function' and node.target == torch._higher_order_ops.auto_functionalize.auto_functionalized:
-            if node.args[0] == torch.ops._C.rotary_embedding.default:
-                kwargs = node.kwargs
-                query = kwargs['query']
-                mm_node = query.args[0].args[0]
-                with graph.inserting_before(node):
-                    graph.call_function(torch.ops._C.rotary_embedding.default, kwargs=kwargs)
-                for user in list(node.users):
-                    if user.op == 'call_function' and user.target == operator.getitem:
-                        for getitem_user in list(user.users):
-                            if getitem_user.op == 'call_function' and getitem_user.target == torch.ops.aten.slice_scatter.default:
-                                getitem_user.replace_all_uses_with(mm_node)
-                                nodes_to_remove.append(getitem_user)
-                        nodes_to_remove.append(user)
-                nodes_to_remove.append(node)
-            elif node.args[0] == torch.ops._C.fused_add_rms_norm.default:
-                kwargs = node.kwargs
-                input = kwargs['input']
-                residual = kwargs['residual']
-                with graph.inserting_before(node):
-                    graph.call_function(torch.ops._C.fused_add_rms_norm.default, kwargs=kwargs)
-                for user in list(node.users):
-                    if user.op == 'call_function' and user.target == operator.getitem:
-                        if user.args[1] == 1:
-                            replace_node = input
-                        elif user.args[1] == 2:
-                            replace_node = residual
-                        user.replace_all_uses_with(replace_node)
-                        nodes_to_remove.append(user)
-                nodes_to_remove.append(node)
-            elif node.args[0] == torch.ops._C.rms_norm.default:
-                kwargs = node.kwargs
-                input = kwargs['input']
-                out = kwargs['out']
-                weight = kwargs['weight']
-                epsilon = kwargs['epsilon']
-                with graph.inserting_before(node):
-                    graph.call_function(torch.ops._C.rms_norm.default, args=(out, input, weight, epsilon))
-                replace_node = out
-                for user in list(node.users):
-                    if user.op == 'call_function' and user.target == operator.getitem:
-                        user.replace_all_uses_with(replace_node)
-                        nodes_to_remove.append(user)
-                nodes_to_remove.append(node)
-            elif node.args[0] == torch.ops._C.silu_and_mul.default:
-                kwargs = node.kwargs
-                input = kwargs['input']
-                out = kwargs['out']
-                with graph.inserting_before(node):
-                    graph.call_function(torch.ops._C.silu_and_mul.default, args=(out, input))
-                replace_node = out
-                for user in list(node.users):
-                    if user.op == 'call_function' and user.target == operator.getitem:
-                        user.replace_all_uses_with(replace_node)
-                        nodes_to_remove.append(user)
-                nodes_to_remove.append(node)
-    for node in nodes_to_remove:
-        graph.erase_node(node)
 

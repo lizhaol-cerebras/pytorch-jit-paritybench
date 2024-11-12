@@ -75,6 +75,9 @@ import warnings
 import inspect
 
 
+from typing import Dict
+
+
 import re
 
 
@@ -157,9 +160,6 @@ import torch.cuda
 
 
 from typing import Callable
-
-
-from typing import Dict
 
 
 import torch.distributed as dist

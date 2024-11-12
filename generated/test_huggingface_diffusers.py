@@ -1429,7 +1429,7 @@ class CrossAttnDownBlock2D(nn.Module):
         encoder_hidden_states_1 = encoder_hidden_states_1 if encoder_hidden_states_1 is not None else encoder_hidden_states
         encoder_attention_mask_1 = encoder_attention_mask_1 if encoder_hidden_states_1 is not None else encoder_attention_mask
         for i in range(num_layers):
-            if self.training and self.gradient_checkpointing:
+            if torch.is_grad_enabled() and self.gradient_checkpointing:
 
                 def create_custom_forward(module, return_dict=None):
 
@@ -1501,7 +1501,7 @@ class UNetMidBlock2DCrossAttn(nn.Module):
         encoder_hidden_states_1 = encoder_hidden_states_1 if encoder_hidden_states_1 is not None else encoder_hidden_states
         encoder_attention_mask_1 = encoder_attention_mask_1 if encoder_hidden_states_1 is not None else encoder_attention_mask
         for i in range(len(self.resnets[1:])):
-            if self.training and self.gradient_checkpointing:
+            if torch.is_grad_enabled() and self.gradient_checkpointing:
 
                 def create_custom_forward(module, return_dict=None):
 
@@ -1576,7 +1576,7 @@ class CrossAttnUpBlock2D(nn.Module):
             res_hidden_states = res_hidden_states_tuple[-1]
             res_hidden_states_tuple = res_hidden_states_tuple[:-1]
             hidden_states = torch.cat([hidden_states, res_hidden_states], dim=1)
-            if self.training and self.gradient_checkpointing:
+            if torch.is_grad_enabled() and self.gradient_checkpointing:
 
                 def create_custom_forward(module, return_dict=None):
 
@@ -4344,7 +4344,7 @@ class AllegroEncoder3D(nn.Module):
         residual = sample
         sample = self.temp_conv_in(sample)
         sample = sample + residual
-        if self.gradient_checkpointing:
+        if torch.is_grad_enabled() and self.gradient_checkpointing:
 
             def create_custom_forward(module):
 
@@ -4411,7 +4411,7 @@ class AllegroDecoder3D(nn.Module):
         sample = self.temp_conv_in(sample)
         sample = sample + residual
         upscale_dtype = next(iter(self.up_blocks.parameters())).dtype
-        if self.gradient_checkpointing:
+        if torch.is_grad_enabled() and self.gradient_checkpointing:
 
             def create_custom_forward(module):
 
@@ -4729,7 +4729,7 @@ class CogVideoXDownBlock3D(nn.Module):
         conv_cache = conv_cache or {}
         for i, resnet in enumerate(self.resnets):
             conv_cache_key = f'resnet_{i}'
-            if self.training and self.gradient_checkpointing:
+            if torch.is_grad_enabled() and self.gradient_checkpointing:
 
                 def create_custom_forward(module):
 
@@ -4785,7 +4785,7 @@ class CogVideoXMidBlock3D(nn.Module):
         conv_cache = conv_cache or {}
         for i, resnet in enumerate(self.resnets):
             conv_cache_key = f'resnet_{i}'
-            if self.training and self.gradient_checkpointing:
+            if torch.is_grad_enabled() and self.gradient_checkpointing:
 
                 def create_custom_forward(module):
 
@@ -4897,7 +4897,7 @@ class CogVideoXUpBlock3D(nn.Module):
         conv_cache = conv_cache or {}
         for i, resnet in enumerate(self.resnets):
             conv_cache_key = f'resnet_{i}'
-            if self.training and self.gradient_checkpointing:
+            if torch.is_grad_enabled() and self.gradient_checkpointing:
 
                 def create_custom_forward(module):
 
@@ -4963,7 +4963,7 @@ class CogVideoXEncoder3D(nn.Module):
         new_conv_cache = {}
         conv_cache = conv_cache or {}
         hidden_states, new_conv_cache['conv_in'] = self.conv_in(sample, conv_cache=conv_cache.get('conv_in'))
-        if self.training and self.gradient_checkpointing:
+        if torch.is_grad_enabled() and self.gradient_checkpointing:
 
             def create_custom_forward(module):
 
@@ -5037,7 +5037,7 @@ class CogVideoXDecoder3D(nn.Module):
         new_conv_cache = {}
         conv_cache = conv_cache or {}
         hidden_states, new_conv_cache['conv_in'] = self.conv_in(sample, conv_cache=conv_cache.get('conv_in'))
-        if self.training and self.gradient_checkpointing:
+        if torch.is_grad_enabled() and self.gradient_checkpointing:
 
             def create_custom_forward(module):
 
@@ -5217,7 +5217,7 @@ class MochiDownBlock3D(nn.Module):
         hidden_states, new_conv_cache['conv_in'] = self.conv_in(hidden_states)
         for i, (resnet, norm, attn) in enumerate(zip(self.resnets, self.norms, self.attentions)):
             conv_cache_key = f'resnet_{i}'
-            if self.training and self.gradient_checkpointing:
+            if torch.is_grad_enabled() and self.gradient_checkpointing:
 
                 def create_custom_forward(module):
 
@@ -5281,7 +5281,7 @@ class MochiMidBlock3D(nn.Module):
         conv_cache = conv_cache or {}
         for i, (resnet, norm, attn) in enumerate(zip(self.resnets, self.norms, self.attentions)):
             conv_cache_key = f'resnet_{i}'
-            if self.training and self.gradient_checkpointing:
+            if torch.is_grad_enabled() and self.gradient_checkpointing:
 
                 def create_custom_forward(module):
 
@@ -5336,7 +5336,7 @@ class MochiUpBlock3D(nn.Module):
         conv_cache = conv_cache or {}
         for i, resnet in enumerate(self.resnets):
             conv_cache_key = f'resnet_{i}'
-            if self.training and self.gradient_checkpointing:
+            if torch.is_grad_enabled() and self.gradient_checkpointing:
 
                 def create_custom_forward(module):
 
@@ -5424,7 +5424,7 @@ class MochiEncoder3D(nn.Module):
         hidden_states = hidden_states.permute(0, 2, 3, 4, 1)
         hidden_states = self.proj_in(hidden_states)
         hidden_states = hidden_states.permute(0, 4, 1, 2, 3)
-        if self.training and self.gradient_checkpointing:
+        if torch.is_grad_enabled() and self.gradient_checkpointing:
 
             def create_custom_forward(module):
 
@@ -5490,7 +5490,7 @@ class MochiDecoder3D(nn.Module):
         new_conv_cache = {}
         conv_cache = conv_cache or {}
         hidden_states = self.conv_in(hidden_states)
-        if self.training and self.gradient_checkpointing:
+        if torch.is_grad_enabled() and self.gradient_checkpointing:
 
             def create_custom_forward(module):
 
@@ -5734,7 +5734,7 @@ class TemporalDecoder(nn.Module):
         """The forward method of the `Decoder` class."""
         sample = self.conv_in(sample)
         upscale_dtype = next(iter(self.up_blocks.parameters())).dtype
-        if self.training and self.gradient_checkpointing:
+        if torch.is_grad_enabled() and self.gradient_checkpointing:
 
             def create_custom_forward(module):
 
@@ -6291,7 +6291,7 @@ class CrossAttnDownBlockFlat(nn.Module):
         output_states = ()
         blocks = list(zip(self.resnets, self.attentions))
         for i, (resnet, attn) in enumerate(blocks):
-            if self.training and self.gradient_checkpointing:
+            if torch.is_grad_enabled() and self.gradient_checkpointing:
 
                 def create_custom_forward(module, return_dict=None):
 
@@ -6335,7 +6335,7 @@ class DownBlockFlat(nn.Module):
     def forward(self, hidden_states: 'torch.Tensor', temb: 'Optional[torch.Tensor]'=None) ->Tuple[torch.Tensor, Tuple[torch.Tensor, ...]]:
         output_states = ()
         for resnet in self.resnets:
-            if self.training and self.gradient_checkpointing:
+            if torch.is_grad_enabled() and self.gradient_checkpointing:
 
                 def create_custom_forward(module):
 
@@ -6413,7 +6413,7 @@ class Encoder(nn.Module):
     def forward(self, sample: 'torch.Tensor') ->torch.Tensor:
         """The forward method of the `Encoder` class."""
         sample = self.conv_in(sample)
-        if self.training and self.gradient_checkpointing:
+        if torch.is_grad_enabled() and self.gradient_checkpointing:
 
             def create_custom_forward(module):
 
@@ -6522,7 +6522,7 @@ class CrossAttnUpBlockFlat(nn.Module):
             if is_freeu_enabled:
                 hidden_states, res_hidden_states = apply_freeu(self.resolution_idx, hidden_states, res_hidden_states, s1=self.s1, s2=self.s2, b1=self.b1, b2=self.b2)
             hidden_states = torch.cat([hidden_states, res_hidden_states], dim=1)
-            if self.training and self.gradient_checkpointing:
+            if torch.is_grad_enabled() and self.gradient_checkpointing:
 
                 def create_custom_forward(module, return_dict=None):
 
@@ -6572,7 +6572,7 @@ class UpBlockFlat(nn.Module):
             if is_freeu_enabled:
                 hidden_states, res_hidden_states = apply_freeu(self.resolution_idx, hidden_states, res_hidden_states, s1=self.s1, s2=self.s2, b1=self.b1, b2=self.b2)
             hidden_states = torch.cat([hidden_states, res_hidden_states], dim=1)
-            if self.training and self.gradient_checkpointing:
+            if torch.is_grad_enabled() and self.gradient_checkpointing:
 
                 def create_custom_forward(module):
 
@@ -6653,7 +6653,7 @@ class Decoder(nn.Module):
         """The forward method of the `Decoder` class."""
         sample = self.conv_in(sample)
         upscale_dtype = next(iter(self.up_blocks.parameters())).dtype
-        if self.training and self.gradient_checkpointing:
+        if torch.is_grad_enabled() and self.gradient_checkpointing:
 
             def create_custom_forward(module):
 
@@ -6804,7 +6804,7 @@ class MaskConditionDecoder(nn.Module):
         sample = z
         sample = self.conv_in(sample)
         upscale_dtype = next(iter(self.up_blocks.parameters())).dtype
-        if self.training and self.gradient_checkpointing:
+        if torch.is_grad_enabled() and self.gradient_checkpointing:
 
             def create_custom_forward(module):
 
@@ -7009,7 +7009,7 @@ class EncoderTiny(nn.Module):
 
     def forward(self, x: 'torch.Tensor') ->torch.Tensor:
         """The forward method of the `EncoderTiny` class."""
-        if self.training and self.gradient_checkpointing:
+        if torch.is_grad_enabled() and self.gradient_checkpointing:
 
             def create_custom_forward(module):
 
@@ -7063,7 +7063,7 @@ class DecoderTiny(nn.Module):
     def forward(self, x: 'torch.Tensor') ->torch.Tensor:
         """The forward method of the `DecoderTiny` class."""
         x = torch.tanh(x / 3) * 3
-        if self.training and self.gradient_checkpointing:
+        if torch.is_grad_enabled() and self.gradient_checkpointing:
 
             def create_custom_forward(module):
 
@@ -7550,7 +7550,7 @@ class ControlNetXSCrossAttnDownBlock2D(nn.Module):
         for (b_res, b_attn), (c_res, c_attn), b2c, c2b in zip(base_blocks, ctrl_blocks, self.base_to_ctrl, self.ctrl_to_base):
             if apply_control:
                 h_ctrl = torch.cat([h_ctrl, b2c(h_base)], dim=1)
-            if self.training and self.gradient_checkpointing:
+            if torch.is_grad_enabled() and self.gradient_checkpointing:
                 ckpt_kwargs: 'Dict[str, Any]' = {'use_reentrant': False} if is_torch_version('>=', '1.11.0') else {}
                 h_base = torch.utils.checkpoint.checkpoint(create_custom_forward(b_res), h_base, temb, **ckpt_kwargs)
             else:
@@ -7558,7 +7558,7 @@ class ControlNetXSCrossAttnDownBlock2D(nn.Module):
             if b_attn is not None:
                 h_base = b_attn(h_base, encoder_hidden_states=encoder_hidden_states, cross_attention_kwargs=cross_attention_kwargs, attention_mask=attention_mask, encoder_attention_mask=encoder_attention_mask, return_dict=False)[0]
             if apply_control:
-                if self.training and self.gradient_checkpointing:
+                if torch.is_grad_enabled() and self.gradient_checkpointing:
                     ckpt_kwargs: 'Dict[str, Any]' = {'use_reentrant': False} if is_torch_version('>=', '1.11.0') else {}
                     h_ctrl = torch.utils.checkpoint.checkpoint(create_custom_forward(c_res), h_ctrl, temb, **ckpt_kwargs)
                 else:
@@ -7749,7 +7749,7 @@ class ControlNetXSCrossAttnUpBlock2D(nn.Module):
                 hidden_states += c2b(res_h_ctrl) * conditioning_scale
             hidden_states, res_h_base = maybe_apply_freeu_to_subblock(hidden_states, res_h_base)
             hidden_states = torch.cat([hidden_states, res_h_base], dim=1)
-            if self.training and self.gradient_checkpointing:
+            if torch.is_grad_enabled() and self.gradient_checkpointing:
                 ckpt_kwargs: 'Dict[str, Any]' = {'use_reentrant': False} if is_torch_version('>=', '1.11.0') else {}
                 hidden_states = torch.utils.checkpoint.checkpoint(create_custom_forward(resnet), hidden_states, temb, **ckpt_kwargs)
             else:
@@ -10774,7 +10774,7 @@ class TransformerSpatioTemporalModel(nn.Module):
         emb = self.time_pos_embed(t_emb)
         emb = emb[:, None, :]
         for block, temporal_block in zip(self.transformer_blocks, self.temporal_transformer_blocks):
-            if self.training and self.gradient_checkpointing:
+            if torch.is_grad_enabled() and self.gradient_checkpointing:
                 hidden_states = torch.utils.checkpoint.checkpoint(block, hidden_states, None, encoder_hidden_states, None, use_reentrant=False)
             else:
                 hidden_states = block(hidden_states, encoder_hidden_states=encoder_hidden_states)
@@ -11355,7 +11355,7 @@ class DownBlock2D(nn.Module):
             deprecate('scale', '1.0.0', deprecation_message)
         output_states = ()
         for resnet in self.resnets:
-            if self.training and self.gradient_checkpointing:
+            if torch.is_grad_enabled() and self.gradient_checkpointing:
 
                 def create_custom_forward(module):
 
@@ -11536,7 +11536,7 @@ class ResnetDownsampleBlock2D(nn.Module):
             deprecate('scale', '1.0.0', deprecation_message)
         output_states = ()
         for resnet in self.resnets:
-            if self.training and self.gradient_checkpointing:
+            if torch.is_grad_enabled() and self.gradient_checkpointing:
 
                 def create_custom_forward(module):
 
@@ -11589,7 +11589,7 @@ class SimpleCrossAttnDownBlock2D(nn.Module):
         else:
             mask = attention_mask
         for resnet, attn in zip(self.resnets, self.attentions):
-            if self.training and self.gradient_checkpointing:
+            if torch.is_grad_enabled() and self.gradient_checkpointing:
 
                 def create_custom_forward(module, return_dict=None):
 
@@ -11635,7 +11635,7 @@ class KDownBlock2D(nn.Module):
             deprecate('scale', '1.0.0', deprecation_message)
         output_states = ()
         for resnet in self.resnets:
-            if self.training and self.gradient_checkpointing:
+            if torch.is_grad_enabled() and self.gradient_checkpointing:
 
                 def create_custom_forward(module):
 
@@ -11741,7 +11741,7 @@ class KCrossAttnDownBlock2D(nn.Module):
             logger.warning('Passing `scale` to `cross_attention_kwargs` is deprecated. `scale` will be ignored.')
         output_states = ()
         for resnet, attn in zip(self.resnets, self.attentions):
-            if self.training and self.gradient_checkpointing:
+            if torch.is_grad_enabled() and self.gradient_checkpointing:
 
                 def create_custom_forward(module, return_dict=None):
 
@@ -11839,7 +11839,7 @@ class UpBlock2D(nn.Module):
             if is_freeu_enabled:
                 hidden_states, res_hidden_states = apply_freeu(self.resolution_idx, hidden_states, res_hidden_states, s1=self.s1, s2=self.s2, b1=self.b1, b2=self.b2)
             hidden_states = torch.cat([hidden_states, res_hidden_states], dim=1)
-            if self.training and self.gradient_checkpointing:
+            if torch.is_grad_enabled() and self.gradient_checkpointing:
 
                 def create_custom_forward(module):
 
@@ -12122,7 +12122,7 @@ class ResnetUpsampleBlock2D(nn.Module):
             res_hidden_states = res_hidden_states_tuple[-1]
             res_hidden_states_tuple = res_hidden_states_tuple[:-1]
             hidden_states = torch.cat([hidden_states, res_hidden_states], dim=1)
-            if self.training and self.gradient_checkpointing:
+            if torch.is_grad_enabled() and self.gradient_checkpointing:
 
                 def create_custom_forward(module):
 
@@ -12177,7 +12177,7 @@ class SimpleCrossAttnUpBlock2D(nn.Module):
             res_hidden_states = res_hidden_states_tuple[-1]
             res_hidden_states_tuple = res_hidden_states_tuple[:-1]
             hidden_states = torch.cat([hidden_states, res_hidden_states], dim=1)
-            if self.training and self.gradient_checkpointing:
+            if torch.is_grad_enabled() and self.gradient_checkpointing:
 
                 def create_custom_forward(module, return_dict=None):
 
@@ -12250,7 +12250,7 @@ class KUpBlock2D(nn.Module):
         if res_hidden_states_tuple is not None:
             hidden_states = torch.cat([hidden_states, res_hidden_states_tuple], dim=1)
         for resnet in self.resnets:
-            if self.training and self.gradient_checkpointing:
+            if torch.is_grad_enabled() and self.gradient_checkpointing:
 
                 def create_custom_forward(module):
 
@@ -12307,7 +12307,7 @@ class KCrossAttnUpBlock2D(nn.Module):
         if res_hidden_states_tuple is not None:
             hidden_states = torch.cat([hidden_states, res_hidden_states_tuple], dim=1)
         for resnet, attn in zip(self.resnets, self.attentions):
-            if self.training and self.gradient_checkpointing:
+            if torch.is_grad_enabled() and self.gradient_checkpointing:
 
                 def create_custom_forward(module, return_dict=None):
 
@@ -12550,7 +12550,7 @@ class UNetMidBlockSpatioTemporal(nn.Module):
     def forward(self, hidden_states: 'torch.Tensor', temb: 'Optional[torch.Tensor]'=None, encoder_hidden_states: 'Optional[torch.Tensor]'=None, image_only_indicator: 'Optional[torch.Tensor]'=None) ->torch.Tensor:
         hidden_states = self.resnets[0](hidden_states, temb, image_only_indicator=image_only_indicator)
         for attn, resnet in zip(self.attentions, self.resnets[1:]):
-            if self.training and self.gradient_checkpointing:
+            if torch.is_grad_enabled() and self.gradient_checkpointing:
 
                 def create_custom_forward(module, return_dict=None):
 
@@ -12587,7 +12587,7 @@ class DownBlockSpatioTemporal(nn.Module):
     def forward(self, hidden_states: 'torch.Tensor', temb: 'Optional[torch.Tensor]'=None, image_only_indicator: 'Optional[torch.Tensor]'=None) ->Tuple[torch.Tensor, Tuple[torch.Tensor, ...]]:
         output_states = ()
         for resnet in self.resnets:
-            if self.training and self.gradient_checkpointing:
+            if torch.is_grad_enabled() and self.gradient_checkpointing:
 
                 def create_custom_forward(module):
 
@@ -12634,7 +12634,7 @@ class CrossAttnDownBlockSpatioTemporal(nn.Module):
         output_states = ()
         blocks = list(zip(self.resnets, self.attentions))
         for resnet, attn in blocks:
-            if self.training and self.gradient_checkpointing:
+            if torch.is_grad_enabled() and self.gradient_checkpointing:
 
                 def create_custom_forward(module, return_dict=None):
 
@@ -12680,7 +12680,7 @@ class UpBlockSpatioTemporal(nn.Module):
             res_hidden_states = res_hidden_states_tuple[-1]
             res_hidden_states_tuple = res_hidden_states_tuple[:-1]
             hidden_states = torch.cat([hidden_states, res_hidden_states], dim=1)
-            if self.training and self.gradient_checkpointing:
+            if torch.is_grad_enabled() and self.gradient_checkpointing:
 
                 def create_custom_forward(module):
 
@@ -12728,7 +12728,7 @@ class CrossAttnUpBlockSpatioTemporal(nn.Module):
             res_hidden_states = res_hidden_states_tuple[-1]
             res_hidden_states_tuple = res_hidden_states_tuple[:-1]
             hidden_states = torch.cat([hidden_states, res_hidden_states], dim=1)
-            if self.training and self.gradient_checkpointing:
+            if torch.is_grad_enabled() and self.gradient_checkpointing:
 
                 def create_custom_forward(module, return_dict=None):
 
@@ -13124,7 +13124,7 @@ class DownBlockMotion(nn.Module):
         output_states = ()
         blocks = zip(self.resnets, self.motion_modules)
         for resnet, motion_module in blocks:
-            if self.training and self.gradient_checkpointing:
+            if torch.is_grad_enabled() and self.gradient_checkpointing:
 
                 def create_custom_forward(module):
 
@@ -13187,7 +13187,7 @@ class CrossAttnDownBlockMotion(nn.Module):
         output_states = ()
         blocks = list(zip(self.resnets, self.attentions, self.motion_modules))
         for i, (resnet, attn, motion_module) in enumerate(blocks):
-            if self.training and self.gradient_checkpointing:
+            if torch.is_grad_enabled() and self.gradient_checkpointing:
 
                 def create_custom_forward(module, return_dict=None):
 
@@ -13261,7 +13261,7 @@ class CrossAttnUpBlockMotion(nn.Module):
             if is_freeu_enabled:
                 hidden_states, res_hidden_states = apply_freeu(self.resolution_idx, hidden_states, res_hidden_states, s1=self.s1, s2=self.s2, b1=self.b1, b2=self.b2)
             hidden_states = torch.cat([hidden_states, res_hidden_states], dim=1)
-            if self.training and self.gradient_checkpointing:
+            if torch.is_grad_enabled() and self.gradient_checkpointing:
 
                 def create_custom_forward(module, return_dict=None):
 
@@ -13319,7 +13319,7 @@ class UpBlockMotion(nn.Module):
             if is_freeu_enabled:
                 hidden_states, res_hidden_states = apply_freeu(self.resolution_idx, hidden_states, res_hidden_states, s1=self.s1, s2=self.s2, b1=self.b1, b2=self.b2)
             hidden_states = torch.cat([hidden_states, res_hidden_states], dim=1)
-            if self.training and self.gradient_checkpointing:
+            if torch.is_grad_enabled() and self.gradient_checkpointing:
 
                 def create_custom_forward(module):
 
@@ -13377,7 +13377,7 @@ class UNetMidBlockCrossAttnMotion(nn.Module):
         blocks = zip(self.attentions, self.resnets[1:], self.motion_modules)
         for attn, resnet, motion_module in blocks:
             hidden_states = attn(hidden_states=hidden_states, encoder_hidden_states=encoder_hidden_states, cross_attention_kwargs=cross_attention_kwargs, attention_mask=attention_mask, encoder_attention_mask=encoder_attention_mask, return_dict=False)[0]
-            if self.training and self.gradient_checkpointing:
+            if torch.is_grad_enabled() and self.gradient_checkpointing:
 
                 def create_custom_forward(module, return_dict=None):
 
@@ -14884,7 +14884,7 @@ class Blip2QFormerEncoder(nn.Module):
                 all_hidden_states = all_hidden_states + (hidden_states,)
             layer_head_mask = head_mask[i] if head_mask is not None else None
             past_key_value = past_key_values[i] if past_key_values is not None else None
-            if getattr(self.config, 'gradient_checkpointing', False) and self.training:
+            if getattr(self.config, 'gradient_checkpointing', False) and torch.is_grad_enabled():
                 if use_cache:
                     logger.warning('`use_cache=True` is incompatible with gradient checkpointing. Setting `use_cache=False`...')
                     use_cache = False
@@ -15396,7 +15396,7 @@ class UNetMidBlockFlatCrossAttn(nn.Module):
                 logger.warning('Passing `scale` to `cross_attention_kwargs` is deprecated. `scale` will be ignored.')
         hidden_states = self.resnets[0](hidden_states, temb)
         for attn, resnet in zip(self.attentions, self.resnets[1:]):
-            if self.training and self.gradient_checkpointing:
+            if torch.is_grad_enabled() and self.gradient_checkpointing:
 
                 def create_custom_forward(module, return_dict=None):
 
@@ -15831,7 +15831,7 @@ class GLMTransformer(torch.nn.Module):
         if not kv_caches:
             kv_caches = [None for _ in range(self.num_layers)]
         presents = () if use_cache else None
-        if self.gradient_checkpointing and self.training:
+        if torch.is_grad_enabled() and self.gradient_checkpointing:
             if use_cache:
                 logger.warning_once('`use_cache=True` is incompatible with gradient checkpointing. Setting `use_cache=False`...')
                 use_cache = False
@@ -15841,7 +15841,7 @@ class GLMTransformer(torch.nn.Module):
             if output_hidden_states:
                 all_hidden_states = all_hidden_states + (hidden_states,)
             layer = self._get_layer(index)
-            if self.gradient_checkpointing and self.training:
+            if torch.is_grad_enabled() and self.gradient_checkpointing:
                 layer_ret = torch.utils.checkpoint.checkpoint(layer, hidden_states, attention_mask, rotary_pos_emb, kv_caches[index], use_cache)
             else:
                 layer_ret = layer(hidden_states, attention_mask, rotary_pos_emb, kv_cache=kv_caches[index], use_cache=use_cache)

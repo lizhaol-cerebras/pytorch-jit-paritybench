@@ -1,0 +1,1822 @@
+
+from unittest.mock import mock_open, MagicMock
+from torch.autograd import Function
+from torch.nn import Module
+import abc, collections, copy, enum, functools, inspect, itertools, logging, math, matplotlib, numbers, numpy, pandas, queue, random, re, scipy, sklearn, string, tensorflow, time, torch, torchvision, types, typing, uuid, warnings
+import operator as op
+from dataclasses import dataclass
+import numpy as np
+from torch import Tensor
+__version__ = '1.0.0'
+xrange = range
+wraps = functools.wraps
+
+
+import logging
+
+
+import numpy as np
+
+
+from collections import OrderedDict
+
+
+import torch
+
+
+import copy
+
+
+import itertools
+
+
+from torch import nn
+
+
+import torch.nn.functional as F
+
+
+from torch.nn import BatchNorm2d
+
+
+import torch.nn as nn
+
+
+from typing import Dict
+
+
+from typing import List
+
+
+from typing import Optional
+
+
+from typing import Tuple
+
+
+from typing import Union
+
+
+from torch.nn import functional as F
+
+
+import math
+
+
+from torchvision.ops import RoIPool
+
+
+import torch.distributed as dist
+
+
+from collections import deque
+
+
+import matplotlib.pyplot as plt
+
+
+class _NewEmptyTensorOp(torch.autograd.Function):
+
+    @staticmethod
+    def forward(ctx, x, new_shape):
+        ctx.shape = x.shape
+        return x.new_empty(new_shape)
+
+    @staticmethod
+    def backward(ctx, grad):
+        shape = ctx.shape
+        return _NewEmptyTensorOp.apply(grad, shape), None
+
+
+class DFConv2d(nn.Module):
+    """Deformable convolutional layer"""
+
+    def __init__(self, in_channels, out_channels, with_modulated_dcn=True, kernel_size=3, stride=1, groups=1, dilation=1, deformable_groups=1, bias=False, padding=None):
+        super(DFConv2d, self).__init__()
+        if isinstance(kernel_size, (list, tuple)):
+            assert isinstance(stride, (list, tuple))
+            assert isinstance(dilation, (list, tuple))
+            assert len(kernel_size) == 2
+            assert len(stride) == 2
+            assert len(dilation) == 2
+            padding = dilation[0] * (kernel_size[0] - 1) // 2, dilation[1] * (kernel_size[1] - 1) // 2
+            offset_base_channels = kernel_size[0] * kernel_size[1]
+        else:
+            padding = dilation * (kernel_size - 1) // 2
+            offset_base_channels = kernel_size * kernel_size
+        if with_modulated_dcn:
+            offset_channels = offset_base_channels * 3
+            conv_block = ModulatedDeformConv
+        else:
+            offset_channels = offset_base_channels * 2
+            conv_block = DeformConv
+        self.offset = Conv2d(in_channels, deformable_groups * offset_channels, kernel_size=kernel_size, stride=stride, padding=padding, groups=1, dilation=dilation)
+        for l in [self.offset]:
+            nn.init.kaiming_uniform_(l.weight, a=1)
+            torch.nn.init.constant_(l.bias, 0.0)
+        self.conv = conv_block(in_channels, out_channels, kernel_size=kernel_size, stride=stride, padding=padding, dilation=dilation, groups=groups, deformable_groups=deformable_groups, bias=bias)
+        self.with_modulated_dcn = with_modulated_dcn
+        self.kernel_size = kernel_size
+        self.stride = stride
+        self.padding = padding
+        self.dilation = dilation
+        self.offset_split = offset_base_channels * deformable_groups * 2
+
+    def forward(self, x, return_offset=False):
+        if x.numel() > 0:
+            if not self.with_modulated_dcn:
+                offset_mask = self.offset(x)
+                x = self.conv(x, offset_mask)
+            else:
+                offset_mask = self.offset(x)
+                offset = offset_mask[:, :self.offset_split, :, :]
+                mask = offset_mask[:, self.offset_split:, :, :].sigmoid()
+                x = self.conv(x, offset, mask)
+            if return_offset:
+                return x, offset_mask
+            return x
+        output_shape = [((i + 2 * p - (di * (k - 1) + 1)) // d + 1) for i, p, di, k, d in zip(x.shape[-2:], self.padding, self.dilation, self.kernel_size, self.stride)]
+        output_shape = [x.shape[0], self.conv.weight.shape[0]] + output_shape
+        return _NewEmptyTensorOp.apply(x, output_shape)
+
+
+class IOULoss(nn.Module):
+
+    def __init__(self, loc_loss_type='iou'):
+        super(IOULoss, self).__init__()
+        self.loc_loss_type = loc_loss_type
+
+    def forward(self, pred, target, weight=None):
+        pred_left = pred[:, 0]
+        pred_top = pred[:, 1]
+        pred_right = pred[:, 2]
+        pred_bottom = pred[:, 3]
+        target_left = target[:, 0]
+        target_top = target[:, 1]
+        target_right = target[:, 2]
+        target_bottom = target[:, 3]
+        target_aera = (target_left + target_right) * (target_top + target_bottom)
+        pred_aera = (pred_left + pred_right) * (pred_top + pred_bottom)
+        w_intersect = torch.min(pred_left, target_left) + torch.min(pred_right, target_right)
+        h_intersect = torch.min(pred_bottom, target_bottom) + torch.min(pred_top, target_top)
+        g_w_intersect = torch.max(pred_left, target_left) + torch.max(pred_right, target_right)
+        g_h_intersect = torch.max(pred_bottom, target_bottom) + torch.max(pred_top, target_top)
+        ac_uion = g_w_intersect * g_h_intersect
+        area_intersect = w_intersect * h_intersect
+        area_union = target_aera + pred_aera - area_intersect
+        ious = (area_intersect + 1.0) / (area_union + 1.0)
+        gious = ious - (ac_uion - area_union) / ac_uion
+        if self.loc_loss_type == 'iou':
+            losses = -torch.log(ious)
+        elif self.loc_loss_type == 'linear_iou':
+            losses = 1 - ious
+        elif self.loc_loss_type == 'giou':
+            losses = 1 - gious
+        else:
+            raise NotImplementedError
+        if weight is not None:
+            return (losses * weight).sum()
+        else:
+            return losses.sum()
+
+
+class MaxPool2d(torch.nn.MaxPool2d):
+    """
+    A wrapper around :class:`torch.nn.MaxPool2d` to support empty inputs and more features.
+    """
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self._make_iteratable()
+
+    def forward(self, x):
+        if x.numel() == 0:
+            output_shape = [((i + 2 * p - (di * (k - 1) + 1)) // s + 1) for i, p, di, k, s in zip(x.shape[-2:], self.padding, self.dilation, self.kernel_size, self.stride)]
+            output_shape = [x.shape[0], x.shape[1]] + output_shape
+            empty = _NewEmptyTensorOp.apply(x, output_shape)
+            return empty
+        x = super().forward(x)
+        return x
+
+    def _make_iteratable(self):
+        if not isinstance(self.padding, list):
+            self.padding = [self.padding, self.padding]
+        if not isinstance(self.dilation, list):
+            self.dilation = [self.dilation, self.dilation]
+        if not isinstance(self.kernel_size, list):
+            self.kernel_size = [self.kernel_size, self.kernel_size]
+        if not isinstance(self.stride, list):
+            self.stride = [self.stride, self.stride]
+
+
+class Linear(torch.nn.Linear):
+    """
+    A wrapper around :class:`torch.nn.Linear` to support empty inputs and more features.
+    Because of https://github.com/pytorch/pytorch/issues/34202
+    """
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+
+    def forward(self, x):
+        if x.numel() == 0:
+            output_shape = [x.shape[0], self.weight.shape[0]]
+            empty = _NewEmptyTensorOp.apply(x, output_shape)
+            if self.training:
+                _dummy = sum(x.view(-1)[0] for x in self.parameters()) * 0.0
+                return empty + _dummy
+            else:
+                return empty
+        x = super().forward(x)
+        return x
+
+
+class LastLevelP6P7(nn.Module):
+    """
+    This module is used in RetinaNet and FCOS to generate extra layers, P6 and P7 from
+    C5 or P5 feature.
+    """
+
+    def __init__(self, in_channels, out_channels, in_features='res5'):
+        super().__init__()
+        self.num_levels = 2
+        self.in_feature = in_features
+        self.p6 = nn.Conv2d(in_channels, out_channels, 3, 2, 1)
+        self.p7 = nn.Conv2d(out_channels, out_channels, 3, 2, 1)
+        for module in [self.p6, self.p7]:
+            weight_init.c2_xavier_fill(module)
+
+    def forward(self, x):
+        p6 = self.p6(x)
+        p7 = self.p7(F.relu(p6))
+        return [p6, p7]
+
+
+class LastLevelP6(nn.Module):
+    """
+    This module is used in FCOS to generate extra layers
+    """
+
+    def __init__(self, in_channels, out_channels, in_features='res5'):
+        super().__init__()
+        self.num_levels = 1
+        self.in_feature = in_features
+        self.p6 = nn.Conv2d(in_channels, out_channels, 3, 2, 1)
+        for module in [self.p6]:
+            weight_init.c2_xavier_fill(module)
+
+    def forward(self, x):
+        p6 = self.p6(x)
+        return [p6]
+
+
+class InvertedResidual(nn.Module):
+
+    def __init__(self, inp, oup, stride, expand_ratio):
+        super(InvertedResidual, self).__init__()
+        self.stride = stride
+        assert stride in [1, 2]
+        hidden_dim = int(round(inp * expand_ratio))
+        self.use_res_connect = self.stride == 1 and inp == oup
+        if expand_ratio == 1:
+            self.conv = nn.Sequential(Conv2d(hidden_dim, hidden_dim, 3, stride, 1, groups=hidden_dim, bias=False), FrozenBatchNorm2d(hidden_dim), nn.ReLU6(inplace=True), Conv2d(hidden_dim, oup, 1, 1, 0, bias=False), FrozenBatchNorm2d(oup))
+        else:
+            self.conv = nn.Sequential(Conv2d(inp, hidden_dim, 1, 1, 0, bias=False), FrozenBatchNorm2d(hidden_dim), nn.ReLU6(inplace=True), Conv2d(hidden_dim, hidden_dim, 3, stride, 1, groups=hidden_dim, bias=False), FrozenBatchNorm2d(hidden_dim), nn.ReLU6(inplace=True), Conv2d(hidden_dim, oup, 1, 1, 0, bias=False), FrozenBatchNorm2d(oup))
+
+    def forward(self, x):
+        if self.use_res_connect:
+            return x + self.conv(x)
+        else:
+            return self.conv(x)
+
+
+_NORM = False
+
+
+class DFConv3x3(nn.Module):
+
+    def __init__(self, in_channels, out_channels, module_name, postfix, dilation=1, groups=1, with_modulated_dcn=None, deformable_groups=1):
+        super(DFConv3x3, self).__init__()
+        self.module_names = []
+        self.with_modulated_dcn = with_modulated_dcn
+        if self.with_modulated_dcn:
+            deform_conv_op = ModulatedDeformConv
+            offset_channels = 27
+        else:
+            deform_conv_op = DeformConv
+            offset_channels = 18
+        unit_name = f'{module_name}_{postfix}/conv_offset'
+        self.module_names.append(unit_name)
+        self.add_module(unit_name, Conv2d(in_channels, offset_channels * deformable_groups, kernel_size=3, stride=1, padding=1 * dilation, dilation=dilation))
+        for m in self.modules():
+            if isinstance(m, nn.Conv2d):
+                nn.init.constant_(m.weight, 0)
+                nn.init.constant_(m.bias, 0)
+        unit_name = f'{module_name}_{postfix}/conv'
+        self.module_names.append(unit_name)
+        self.add_module(f'{module_name}_{postfix}/conv', deform_conv_op(in_channels, out_channels, kernel_size=3, stride=1, padding=1 * dilation, bias=False, groups=groups, dilation=1, deformable_groups=deformable_groups))
+        unit_name = f'{module_name}_{postfix}/norm'
+        self.module_names.append(unit_name)
+        self.add_module(unit_name, get_norm(_NORM, out_channels))
+
+    def forward(self, x):
+        if self.with_modulated_dcn:
+            offset_mask = getattr(self, self.module_names[0])(x)
+            offset_x, offset_y, mask = torch.chunk(offset_mask, 3, dim=1)
+            offset = torch.cat((offset_x, offset_y), dim=1)
+            mask = mask.sigmoid()
+            out = getattr(self, self.module_names[1])(x, offset, mask)
+        else:
+            offset = getattr(self, self.module_names[0])(x)
+            out = getattr(self, self.module_names[1])(x, offset)
+        return F.relu_(getattr(self, self.module_names[2])(out))
+
+
+class Hsigmoid(nn.Module):
+
+    def __init__(self, inplace=True):
+        super(Hsigmoid, self).__init__()
+        self.inplace = inplace
+
+    def forward(self, x):
+        return F.relu6(x + 3.0, inplace=self.inplace) / 6.0
+
+
+class eSEModule(nn.Module):
+
+    def __init__(self, channel, reduction=4):
+        super(eSEModule, self).__init__()
+        self.avg_pool = nn.AdaptiveAvgPool2d(1)
+        self.fc = nn.Conv2d(channel, channel, kernel_size=1, padding=0)
+        self.hsigmoid = Hsigmoid()
+
+    def forward(self, x):
+        input = x
+        x = self.avg_pool(x)
+        x = self.fc(x)
+        x = self.hsigmoid(x)
+        return input * x
+
+
+def conv1x1(in_channels, out_channels, module_name, postfix, stride=1, groups=1, kernel_size=1, padding=0):
+    """1x1 convolution with padding"""
+    return [(f'{module_name}_{postfix}/conv', nn.Conv2d(in_channels, out_channels, kernel_size=kernel_size, stride=stride, padding=padding, groups=groups, bias=False)), (f'{module_name}_{postfix}/norm', get_norm(_NORM, out_channels)), (f'{module_name}_{postfix}/relu', nn.ReLU(inplace=True))]
+
+
+def conv3x3(in_channels, out_channels, module_name, postfix, stride=1, groups=1, kernel_size=3, padding=1):
+    """3x3 convolution with padding"""
+    return [(f'{module_name}_{postfix}/conv', nn.Conv2d(in_channels, out_channels, kernel_size=kernel_size, stride=stride, padding=padding, groups=groups, bias=False)), (f'{module_name}_{postfix}/norm', get_norm(_NORM, out_channels)), (f'{module_name}_{postfix}/relu', nn.ReLU(inplace=True))]
+
+
+def dw_conv3x3(in_channels, out_channels, module_name, postfix, stride=1, kernel_size=3, padding=1):
+    """3x3 convolution with padding"""
+    return [('{}_{}/dw_conv3x3'.format(module_name, postfix), nn.Conv2d(in_channels, out_channels, kernel_size=kernel_size, stride=stride, padding=padding, groups=out_channels, bias=False)), ('{}_{}/pw_conv1x1'.format(module_name, postfix), nn.Conv2d(in_channels, out_channels, kernel_size=1, stride=1, padding=0, groups=1, bias=False)), ('{}_{}/pw_norm'.format(module_name, postfix), get_norm(_NORM, out_channels)), ('{}_{}/pw_relu'.format(module_name, postfix), nn.ReLU(inplace=True))]
+
+
+class _OSA_module(nn.Module):
+
+    def __init__(self, in_ch, stage_ch, concat_ch, layer_per_block, module_name, SE=False, identity=False, depthwise=False, dcn_config={}):
+        super(_OSA_module, self).__init__()
+        self.identity = identity
+        self.depthwise = depthwise
+        self.isReduced = False
+        self.layers = nn.ModuleList()
+        in_channel = in_ch
+        if self.depthwise and in_channel != stage_ch:
+            self.isReduced = True
+            self.conv_reduction = nn.Sequential(OrderedDict(conv1x1(in_channel, stage_ch, '{}_reduction'.format(module_name), '0')))
+        with_dcn = dcn_config.get('stage_with_dcn', False)
+        for i in range(layer_per_block):
+            if self.depthwise:
+                self.layers.append(nn.Sequential(OrderedDict(dw_conv3x3(stage_ch, stage_ch, module_name, i))))
+            elif with_dcn:
+                deformable_groups = dcn_config.get('deformable_groups', 1)
+                with_modulated_dcn = dcn_config.get('with_modulated_dcn', False)
+                self.layers.append(DFConv3x3(in_channel, stage_ch, module_name, i, with_modulated_dcn=with_modulated_dcn, deformable_groups=deformable_groups))
+            else:
+                self.layers.append(nn.Sequential(OrderedDict(conv3x3(in_channel, stage_ch, module_name, i))))
+            in_channel = stage_ch
+        in_channel = in_ch + layer_per_block * stage_ch
+        self.concat = nn.Sequential(OrderedDict(conv1x1(in_channel, concat_ch, module_name, 'concat')))
+        self.ese = eSEModule(concat_ch)
+
+    def forward(self, x):
+        identity_feat = x
+        output = []
+        output.append(x)
+        if self.depthwise and self.isReduced:
+            x = self.conv_reduction(x)
+        for layer in self.layers:
+            x = layer(x)
+            output.append(x)
+        x = torch.cat(output, dim=1)
+        xt = self.concat(x)
+        xt = self.ese(xt)
+        if self.identity:
+            xt = xt + identity_feat
+        return xt
+
+
+class _OSA_stage(nn.Sequential):
+
+    def __init__(self, in_ch, stage_ch, concat_ch, block_per_stage, layer_per_block, stage_num, SE=False, depthwise=False, dcn_config={}):
+        super(_OSA_stage, self).__init__()
+        if not stage_num == 2:
+            self.add_module('Pooling', nn.MaxPool2d(kernel_size=3, stride=2, ceil_mode=True))
+        if block_per_stage != 1:
+            SE = False
+        module_name = f'OSA{stage_num}_1'
+        self.add_module(module_name, _OSA_module(in_ch, stage_ch, concat_ch, layer_per_block, module_name, SE, depthwise=depthwise, dcn_config=dcn_config))
+        for i in range(block_per_stage - 1):
+            if i != block_per_stage - 2:
+                SE = False
+            module_name = f'OSA{stage_num}_{i + 2}'
+            self.add_module(module_name, _OSA_module(concat_ch, stage_ch, concat_ch, layer_per_block, module_name, SE, identity=True, depthwise=depthwise, dcn_config=dcn_config))
+
+
+def add_ground_truth_to_proposals_single_image(targets_i, proposals):
+    """
+    Augment `proposals` with ground-truth boxes from `gt_boxes`.
+
+    Args:
+        Same as `add_ground_truth_to_proposals`, but with targets and proposals
+        per image.
+
+    Returns:
+        Same as `add_ground_truth_to_proposals`, but for only one image.
+    """
+    device = proposals.scores.device
+    proposals.proposal_boxes = proposals.pred_boxes
+    proposals.remove('pred_boxes')
+    gt_logit_value = math.log((1.0 - 1e-10) / (1 - (1.0 - 1e-10)))
+    gt_logits = gt_logit_value * torch.ones(len(targets_i), device=device)
+    gt_proposal = Instances(proposals.image_size)
+    gt_proposal.proposal_boxes = targets_i.gt_boxes
+    gt_proposal.scores = gt_logits
+    gt_proposal.pred_classes = targets_i.gt_classes
+    gt_proposal.locations = torch.ones((len(targets_i), 2), device=device)
+    new_proposals = Instances.cat([proposals, gt_proposal])
+    return new_proposals
+
+
+def add_ground_truth_to_proposals(targets, proposals):
+    """
+    Call `add_ground_truth_to_proposals_single_image` for all images.
+
+    Args:
+        targets(list[Instances]): list of N elements. Element i is a Boxes
+            representing the gound-truth for image i.
+        proposals (list[Instances]): list of N elements. Element i is a Instances
+            representing the proposals for image i.
+
+    Returns:
+        list[Instances]: list of N Instances. Each is the proposals for the image,
+            with field "proposal_boxes" and "objectness_logits".
+    """
+    assert targets is not None
+    assert len(proposals) == len(targets)
+    if len(proposals) == 0:
+        return proposals
+    return [add_ground_truth_to_proposals_single_image(tagets_i, proposals_i) for tagets_i, proposals_i in zip(targets, proposals)]
+
+
+class ROIHeads(nn.Module):
+    """
+    ROIHeads perform all per-region computation in an R-CNN.
+
+    It contains logic of cropping the regions, extract per-region features,
+    and make per-region predictions.
+
+    It can have many variants, implemented as subclasses of this class.
+    """
+
+    def __init__(self, cfg, input_shape: 'Dict[str, ShapeSpec]'):
+        super(ROIHeads, self).__init__()
+        self.batch_size_per_image = cfg.MODEL.ROI_HEADS.BATCH_SIZE_PER_IMAGE
+        self.positive_sample_fraction = cfg.MODEL.ROI_HEADS.POSITIVE_FRACTION
+        self.test_score_thresh = cfg.MODEL.ROI_HEADS.SCORE_THRESH_TEST
+        self.test_nms_thresh = cfg.MODEL.ROI_HEADS.NMS_THRESH_TEST
+        self.test_detections_per_img = cfg.TEST.DETECTIONS_PER_IMAGE
+        self.in_features = cfg.MODEL.ROI_HEADS.IN_FEATURES
+        self.num_classes = cfg.MODEL.ROI_HEADS.NUM_CLASSES
+        self.proposal_append_gt = cfg.MODEL.ROI_HEADS.PROPOSAL_APPEND_GT
+        self.feature_strides = {k: v.stride for k, v in input_shape.items()}
+        self.feature_channels = {k: v.channels for k, v in input_shape.items()}
+        self.proposal_matcher = Matcher(cfg.MODEL.ROI_HEADS.IOU_THRESHOLDS, cfg.MODEL.ROI_HEADS.IOU_LABELS, allow_low_quality_matches=False)
+
+    def _sample_proposals(self, matched_idxs, matched_labels, gt_classes):
+        """
+        Based on the matching between N proposals and M groundtruth,
+        sample the proposals and set their classification labels.
+
+        Args:
+            matched_idxs (Tensor): a vector of length N, each is the best-matched
+                gt index in [0, M) for each proposal.
+            matched_labels (Tensor): a vector of length N, the matcher's label
+                (one of cfg.MODEL.ROI_HEADS.IOU_LABELS) for each proposal.
+            gt_classes (Tensor): a vector of length M.
+
+        Returns:
+            Tensor: a vector of indices of sampled proposals. Each is in [0, N).
+            Tensor: a vector of the same length, the classification label for
+                each sampled proposal. Each sample is labeled as either a category in
+                [0, num_classes) or the background (num_classes).
+        """
+        has_gt = gt_classes.numel() > 0
+        if has_gt:
+            gt_classes = gt_classes[matched_idxs]
+            gt_classes[matched_labels == 0] = self.num_classes
+            gt_classes[matched_labels == -1] = -1
+        else:
+            gt_classes = torch.zeros_like(matched_idxs) + self.num_classes
+        sampled_fg_idxs, sampled_bg_idxs = subsample_labels(gt_classes, self.batch_size_per_image, self.positive_sample_fraction, self.num_classes)
+        sampled_idxs = torch.cat([sampled_fg_idxs, sampled_bg_idxs], dim=0)
+        return sampled_idxs, gt_classes[sampled_idxs]
+
+    @torch.no_grad()
+    def label_and_sample_proposals(self, proposals, targets):
+        """
+        Prepare some proposals to be used to train the ROI heads.
+        It performs box matching between `proposals` and `targets`, and assigns
+        training labels to the proposals.
+        It returns ``self.batch_size_per_image`` random samples from proposals and groundtruth
+        boxes, with a fraction of positives that is no larger than
+        ``self.positive_sample_fraction``.
+
+        Args:
+            See :meth:`ROIHeads.forward`
+
+        Returns:
+            list[Instances]:
+                length `N` list of `Instances`s containing the proposals
+                sampled for training. Each `Instances` has the following fields:
+
+                - proposal_boxes: the proposal boxes
+                - gt_boxes: the ground-truth box that the proposal is assigned to
+                  (this is only meaningful if the proposal has a label > 0; if label = 0
+                  then the ground-truth box is random)
+
+                Other fields such as "gt_classes", "gt_masks", that's included in `targets`.
+        """
+        if self.proposal_append_gt:
+            proposals = add_ground_truth_to_proposals(targets, proposals)
+        proposals_with_gt = []
+        num_fg_samples = []
+        num_bg_samples = []
+        for proposals_per_image, targets_per_image in zip(proposals, targets):
+            has_gt = len(targets_per_image) > 0
+            match_quality_matrix = pairwise_iou(targets_per_image.gt_boxes, proposals_per_image.proposal_boxes)
+            matched_idxs, matched_labels = self.proposal_matcher(match_quality_matrix)
+            sampled_idxs, gt_classes = self._sample_proposals(matched_idxs, matched_labels, targets_per_image.gt_classes)
+            proposals_per_image = proposals_per_image[sampled_idxs]
+            proposals_per_image.gt_classes = gt_classes
+            if has_gt:
+                sampled_targets = matched_idxs[sampled_idxs]
+                for trg_name, trg_value in targets_per_image.get_fields().items():
+                    if trg_name.startswith('gt_') and not proposals_per_image.has(trg_name):
+                        proposals_per_image.set(trg_name, trg_value[sampled_targets])
+            else:
+                gt_boxes = Boxes(targets_per_image.gt_boxes.tensor.new_zeros((len(sampled_idxs), 4)))
+                proposals_per_image.gt_boxes = gt_boxes
+            num_bg_samples.append((gt_classes == self.num_classes).sum().item())
+            num_fg_samples.append(gt_classes.numel() - num_bg_samples[-1])
+            proposals_with_gt.append(proposals_per_image)
+        storage = get_event_storage()
+        storage.put_scalar('roi_head/num_fg_samples', np.mean(num_fg_samples))
+        storage.put_scalar('roi_head/num_bg_samples', np.mean(num_bg_samples))
+        return proposals_with_gt
+
+    def forward(self, images, features, proposals, targets=None):
+        """
+        Args:
+            images (ImageList):
+            features (dict[str: Tensor]): input data as a mapping from feature
+                map name to tensor. Axis 0 represents the number of images `N` in
+                the input data; axes 1-3 are channels, height, and width, which may
+                vary between feature maps (e.g., if a feature pyramid is used).
+            proposals (list[Instances]): length `N` list of `Instances`s. The i-th
+                `Instances` contains object proposals for the i-th input image,
+                with fields "proposal_boxes" and "objectness_logits".
+            targets (list[Instances], optional): length `N` list of `Instances`s. The i-th
+                `Instances` contains the ground-truth per-instance annotations
+                for the i-th input image.  Specify `targets` during training only.
+                It may have the following fields:
+
+                - gt_boxes: the bounding box of each instance.
+                - gt_classes: the label for each instance with a category ranging in [0, #class].
+                - gt_masks: PolygonMasks or BitMasks, the ground-truth masks of each instance.
+                - gt_keypoints: NxKx3, the groud-truth keypoints for each instance.
+
+        Returns:
+            results (list[Instances]): length `N` list of `Instances`s containing the
+            detected instances. Returned during inference only; may be [] during training.
+
+            losses (dict[str->Tensor]):
+            mapping from a named loss to a tensor storing the loss. Used during training only.
+        """
+        raise NotImplementedError()
+
+
+def assign_boxes_to_levels(box_lists, min_level, max_level, canonical_box_size, canonical_level):
+    """
+    Map each box in `box_lists` to a feature map level index and return the assignment
+    vector.
+
+    Args:
+        box_lists (list[Boxes] | list[RotatedBoxes]): A list of N Boxes or N RotatedBoxes,
+            where N is the number of images in the batch.
+        min_level (int): Smallest feature map level index. The input is considered index 0,
+            the output of stage 1 is index 1, and so.
+        max_level (int): Largest feature map level index.
+        canonical_box_size (int): A canonical box size in pixels (sqrt(box area)).
+        canonical_level (int): The feature map level index on which a canonically-sized box
+            should be placed.
+
+    Returns:
+        A tensor of length M, where M is the total number of boxes aggregated over all
+            N batch images. The memory layout corresponds to the concatenation of boxes
+            from all images. Each element is the feature map index, as an offset from
+            `self.min_level`, for the corresponding box (so value i means the box is at
+            `self.min_level + i`).
+    """
+    eps = sys.float_info.epsilon
+    box_sizes = torch.sqrt(cat([boxes.area() for boxes in box_lists]))
+    level_assignments = torch.floor(canonical_level + torch.log2(box_sizes / canonical_box_size + eps))
+    level_assignments = torch.clamp(level_assignments, min=min_level, max=max_level)
+    return level_assignments - min_level
+
+
+def _img_area(instance):
+    device = instance.pred_classes.device
+    image_size = instance.image_size
+    area = torch.as_tensor(image_size[0] * image_size[1], dtype=torch.float, device=device)
+    tmp = torch.zeros((len(instance.pred_classes), 1), dtype=torch.float, device=device)
+    return (area + tmp).squeeze(1)
+
+
+def assign_boxes_to_levels_by_ratio(instances, min_level, max_level, is_train=False):
+    """
+    Map each box in `instances` to a feature map level index by adaptive ROI mapping function 
+    in CenterMask paper and return the assignment
+    vector.
+
+    Args:
+        instances (list[Instances]): the per-image instances to train/predict masks.
+        min_level (int): Smallest feature map level index. The input is considered index 0,
+            the output of stage 1 is index 1, and so.
+        max_level (int): Largest feature map level index.
+
+    Returns:
+        A tensor of length M, where M is the total number of boxes aggregated over all
+            N batch images. The memory layout corresponds to the concatenation of boxes
+            from all images. Each element is the feature map index, as an offset from
+            `self.min_level`, for the corresponding box (so value i means the box is at
+            `self.min_level + i`).
+    """
+    eps = sys.float_info.epsilon
+    if is_train:
+        box_lists = [x.proposal_boxes for x in instances]
+    else:
+        box_lists = [x.pred_boxes for x in instances]
+    box_areas = cat([boxes.area() for boxes in box_lists])
+    img_areas = cat([_img_area(instance_i) for instance_i in instances])
+    level_assignments = torch.ceil(max_level - torch.log2(img_areas / box_areas + eps))
+    level_assignments = torch.clamp(level_assignments, min=min_level, max=max_level)
+    return level_assignments - min_level
+
+
+def convert_boxes_to_pooler_format(box_lists):
+    """
+    Convert all boxes in `box_lists` to the low-level format used by ROI pooling ops
+    (see description under Returns).
+
+    Args:
+        box_lists (list[Boxes] | list[RotatedBoxes]):
+            A list of N Boxes or N RotatedBoxes, where N is the number of images in the batch.
+
+    Returns:
+        When input is list[Boxes]:
+            A tensor of shape (M, 5), where M is the total number of boxes aggregated over all
+            N batch images.
+            The 5 columns are (batch index, x0, y0, x1, y1), where batch index
+            is the index in [0, N) identifying which batch image the box with corners at
+            (x0, y0, x1, y1) comes from.
+        When input is list[RotatedBoxes]:
+            A tensor of shape (M, 6), where M is the total number of boxes aggregated over all
+            N batch images.
+            The 6 columns are (batch index, x_ctr, y_ctr, width, height, angle_degrees),
+            where batch index is the index in [0, N) identifying which batch image the
+            rotated box (x_ctr, y_ctr, width, height, angle_degrees) comes from.
+    """
+
+    def fmt_box_list(box_tensor, batch_index):
+        repeated_index = torch.full((len(box_tensor), 1), batch_index, dtype=box_tensor.dtype, device=box_tensor.device)
+        return cat((repeated_index, box_tensor), dim=1)
+    pooler_fmt_boxes = cat([fmt_box_list(box_list.tensor, i) for i, box_list in enumerate(box_lists)], dim=0)
+    return pooler_fmt_boxes
+
+
+class ROIPooler(nn.Module):
+    """
+    Region of interest feature map pooler that supports pooling from one or more
+    feature maps.
+    """
+
+    def __init__(self, output_size, scales, sampling_ratio, pooler_type, canonical_box_size=224, canonical_level=4, assign_crit='area'):
+        """
+        Args:
+            output_size (int, tuple[int] or list[int]): output size of the pooled region,
+                e.g., 14 x 14. If tuple or list is given, the length must be 2.
+            scales (list[float]): The scale for each low-level pooling op relative to
+                the input image. For a feature map with stride s relative to the input
+                image, scale is defined as a 1 / s. The stride must be power of 2.
+                When there are multiple scales, they must form a pyramid, i.e. they must be
+                a monotically decreasing geometric sequence with a factor of 1/2.
+            sampling_ratio (int): The `sampling_ratio` parameter for the ROIAlign op.
+            pooler_type (string): Name of the type of pooling operation that should be applied.
+                For instance, "ROIPool" or "ROIAlignV2".
+            canonical_box_size (int): A canonical box size in pixels (sqrt(box area)). The default
+                is heuristically defined as 224 pixels in the FPN paper (based on ImageNet
+                pre-training).
+            canonical_level (int): The feature map level index from which a canonically-sized box
+                should be placed. The default is defined as level 4 (stride=16) in the FPN paper,
+                i.e., a box of size 224x224 will be placed on the feature with stride=16.
+                The box placement for all boxes will be determined from their sizes w.r.t
+                canonical_box_size. For example, a box whose area is 4x that of a canonical box
+                should be used to pool features from feature level ``canonical_level+1``.
+
+                Note that the actual input feature maps given to this module may not have
+                sufficiently many levels for the input boxes. If the boxes are too large or too
+                small for the input feature maps, the closest level will be used.
+        """
+        super().__init__()
+        if isinstance(output_size, int):
+            output_size = output_size, output_size
+        assert len(output_size) == 2
+        assert isinstance(output_size[0], int) and isinstance(output_size[1], int)
+        self.output_size = output_size
+        if pooler_type == 'ROIAlign':
+            self.level_poolers = nn.ModuleList(ROIAlign(output_size, spatial_scale=scale, sampling_ratio=sampling_ratio, aligned=False) for scale in scales)
+        elif pooler_type == 'ROIAlignV2':
+            self.level_poolers = nn.ModuleList(ROIAlign(output_size, spatial_scale=scale, sampling_ratio=sampling_ratio, aligned=True) for scale in scales)
+        elif pooler_type == 'ROIPool':
+            self.level_poolers = nn.ModuleList(RoIPool(output_size, spatial_scale=scale) for scale in scales)
+        elif pooler_type == 'ROIAlignRotated':
+            self.level_poolers = nn.ModuleList(ROIAlignRotated(output_size, spatial_scale=scale, sampling_ratio=sampling_ratio) for scale in scales)
+        else:
+            raise ValueError('Unknown pooler type: {}'.format(pooler_type))
+        min_level = -math.log2(scales[0])
+        max_level = -math.log2(scales[-1])
+        assert math.isclose(min_level, int(min_level)) and math.isclose(max_level, int(max_level)), 'Featuremap stride is not power of 2!'
+        self.min_level = int(min_level)
+        self.max_level = int(max_level)
+        assert len(scales) == self.max_level - self.min_level + 1, '[ROIPooler] Sizes of input featuremaps do not form a pyramid!'
+        assert 0 < self.min_level and self.min_level <= self.max_level
+        if len(scales) > 1:
+            assert self.min_level <= canonical_level and canonical_level <= self.max_level
+        self.canonical_level = canonical_level
+        assert canonical_box_size > 0
+        self.canonical_box_size = canonical_box_size
+        self.assign_crit = assign_crit
+
+    def forward(self, x, instances, is_train=False):
+        """
+        Args:
+            x (list[Tensor]): A list of feature maps of NCHW shape, with scales matching those
+                used to construct this module.
+            instances (list[Instances]): the per-image instances to train/predict masks.
+                In training, they can be the proposals.
+                In inference, they can be the predicted boxes.
+            is_train (True/False)
+
+        Returns:
+            Tensor:
+                A tensor of shape (M, C, output_size, output_size) where M is the total number of
+                boxes aggregated over all N batch images and C is the number of channels in `x`.
+        """
+        if is_train:
+            box_lists = [x.proposal_boxes for x in instances]
+        else:
+            box_lists = [x.pred_boxes for x in instances]
+        num_level_assignments = len(self.level_poolers)
+        assert isinstance(x, list) and isinstance(box_lists, list), 'Arguments to pooler must be lists'
+        assert len(x) == num_level_assignments, 'unequal value, num_level_assignments={}, but x is list of {} Tensors'.format(num_level_assignments, len(x))
+        assert len(box_lists) == x[0].size(0), 'unequal value, x[0] batch dim 0 is {}, but box_list has length {}'.format(x[0].size(0), len(box_lists))
+        pooler_fmt_boxes = convert_boxes_to_pooler_format(box_lists)
+        if num_level_assignments == 1:
+            return self.level_poolers[0](x[0], pooler_fmt_boxes)
+        if self.assign_crit == 'ratio':
+            level_assignments = assign_boxes_to_levels_by_ratio(instances, self.min_level, self.max_level, is_train)
+        else:
+            level_assignments = assign_boxes_to_levels(box_lists, self.min_level, self.max_level, self.canonical_box_size, self.canonical_level)
+        num_boxes = len(pooler_fmt_boxes)
+        num_channels = x[0].shape[1]
+        output_size = self.output_size[0]
+        dtype, device = x[0].dtype, x[0].device
+        output = torch.zeros((num_boxes, num_channels, output_size, output_size), dtype=dtype, device=device)
+        for level, (x_level, pooler) in enumerate(zip(x, self.level_poolers)):
+            inds = torch.nonzero(level_assignments == level).squeeze(1)
+            pooler_fmt_boxes_level = pooler_fmt_boxes[inds]
+            output[inds] = pooler(x_level, pooler_fmt_boxes_level)
+        return output
+
+
+def build_keypoint_head(cfg, input_shape):
+    """
+    Build a keypoint head from `cfg.MODEL.ROI_KEYPOINT_HEAD.NAME`.
+    """
+    name = cfg.MODEL.ROI_KEYPOINT_HEAD.NAME
+    return ROI_KEYPOINT_HEAD_REGISTRY.get(name)(cfg, input_shape)
+
+
+def build_mask_head(cfg, input_shape):
+    """
+    Build a mask head defined by `cfg.MODEL.ROI_MASK_HEAD.NAME`.
+    """
+    name = cfg.MODEL.ROI_MASK_HEAD.NAME
+    return ROI_MASK_HEAD_REGISTRY.get(name)(cfg, input_shape)
+
+
+def build_maskiou_head(cfg, input_shape):
+    """
+    Build a mask iou head defined by `cfg.MODEL.ROI_MASKIOU_HEAD.NAME`.
+    """
+    name = cfg.MODEL.ROI_MASKIOU_HEAD.NAME
+    return ROI_MASKIOU_HEAD_REGISTRY.get(name)(cfg, input_shape)
+
+
+def mask_iou_inference(pred_instances, pred_maskiou):
+    labels = cat([i.pred_classes for i in pred_instances])
+    num_masks = pred_maskiou.shape[0]
+    index = torch.arange(num_masks, device=labels.device)
+    num_boxes_per_image = [len(i) for i in pred_instances]
+    maskious = pred_maskiou[index, labels].split(num_boxes_per_image, dim=0)
+    for maskiou, box in zip(maskious, pred_instances):
+        box.mask_scores = box.scores * maskiou
+
+
+def mask_iou_loss(labels, pred_maskiou, gt_maskiou, loss_weight):
+    """
+    Compute the maskiou loss.
+
+    Args:
+        labels (Tensor): Given mask labels (num of instance,)
+        pred_maskiou (Tensor):  A tensor of shape (num of instance, C)
+        gt_maskiou (Tensor): Ground Truth IOU generated in mask head (num of instance,)
+    """
+
+    def l2_loss(input, target):
+        """
+        very similar to the smooth_l1_loss from pytorch, but with
+        the extra beta parameter
+        """
+        pos_inds = torch.nonzero(target > 0.0).squeeze(1)
+        if pos_inds.shape[0] > 0:
+            cond = torch.abs(input[pos_inds] - target[pos_inds])
+            loss = 0.5 * cond ** 2 / pos_inds.shape[0]
+        else:
+            loss = input * 0.0
+        return loss.sum()
+    if labels.numel() == 0:
+        return pred_maskiou.sum() * 0
+    index = torch.arange(pred_maskiou.shape[0])
+    maskiou_loss = l2_loss(pred_maskiou[index, labels], gt_maskiou)
+    maskiou_loss = loss_weight * maskiou_loss
+    return maskiou_loss
+
+
+def mask_rcnn_inference(pred_mask_logits, pred_instances):
+    """
+    Convert pred_mask_logits to estimated foreground probability masks while also
+    extracting only the masks for the predicted classes in pred_instances. For each
+    predicted box, the mask of the same class is attached to the instance by adding a
+    new "pred_masks" field to pred_instances.
+
+    Args:
+        pred_mask_logits (Tensor): A tensor of shape (B, C, Hmask, Wmask) or (B, 1, Hmask, Wmask)
+            for class-specific or class-agnostic, where B is the total number of predicted masks
+            in all images, C is the number of foreground classes, and Hmask, Wmask are the height
+            and width of the mask predictions. The values are logits.
+        pred_instances (list[Instances]): A list of N Instances, where N is the number of images
+            in the batch. Each Instances must have field "pred_classes".
+
+    Returns:
+        None. pred_instances will contain an extra "pred_masks" field storing a mask of size (Hmask,
+            Wmask) for predicted class. Note that the masks are returned as a soft (non-quantized)
+            masks the resolution predicted by the network; post-processing steps, such as resizing
+            the predicted masks to the original image resolution and/or binarizing them, is left
+            to the caller.
+    """
+    cls_agnostic_mask = pred_mask_logits.size(1) == 1
+    if cls_agnostic_mask:
+        mask_probs_pred = pred_mask_logits.sigmoid()
+    else:
+        num_masks = pred_mask_logits.shape[0]
+        class_pred = cat([i.pred_classes for i in pred_instances])
+        indices = torch.arange(num_masks, device=class_pred.device)
+        mask_probs_pred = pred_mask_logits[indices, class_pred][:, None].sigmoid()
+    num_boxes_per_image = [len(i) for i in pred_instances]
+    mask_probs_pred = mask_probs_pred.split(num_boxes_per_image, dim=0)
+    for prob, instances in zip(mask_probs_pred, pred_instances):
+        instances.pred_masks = prob
+
+
+def _crop(polygons: 'np.ndarray', box: 'np.ndarray') ->List[np.ndarray]:
+    w, h = box[2] - box[0], box[3] - box[1]
+    polygons = copy.deepcopy(polygons)
+    for p in polygons:
+        p[0::2] = p[0::2] - box[0]
+        p[1::2] = p[1::2] - box[1]
+    return polygons
+
+
+def crop(polygons: 'List[List[np.ndarray]]', boxes: 'torch.Tensor') ->'PolygonMasks':
+    boxes = boxes.numpy()
+    results = [_crop(polygon, box) for polygon, box in zip(polygons, boxes)]
+    return PolygonMasks(results)
+
+
+def mask_rcnn_loss(pred_mask_logits, instances, maskiou_on):
+    """
+    Compute the mask prediction loss defined in the Mask R-CNN paper.
+
+    Args:
+        pred_mask_logits (Tensor): A tensor of shape (B, C, Hmask, Wmask) or (B, 1, Hmask, Wmask)
+            for class-specific or class-agnostic, where B is the total number of predicted masks
+            in all images, C is the number of foreground classes, and Hmask, Wmask are the height
+            and width of the mask predictions. The values are logits.
+        instances (list[Instances]): A list of N Instances, where N is the number of images
+            in the batch. These instances are in 1:1
+            correspondence with the pred_mask_logits. The ground-truth labels (class, box, mask,
+            ...) associated with each instance are stored in fields.
+
+    Returns:
+        mask_loss (Tensor): A scalar tensor containing the loss.
+    """
+    cls_agnostic_mask = pred_mask_logits.size(1) == 1
+    total_num_masks = pred_mask_logits.size(0)
+    mask_side_len = pred_mask_logits.size(2)
+    assert pred_mask_logits.size(2) == pred_mask_logits.size(3), 'Mask prediction must be square!'
+    gt_classes = []
+    gt_masks = []
+    mask_ratios = []
+    for instances_per_image in instances:
+        if len(instances_per_image) == 0:
+            continue
+        if not cls_agnostic_mask:
+            gt_classes_per_image = instances_per_image.gt_classes
+            gt_classes.append(gt_classes_per_image)
+        if maskiou_on:
+            cropped_mask = crop(instances_per_image.gt_masks.polygons, instances_per_image.proposal_boxes.tensor)
+            cropped_mask = torch.tensor([mask_utils.area(mask_utils.frPyObjects([p for p in obj], box[3] - box[1], box[2] - box[0])).sum().astype(float) for obj, box in zip(cropped_mask.polygons, instances_per_image.proposal_boxes.tensor)])
+            mask_ratios.append((cropped_mask / instances_per_image.gt_masks.area()).clamp(min=0.0, max=1.0))
+        gt_masks_per_image = instances_per_image.gt_masks.crop_and_resize(instances_per_image.proposal_boxes.tensor, mask_side_len)
+        gt_masks.append(gt_masks_per_image)
+    if len(gt_masks) == 0:
+        gt_classes = torch.LongTensor(gt_classes)
+        if maskiou_on:
+            selected_index = torch.arange(pred_mask_logits.shape[0], device=pred_mask_logits.device)
+            if cls_agnostic_mask:
+                selected_mask = pred_mask_logits[:, 0]
+            else:
+                selected_mask = pred_mask_logits[selected_index, gt_classes]
+            mask_num, mask_h, mask_w = selected_mask.shape
+            selected_mask = selected_mask.reshape(mask_num, 1, mask_h, mask_w)
+            return pred_mask_logits.sum() * 0, selected_mask, gt_classes, None
+        else:
+            return pred_mask_logits.sum() * 0
+    gt_masks = cat(gt_masks, dim=0)
+    if cls_agnostic_mask:
+        pred_mask_logits = pred_mask_logits[:, 0]
+        gt_classes = torch.zeros(total_num_masks, dtype=torch.int64)
+    else:
+        indices = torch.arange(total_num_masks)
+        gt_classes = cat(gt_classes, dim=0)
+        pred_mask_logits = pred_mask_logits[indices, gt_classes]
+    if gt_masks.dtype == torch.bool:
+        gt_masks_bool = gt_masks
+    else:
+        gt_masks_bool = gt_masks > 0.5
+    mask_incorrect = (pred_mask_logits > 0.0) != gt_masks_bool
+    mask_accuracy = 1 - mask_incorrect.sum().item() / max(mask_incorrect.numel(), 1.0)
+    num_positive = gt_masks_bool.sum().item()
+    false_positive = (mask_incorrect & ~gt_masks_bool).sum().item() / max(gt_masks_bool.numel() - num_positive, 1.0)
+    false_negative = (mask_incorrect & gt_masks_bool).sum().item() / max(num_positive, 1.0)
+    storage = get_event_storage()
+    storage.put_scalar('mask_rcnn/accuracy', mask_accuracy)
+    storage.put_scalar('mask_rcnn/false_positive', false_positive)
+    storage.put_scalar('mask_rcnn/false_negative', false_negative)
+    mask_loss = F.binary_cross_entropy_with_logits(pred_mask_logits, gt_masks, reduction='mean')
+    if maskiou_on:
+        mask_ratios = cat(mask_ratios, dim=0)
+        value_eps = 1e-10 * torch.ones(gt_masks.shape[0], device=gt_masks.device).double()
+        mask_ratios = torch.max(mask_ratios, value_eps)
+        pred_masks = pred_mask_logits > 0
+        mask_targets_full_area = gt_masks.sum(dim=[1, 2]) / mask_ratios
+        mask_ovr_area = (pred_masks * gt_masks).sum(dim=[1, 2]).float()
+        mask_union_area = pred_masks.sum(dim=[1, 2]) + mask_targets_full_area - mask_ovr_area
+        value_1 = torch.ones(pred_masks.shape[0], device=gt_masks.device).double()
+        value_0 = torch.zeros(pred_masks.shape[0], device=gt_masks.device)
+        mask_union_area = torch.max(mask_union_area, value_1)
+        mask_ovr_area = torch.max(mask_ovr_area, value_0)
+        maskiou_targets = mask_ovr_area / mask_union_area
+        mask_num, mask_h, mask_w = pred_mask_logits.shape
+        selected_mask = pred_mask_logits.reshape(mask_num, 1, mask_h, mask_w)
+        selected_mask = selected_mask.sigmoid()
+        return mask_loss, selected_mask, gt_classes, maskiou_targets.detach()
+    else:
+        return mask_loss
+
+
+def select_foreground_proposals(proposals, bg_label):
+    """
+    Given a list of N Instances (for N images), each containing a `gt_classes` field,
+    return a list of Instances that contain only instances with `gt_classes != -1 &&
+    gt_classes != bg_label`.
+
+    Args:
+        proposals (list[Instances]): A list of N Instances, where N is the number of
+            images in the batch.
+        bg_label: label index of background class.
+
+    Returns:
+        list[Instances]: N Instances, each contains only the selected foreground instances.
+        list[Tensor]: N boolean vector, correspond to the selection mask of
+            each Instances object. True for selected instances.
+    """
+    assert isinstance(proposals, (list, tuple))
+    assert isinstance(proposals[0], Instances)
+    assert proposals[0].has('gt_classes')
+    fg_proposals = []
+    fg_selection_masks = []
+    for proposals_per_image in proposals:
+        gt_classes = proposals_per_image.gt_classes
+        fg_selection_mask = (gt_classes != -1) & (gt_classes != bg_label)
+        fg_idxs = fg_selection_mask.nonzero().squeeze(1)
+        fg_proposals.append(proposals_per_image[fg_idxs])
+        fg_selection_masks.append(fg_selection_mask)
+    return fg_proposals, fg_selection_masks
+
+
+def keypoint_rcnn_inference(pred_keypoint_logits, pred_instances):
+    """
+    Post process each predicted keypoint heatmap in `pred_keypoint_logits` into (x, y, score)
+        and add it to the `pred_instances` as a `pred_keypoints` field.
+
+    Args:
+        pred_keypoint_logits (Tensor): A tensor of shape (R, K, S, S) where R is the total number
+           of instances in the batch, K is the number of keypoints, and S is the side length of
+           the keypoint heatmap. The values are spatial logits.
+        pred_instances (list[Instances]): A list of N Instances, where N is the number of images.
+
+    Returns:
+        None. Each element in pred_instances will contain an extra "pred_keypoints" field.
+            The field is a tensor of shape (#instance, K, 3) where the last
+            dimension corresponds to (x, y, score).
+            The scores are larger than 0.
+    """
+    bboxes_flat = cat([b.pred_boxes.tensor for b in pred_instances], dim=0)
+    keypoint_results = heatmaps_to_keypoints(pred_keypoint_logits.detach(), bboxes_flat.detach())
+    num_instances_per_image = [len(i) for i in pred_instances]
+    keypoint_results = keypoint_results[:, :, [0, 1, 3]].split(num_instances_per_image, dim=0)
+    for keypoint_results_per_image, instances_per_image in zip(keypoint_results, pred_instances):
+        instances_per_image.pred_keypoints = keypoint_results_per_image
+
+
+def keypoint_rcnn_loss(pred_keypoint_logits, instances, normalizer):
+    """
+    Arguments:
+        pred_keypoint_logits (Tensor): A tensor of shape (N, K, S, S) where N is the total number
+            of instances in the batch, K is the number of keypoints, and S is the side length
+            of the keypoint heatmap. The values are spatial logits.
+        instances (list[Instances]): A list of M Instances, where M is the batch size.
+            These instances are predictions from the model
+            that are in 1:1 correspondence with pred_keypoint_logits.
+            Each Instances should contain a `gt_keypoints` field containing a `structures.Keypoint`
+            instance.
+        normalizer (float): Normalize the loss by this amount.
+            If not specified, we normalize by the number of visible keypoints in the minibatch.
+
+    Returns a scalar tensor containing the loss.
+    """
+    heatmaps = []
+    valid = []
+    keypoint_side_len = pred_keypoint_logits.shape[2]
+    for instances_per_image in instances:
+        if len(instances_per_image) == 0:
+            continue
+        keypoints = instances_per_image.gt_keypoints
+        heatmaps_per_image, valid_per_image = keypoints.to_heatmap(instances_per_image.proposal_boxes.tensor, keypoint_side_len)
+        heatmaps.append(heatmaps_per_image.view(-1))
+        valid.append(valid_per_image.view(-1))
+    if len(heatmaps):
+        keypoint_targets = cat(heatmaps, dim=0)
+        valid = cat(valid, dim=0)
+        valid = torch.nonzero(valid).squeeze(1)
+    if len(heatmaps) == 0 or valid.numel() == 0:
+        global _TOTAL_SKIPPED
+        _TOTAL_SKIPPED += 1
+        storage = get_event_storage()
+        storage.put_scalar('kpts_num_skipped_batches', _TOTAL_SKIPPED, smoothing_hint=False)
+        return pred_keypoint_logits.sum() * 0
+    N, K, H, W = pred_keypoint_logits.shape
+    pred_keypoint_logits = pred_keypoint_logits.view(N * K, H * W)
+    keypoint_loss = F.cross_entropy(pred_keypoint_logits[valid], keypoint_targets[valid], reduction='sum')
+    if normalizer is None:
+        normalizer = valid.numel()
+    keypoint_loss /= normalizer
+    return keypoint_loss
+
+
+class BaseKeypointRCNNHead(nn.Module):
+    """
+    Implement the basic Keypoint R-CNN losses and inference logic.
+    """
+
+    def __init__(self, cfg, input_shape):
+        super().__init__()
+        self.loss_weight = cfg.MODEL.ROI_KEYPOINT_HEAD.LOSS_WEIGHT
+        self.normalize_by_visible_keypoints = cfg.MODEL.ROI_KEYPOINT_HEAD.NORMALIZE_LOSS_BY_VISIBLE_KEYPOINTS
+        self.num_keypoints = cfg.MODEL.ROI_KEYPOINT_HEAD.NUM_KEYPOINTS
+        batch_size_per_image = cfg.MODEL.ROI_HEADS.BATCH_SIZE_PER_IMAGE
+        positive_sample_fraction = cfg.MODEL.ROI_HEADS.POSITIVE_FRACTION
+        self.normalizer_per_img = self.num_keypoints * batch_size_per_image * positive_sample_fraction
+
+    def forward(self, x, instances: 'List[Instances]'):
+        """
+        Args:
+            x: input region feature(s) provided by :class:`ROIHeads`.
+            instances (list[Instances]): contains the boxes & labels corresponding
+                to the input features.
+                Exact format is up to its caller to decide.
+                Typically, this is the foreground instances in training, with
+                "proposal_boxes" field and other gt annotations.
+                In inference, it contains boxes that are already predicted.
+
+        Returns:
+            A dict of losses if in training. The predicted "instances" if in inference.
+        """
+        x = self.layers(x)
+        if self.training:
+            num_images = len(instances)
+            normalizer = None if self.normalize_by_visible_keypoints else num_images * self.normalizer_per_img
+            return {'loss_keypoint': keypoint_rcnn_loss(x, instances, normalizer=normalizer) * self.loss_weight}
+        else:
+            keypoint_rcnn_inference(x, instances)
+            return instances
+
+    def layers(self, x):
+        """
+        Neural network layers that makes predictions from regional input features.
+        """
+        raise NotImplementedError
+
+
+class KRCNNConvDeconvUpsampleHead(BaseKeypointRCNNHead):
+    """
+    A standard keypoint head containing a series of 3x3 convs, followed by
+    a transpose convolution and bilinear interpolation for upsampling.
+    """
+
+    def __init__(self, cfg, input_shape: 'ShapeSpec'):
+        """
+        The following attributes are parsed from config:
+            conv_dims: an iterable of output channel counts for each conv in the head
+                         e.g. (512, 512, 512) for three convs outputting 512 channels.
+            num_keypoints: number of keypoint heatmaps to predicts, determines the number of
+                           channels in the final output.
+        """
+        super().__init__(cfg, input_shape)
+        up_scale = 2
+        conv_dims = cfg.MODEL.ROI_KEYPOINT_HEAD.CONV_DIMS
+        num_keypoints = cfg.MODEL.ROI_KEYPOINT_HEAD.NUM_KEYPOINTS
+        in_channels = input_shape.channels
+        self.blocks = []
+        for idx, layer_channels in enumerate(conv_dims, 1):
+            module = Conv2d(in_channels, layer_channels, 3, stride=1, padding=1)
+            self.add_module('conv_fcn{}'.format(idx), module)
+            self.blocks.append(module)
+            in_channels = layer_channels
+        deconv_kernel = 4
+        self.score_lowres = ConvTranspose2d(in_channels, num_keypoints, deconv_kernel, stride=2, padding=deconv_kernel // 2 - 1)
+        self.up_scale = up_scale
+        for name, param in self.named_parameters():
+            if 'bias' in name:
+                nn.init.constant_(param, 0)
+            elif 'weight' in name:
+                nn.init.kaiming_normal_(param, mode='fan_out', nonlinearity='relu')
+
+    def layers(self, x):
+        for layer in self.blocks:
+            x = F.relu(layer(x))
+        x = self.score_lowres(x)
+        x = interpolate(x, scale_factor=self.up_scale, mode='bilinear', align_corners=False)
+        return x
+
+
+class MaskRCNNConvUpsampleHead(nn.Module):
+    """
+    A mask head with several conv layers, plus an upsample layer (with `ConvTranspose2d`).
+    """
+
+    def __init__(self, cfg, input_shape: 'ShapeSpec'):
+        """
+        The following attributes are parsed from config:
+            num_conv: the number of conv layers
+            conv_dim: the dimension of the conv layers
+            norm: normalization for the conv layers
+        """
+        super(MaskRCNNConvUpsampleHead, self).__init__()
+        num_classes = cfg.MODEL.ROI_HEADS.NUM_CLASSES
+        conv_dims = cfg.MODEL.ROI_MASK_HEAD.CONV_DIM
+        self.norm = cfg.MODEL.ROI_MASK_HEAD.NORM
+        num_conv = cfg.MODEL.ROI_MASK_HEAD.NUM_CONV
+        input_channels = input_shape.channels
+        cls_agnostic_mask = cfg.MODEL.ROI_MASK_HEAD.CLS_AGNOSTIC_MASK
+        self.conv_norm_relus = []
+        for k in range(num_conv):
+            conv = Conv2d(input_channels if k == 0 else conv_dims, conv_dims, kernel_size=3, stride=1, padding=1, bias=not self.norm, norm=get_norm(self.norm, conv_dims), activation=F.relu)
+            self.add_module('mask_fcn{}'.format(k + 1), conv)
+            self.conv_norm_relus.append(conv)
+        self.deconv = ConvTranspose2d(conv_dims if num_conv > 0 else input_channels, conv_dims, kernel_size=2, stride=2, padding=0)
+        num_mask_classes = 1 if cls_agnostic_mask else num_classes
+        self.predictor = Conv2d(conv_dims, num_mask_classes, kernel_size=1, stride=1, padding=0)
+        for layer in (self.conv_norm_relus + [self.deconv]):
+            weight_init.c2_msra_fill(layer)
+        nn.init.normal_(self.predictor.weight, std=0.001)
+        if self.predictor.bias is not None:
+            nn.init.constant_(self.predictor.bias, 0)
+
+    def forward(self, x):
+        for layer in self.conv_norm_relus:
+            x = layer(x)
+        x = F.relu(self.deconv(x))
+        return self.predictor(x)
+
+
+class MaskIoUHead(nn.Module):
+
+    def __init__(self, cfg, input_shape: 'ShapeSpec'):
+        super(MaskIoUHead, self).__init__()
+        num_classes = cfg.MODEL.ROI_HEADS.NUM_CLASSES
+        conv_dims = cfg.MODEL.ROI_MASKIOU_HEAD.CONV_DIM
+        num_conv = cfg.MODEL.ROI_MASKIOU_HEAD.NUM_CONV
+        input_channels = input_shape.channels + 1
+        resolution = input_shape.width // 2
+        self.conv_relus = []
+        stride = 1
+        for k in range(num_conv):
+            if k + 1 == num_conv:
+                stride = 2
+            conv = Conv2d(input_channels if k == 0 else conv_dims, conv_dims, kernel_size=3, stride=stride, padding=1, activation=F.relu)
+            self.add_module('maskiou_fcn{}'.format(k + 1), conv)
+            self.conv_relus.append(conv)
+        self.maskiou_fc1 = Linear(conv_dims * resolution ** 2, 1024)
+        self.maskiou_fc2 = Linear(1024, 1024)
+        self.maskiou = Linear(1024, num_classes)
+        self.pooling = MaxPool2d(kernel_size=2, stride=2)
+        for l in self.conv_relus:
+            nn.init.kaiming_normal_(l.weight, mode='fan_out', nonlinearity='relu')
+            nn.init.constant_(l.bias, 0)
+        for l in [self.maskiou_fc1, self.maskiou_fc2]:
+            nn.init.kaiming_normal_(l.weight, mode='fan_out', nonlinearity='relu')
+            nn.init.constant_(l.bias, 0)
+        nn.init.normal_(self.maskiou.weight, mean=0, std=0.01)
+        nn.init.constant_(self.maskiou.bias, 0)
+
+    def forward(self, x, mask):
+        mask_pool = self.pooling(mask)
+        x = torch.cat((x, mask_pool), 1)
+        for layer in self.conv_relus:
+            x = layer(x)
+        x = torch.flatten(x, 1)
+        x = F.relu(self.maskiou_fc1(x))
+        x = F.relu(self.maskiou_fc2(x))
+        x = self.maskiou(x)
+        return x
+
+
+def Max(x):
+    """
+    A wrapper around torch.max in Spatial Attention Module (SAM) to support empty inputs and more features.
+    """
+    if x.numel() == 0:
+        output_shape = [x.shape[0], 1, x.shape[2], x.shape[3]]
+        empty = _NewEmptyTensorOp.apply(x, output_shape)
+        return empty
+    return torch.max(x, dim=1, keepdim=True)[0]
+
+
+class SpatialAttention(nn.Module):
+
+    def __init__(self, kernel_size=3):
+        super(SpatialAttention, self).__init__()
+        assert kernel_size in (3, 7), 'kernel size must be 3 or 7'
+        padding = 3 if kernel_size == 7 else 1
+        self.conv = Conv2d(2, 1, kernel_size, padding=padding, bias=False)
+        weight_init.c2_msra_fill(self.conv)
+        self.sigmoid = nn.Sigmoid()
+
+    def forward(self, x):
+        avg_out = torch.mean(x, dim=1, keepdim=True)
+        max_out = Max(x)
+        scale = torch.cat([avg_out, max_out], dim=1)
+        scale = self.conv(scale)
+        return x * self.sigmoid(scale)
+
+
+class SpatialAttentionMaskHead(nn.Module):
+    """
+    A mask head with several conv layers and spatial attention module 
+    in CenterMask paper, plus an upsample layer (with `ConvTranspose2d`).
+    """
+
+    def __init__(self, cfg, input_shape: 'ShapeSpec'):
+        """
+        The following attributes are parsed from config:
+            num_conv: the number of conv layers
+            conv_dim: the dimension of the conv layers
+            norm: normalization for the conv layers
+        """
+        super(SpatialAttentionMaskHead, self).__init__()
+        num_classes = cfg.MODEL.ROI_HEADS.NUM_CLASSES
+        conv_dims = cfg.MODEL.ROI_MASK_HEAD.CONV_DIM
+        self.norm = cfg.MODEL.ROI_MASK_HEAD.NORM
+        num_conv = cfg.MODEL.ROI_MASK_HEAD.NUM_CONV
+        input_channels = input_shape.channels
+        cls_agnostic_mask = cfg.MODEL.ROI_MASK_HEAD.CLS_AGNOSTIC_MASK
+        self.conv_norm_relus = []
+        for k in range(num_conv):
+            conv = Conv2d(input_channels if k == 0 else conv_dims, conv_dims, kernel_size=3, stride=1, padding=1, bias=not self.norm, norm=get_norm(self.norm, conv_dims), activation=F.relu)
+            self.add_module('mask_fcn{}'.format(k + 1), conv)
+            self.conv_norm_relus.append(conv)
+        self.spatialAtt = SpatialAttention()
+        self.deconv = ConvTranspose2d(conv_dims if num_conv > 0 else input_channels, conv_dims, kernel_size=2, stride=2, padding=0)
+        num_mask_classes = 1 if cls_agnostic_mask else num_classes
+        self.predictor = Conv2d(conv_dims, num_mask_classes, kernel_size=1, stride=1, padding=0)
+        for layer in (self.conv_norm_relus + [self.deconv]):
+            weight_init.c2_msra_fill(layer)
+        nn.init.normal_(self.predictor.weight, std=0.001)
+        if self.predictor.bias is not None:
+            nn.init.constant_(self.predictor.bias, 0)
+
+    def forward(self, x):
+        for layer in self.conv_norm_relus:
+            x = layer(x)
+        x = self.spatialAtt(x)
+        x = F.relu(self.deconv(x))
+        return self.predictor(x)
+
+
+class Scale(nn.Module):
+
+    def __init__(self, init_value=1.0):
+        super(Scale, self).__init__()
+        self.scale = nn.Parameter(torch.FloatTensor([init_value]))
+
+    def forward(self, input):
+        return input * self.scale
+
+
+class FCOSHead(nn.Module):
+
+    def __init__(self, cfg, input_shape: 'List[ShapeSpec]'):
+        """
+        Arguments:
+            in_channels (int): number of channels of the input feature
+        """
+        super().__init__()
+        self.num_classes = cfg.MODEL.FCOS.NUM_CLASSES
+        self.fpn_strides = cfg.MODEL.FCOS.FPN_STRIDES
+        head_configs = {'cls': (cfg.MODEL.FCOS.NUM_CLS_CONVS, False), 'bbox': (cfg.MODEL.FCOS.NUM_BOX_CONVS, cfg.MODEL.FCOS.USE_DEFORMABLE), 'share': (cfg.MODEL.FCOS.NUM_SHARE_CONVS, cfg.MODEL.FCOS.USE_DEFORMABLE)}
+        norm = None if cfg.MODEL.FCOS.NORM == 'none' else cfg.MODEL.FCOS.NORM
+        in_channels = [s.channels for s in input_shape]
+        assert len(set(in_channels)) == 1, 'Each level must have the same channel!'
+        in_channels = in_channels[0]
+        for head in head_configs:
+            tower = []
+            num_convs, use_deformable = head_configs[head]
+            if use_deformable:
+                conv_func = DFConv2d
+            else:
+                conv_func = nn.Conv2d
+            for i in range(num_convs):
+                tower.append(conv_func(in_channels, in_channels, kernel_size=3, stride=1, padding=1, bias=True))
+                if norm == 'GN':
+                    tower.append(nn.GroupNorm(32, in_channels))
+                tower.append(nn.ReLU())
+            self.add_module('{}_tower'.format(head), nn.Sequential(*tower))
+        self.cls_logits = nn.Conv2d(in_channels, self.num_classes, kernel_size=3, stride=1, padding=1)
+        self.bbox_pred = nn.Conv2d(in_channels, 4, kernel_size=3, stride=1, padding=1)
+        self.ctrness = nn.Conv2d(in_channels, 1, kernel_size=3, stride=1, padding=1)
+        if cfg.MODEL.FCOS.USE_SCALE:
+            self.scales = nn.ModuleList([Scale(init_value=1.0) for _ in self.fpn_strides])
+        else:
+            self.scales = None
+        for modules in [self.cls_tower, self.bbox_tower, self.share_tower, self.cls_logits, self.bbox_pred, self.ctrness]:
+            for l in modules.modules():
+                if isinstance(l, nn.Conv2d):
+                    torch.nn.init.normal_(l.weight, std=0.01)
+                    torch.nn.init.constant_(l.bias, 0)
+        prior_prob = cfg.MODEL.FCOS.PRIOR_PROB
+        bias_value = -math.log((1 - prior_prob) / prior_prob)
+        torch.nn.init.constant_(self.cls_logits.bias, bias_value)
+
+    def forward(self, x):
+        logits = []
+        bbox_reg = []
+        ctrness = []
+        bbox_towers = []
+        for l, feature in enumerate(x):
+            feature = self.share_tower(feature)
+            cls_tower = self.cls_tower(feature)
+            bbox_tower = self.bbox_tower(feature)
+            logits.append(self.cls_logits(cls_tower))
+            ctrness.append(self.ctrness(bbox_tower))
+            reg = self.bbox_pred(bbox_tower)
+            if self.scales is not None:
+                reg = self.scales[l](reg)
+            bbox_reg.append(F.relu(reg))
+        return logits, bbox_reg, ctrness, bbox_towers
+
+
+INF = 100000000
+
+
+def compute_ctrness_targets(reg_targets):
+    if len(reg_targets) == 0:
+        return reg_targets.new_zeros(len(reg_targets))
+    left_right = reg_targets[:, [0, 2]]
+    top_bottom = reg_targets[:, [1, 3]]
+    ctrness = left_right.min(dim=-1)[0] / left_right.max(dim=-1)[0] * (top_bottom.min(dim=-1)[0] / top_bottom.max(dim=-1)[0])
+    return torch.sqrt(ctrness)
+
+
+def reduce_sum(tensor):
+    world_size = get_world_size()
+    if world_size < 2:
+        return tensor
+    tensor = tensor.clone()
+    dist.all_reduce(tensor, op=dist.ReduceOp.SUM)
+    return tensor
+
+
+def fcos_losses(labels, reg_targets, logits_pred, reg_pred, ctrness_pred, focal_loss_alpha, focal_loss_gamma, iou_loss):
+    num_classes = logits_pred.size(1)
+    labels = labels.flatten()
+    pos_inds = torch.nonzero(labels != num_classes).squeeze(1)
+    num_pos_local = pos_inds.numel()
+    num_gpus = get_world_size()
+    total_num_pos = reduce_sum(pos_inds.new_tensor([num_pos_local])).item()
+    num_pos_avg = max(total_num_pos / num_gpus, 1.0)
+    class_target = torch.zeros_like(logits_pred)
+    class_target[pos_inds, labels[pos_inds]] = 1
+    class_loss = sigmoid_focal_loss_jit(logits_pred, class_target, alpha=focal_loss_alpha, gamma=focal_loss_gamma, reduction='sum') / num_pos_avg
+    reg_pred = reg_pred[pos_inds]
+    reg_targets = reg_targets[pos_inds]
+    ctrness_pred = ctrness_pred[pos_inds]
+    ctrness_targets = compute_ctrness_targets(reg_targets)
+    ctrness_targets_sum = ctrness_targets.sum()
+    ctrness_norm = max(reduce_sum(ctrness_targets_sum).item() / num_gpus, 1e-06)
+    reg_loss = iou_loss(reg_pred, reg_targets, ctrness_targets) / ctrness_norm
+    ctrness_loss = F.binary_cross_entropy_with_logits(ctrness_pred, ctrness_targets, reduction='sum') / num_pos_avg
+    losses = {'loss_fcos_cls': class_loss, 'loss_fcos_loc': reg_loss, 'loss_fcos_ctr': ctrness_loss}
+    return losses, {}
+
+
+def ml_nms(boxlist, nms_thresh, max_proposals=-1, score_field='scores', label_field='labels'):
+    """
+    Performs non-maximum suppression on a boxlist, with scores specified
+    in a boxlist field via score_field.
+    Arguments:
+        boxlist(BoxList)
+        nms_thresh (float)
+        max_proposals (int): if > 0, then only the top max_proposals are kept
+            after non-maximum suppression
+        score_field (str)
+    """
+    if nms_thresh <= 0:
+        return boxlist
+    boxes = boxlist.pred_boxes.tensor
+    scores = boxlist.scores
+    labels = boxlist.pred_classes
+    keep = batched_nms(boxes, scores, labels, nms_thresh)
+    if max_proposals > 0:
+        keep = keep[:max_proposals]
+    boxlist = boxlist[keep]
+    return boxlist
+
+
+class FCOSOutputs(object):
+
+    def __init__(self, images, locations, logits_pred, reg_pred, ctrness_pred, focal_loss_alpha, focal_loss_gamma, iou_loss, center_sample, sizes_of_interest, strides, radius, num_classes, pre_nms_thresh, pre_nms_top_n, nms_thresh, fpn_post_nms_top_n, thresh_with_ctr, gt_instances=None):
+        self.logits_pred = logits_pred
+        self.reg_pred = reg_pred
+        self.ctrness_pred = ctrness_pred
+        self.locations = locations
+        self.gt_instances = gt_instances
+        self.num_feature_maps = len(logits_pred)
+        self.num_images = len(images)
+        self.image_sizes = images.image_sizes
+        self.focal_loss_alpha = focal_loss_alpha
+        self.focal_loss_gamma = focal_loss_gamma
+        self.iou_loss = iou_loss
+        self.center_sample = center_sample
+        self.sizes_of_interest = sizes_of_interest
+        self.strides = strides
+        self.radius = radius
+        self.num_classes = num_classes
+        self.pre_nms_thresh = pre_nms_thresh
+        self.pre_nms_top_n = pre_nms_top_n
+        self.nms_thresh = nms_thresh
+        self.fpn_post_nms_top_n = fpn_post_nms_top_n
+        self.thresh_with_ctr = thresh_with_ctr
+
+    def _transpose(self, training_targets, num_loc_list):
+        """
+        This function is used to transpose image first training targets to level first ones
+        :return: level first training targets
+        """
+        for im_i in range(len(training_targets)):
+            training_targets[im_i] = torch.split(training_targets[im_i], num_loc_list, dim=0)
+        targets_level_first = []
+        for targets_per_level in zip(*training_targets):
+            targets_level_first.append(torch.cat(targets_per_level, dim=0))
+        return targets_level_first
+
+    def _get_ground_truth(self):
+        num_loc_list = [len(loc) for loc in self.locations]
+        self.num_loc_list = num_loc_list
+        loc_to_size_range = []
+        for l, loc_per_level in enumerate(self.locations):
+            loc_to_size_range_per_level = loc_per_level.new_tensor(self.sizes_of_interest[l])
+            loc_to_size_range.append(loc_to_size_range_per_level[None].expand(num_loc_list[l], -1))
+        loc_to_size_range = torch.cat(loc_to_size_range, dim=0)
+        locations = torch.cat(self.locations, dim=0)
+        training_targets = self.compute_targets_for_locations(locations, self.gt_instances, loc_to_size_range)
+        training_targets = {k: self._transpose(v, num_loc_list) for k, v in training_targets.items()}
+        reg_targets = training_targets['reg_targets']
+        for l in range(len(reg_targets)):
+            reg_targets[l] = reg_targets[l] / float(self.strides[l])
+        return training_targets
+
+    def get_sample_region(self, gt, strides, num_loc_list, loc_xs, loc_ys, radius=1):
+        num_gts = gt.shape[0]
+        K = len(loc_xs)
+        gt = gt[None].expand(K, num_gts, 4)
+        center_x = (gt[..., 0] + gt[..., 2]) / 2
+        center_y = (gt[..., 1] + gt[..., 3]) / 2
+        center_gt = gt.new_zeros(gt.shape)
+        if center_x.numel() == 0 or center_x[..., 0].sum() == 0:
+            return loc_xs.new_zeros(loc_xs.shape, dtype=torch.uint8)
+        beg = 0
+        for level, num_loc in enumerate(num_loc_list):
+            end = beg + num_loc
+            stride = strides[level] * radius
+            xmin = center_x[beg:end] - stride
+            ymin = center_y[beg:end] - stride
+            xmax = center_x[beg:end] + stride
+            ymax = center_y[beg:end] + stride
+            center_gt[beg:end, :, 0] = torch.where(xmin > gt[beg:end, :, 0], xmin, gt[beg:end, :, 0])
+            center_gt[beg:end, :, 1] = torch.where(ymin > gt[beg:end, :, 1], ymin, gt[beg:end, :, 1])
+            center_gt[beg:end, :, 2] = torch.where(xmax > gt[beg:end, :, 2], gt[beg:end, :, 2], xmax)
+            center_gt[beg:end, :, 3] = torch.where(ymax > gt[beg:end, :, 3], gt[beg:end, :, 3], ymax)
+            beg = end
+        left = loc_xs[:, None] - center_gt[..., 0]
+        right = center_gt[..., 2] - loc_xs[:, None]
+        top = loc_ys[:, None] - center_gt[..., 1]
+        bottom = center_gt[..., 3] - loc_ys[:, None]
+        center_bbox = torch.stack((left, top, right, bottom), -1)
+        inside_gt_bbox_mask = center_bbox.min(-1)[0] > 0
+        return inside_gt_bbox_mask
+
+    def compute_targets_for_locations(self, locations, targets, size_ranges):
+        labels = []
+        reg_targets = []
+        xs, ys = locations[:, 0], locations[:, 1]
+        for im_i in range(len(targets)):
+            targets_per_im = targets[im_i]
+            bboxes = targets_per_im.gt_boxes.tensor
+            labels_per_im = targets_per_im.gt_classes
+            if bboxes.numel() == 0:
+                labels.append(labels_per_im.new_zeros(locations.size(0)) + self.num_classes)
+                reg_targets.append(locations.new_zeros((locations.size(0), 4)))
+                continue
+            area = targets_per_im.gt_boxes.area()
+            l = xs[:, None] - bboxes[:, 0][None]
+            t = ys[:, None] - bboxes[:, 1][None]
+            r = bboxes[:, 2][None] - xs[:, None]
+            b = bboxes[:, 3][None] - ys[:, None]
+            reg_targets_per_im = torch.stack([l, t, r, b], dim=2)
+            if self.center_sample:
+                is_in_boxes = self.get_sample_region(bboxes, self.strides, self.num_loc_list, xs, ys, radius=self.radius)
+            else:
+                is_in_boxes = reg_targets_per_im.min(dim=2)[0] > 0
+            max_reg_targets_per_im = reg_targets_per_im.max(dim=2)[0]
+            is_cared_in_the_level = (max_reg_targets_per_im >= size_ranges[:, [0]]) & (max_reg_targets_per_im <= size_ranges[:, [1]])
+            locations_to_gt_area = area[None].repeat(len(locations), 1)
+            locations_to_gt_area[is_in_boxes == 0] = INF
+            locations_to_gt_area[is_cared_in_the_level == 0] = INF
+            locations_to_min_area, locations_to_gt_inds = locations_to_gt_area.min(dim=1)
+            reg_targets_per_im = reg_targets_per_im[range(len(locations)), locations_to_gt_inds]
+            labels_per_im = labels_per_im[locations_to_gt_inds]
+            labels_per_im[locations_to_min_area == INF] = self.num_classes
+            labels.append(labels_per_im)
+            reg_targets.append(reg_targets_per_im)
+        return {'labels': labels, 'reg_targets': reg_targets}
+
+    def losses(self):
+        """
+        Return the losses from a set of FCOS predictions and their associated ground-truth.
+
+        Returns:
+            dict[loss name -> loss value]: A dict mapping from loss name to loss value.
+        """
+        training_targets = self._get_ground_truth()
+        labels, reg_targets = training_targets['labels'], training_targets['reg_targets']
+        logits_pred = cat([x.permute(0, 2, 3, 1).reshape(-1, self.num_classes) for x in self.logits_pred], dim=0)
+        reg_pred = cat([x.permute(0, 2, 3, 1).reshape(-1, 4) for x in self.reg_pred], dim=0)
+        ctrness_pred = cat([x.reshape(-1) for x in self.ctrness_pred], dim=0)
+        labels = cat([x.reshape(-1) for x in labels], dim=0)
+        reg_targets = cat([x.reshape(-1, 4) for x in reg_targets], dim=0)
+        return fcos_losses(labels, reg_targets, logits_pred, reg_pred, ctrness_pred, self.focal_loss_alpha, self.focal_loss_gamma, self.iou_loss)
+
+    def predict_proposals(self):
+        sampled_boxes = []
+        bundle = self.locations, self.logits_pred, self.reg_pred, self.ctrness_pred, self.strides
+        for i, (l, o, r, c, s) in enumerate(zip(*bundle)):
+            r = r * s
+            sampled_boxes.append(self.forward_for_single_feature_map(l, o, r, c, self.image_sizes))
+        boxlists = list(zip(*sampled_boxes))
+        boxlists = [Instances.cat(boxlist) for boxlist in boxlists]
+        boxlists = self.select_over_all_levels(boxlists)
+        return boxlists
+
+    def forward_for_single_feature_map(self, locations, box_cls, reg_pred, ctrness, image_sizes):
+        N, C, H, W = box_cls.shape
+        box_cls = box_cls.view(N, C, H, W).permute(0, 2, 3, 1)
+        box_cls = box_cls.reshape(N, -1, C).sigmoid()
+        box_regression = reg_pred.view(N, 4, H, W).permute(0, 2, 3, 1)
+        box_regression = box_regression.reshape(N, -1, 4)
+        ctrness = ctrness.view(N, 1, H, W).permute(0, 2, 3, 1)
+        ctrness = ctrness.reshape(N, -1).sigmoid()
+        if self.thresh_with_ctr:
+            box_cls = box_cls * ctrness[:, :, None]
+        candidate_inds = box_cls > self.pre_nms_thresh
+        pre_nms_top_n = candidate_inds.reshape(N, -1).sum(1)
+        pre_nms_top_n = pre_nms_top_n.clamp(max=self.pre_nms_top_n)
+        if not self.thresh_with_ctr:
+            box_cls = box_cls * ctrness[:, :, None]
+        results = []
+        for i in range(N):
+            per_box_cls = box_cls[i]
+            per_candidate_inds = candidate_inds[i]
+            per_box_cls = per_box_cls[per_candidate_inds]
+            per_candidate_nonzeros = torch.nonzero(per_candidate_inds, as_tuple=False)
+            per_box_loc = per_candidate_nonzeros[:, 0]
+            per_class = per_candidate_nonzeros[:, 1]
+            per_box_regression = box_regression[i]
+            per_box_regression = per_box_regression[per_box_loc]
+            per_locations = locations[per_box_loc]
+            per_pre_nms_top_n = pre_nms_top_n[i]
+            if per_candidate_inds.sum().item() > per_pre_nms_top_n.item():
+                per_box_cls, top_k_indices = per_box_cls.topk(per_pre_nms_top_n, sorted=False)
+                per_class = per_class[top_k_indices]
+                per_box_regression = per_box_regression[top_k_indices]
+                per_locations = per_locations[top_k_indices]
+            detections = torch.stack([per_locations[:, 0] - per_box_regression[:, 0], per_locations[:, 1] - per_box_regression[:, 1], per_locations[:, 0] + per_box_regression[:, 2], per_locations[:, 1] + per_box_regression[:, 3]], dim=1)
+            boxlist = Instances(image_sizes[i])
+            boxlist.pred_boxes = Boxes(detections)
+            boxlist.scores = torch.sqrt(per_box_cls)
+            boxlist.pred_classes = per_class
+            boxlist.locations = per_locations
+            results.append(boxlist)
+        return results
+
+    def select_over_all_levels(self, boxlists):
+        num_images = len(boxlists)
+        results = []
+        for i in range(num_images):
+            result = ml_nms(boxlists[i], self.nms_thresh)
+            number_of_detections = len(result)
+            if number_of_detections > self.fpn_post_nms_top_n > 0:
+                cls_scores = result.scores
+                image_thresh, _ = torch.kthvalue(cls_scores.cpu(), number_of_detections - self.fpn_post_nms_top_n + 1)
+                keep = cls_scores >= image_thresh.item()
+                keep = torch.nonzero(keep).squeeze(1)
+                result = result[keep]
+            results.append(result)
+        return results
+
+
+class FCOS(nn.Module):
+
+    def __init__(self, cfg, input_shape: 'Dict[str, ShapeSpec]'):
+        super().__init__()
+        self.in_features = cfg.MODEL.FCOS.IN_FEATURES
+        self.fpn_strides = cfg.MODEL.FCOS.FPN_STRIDES
+        self.focal_loss_alpha = cfg.MODEL.FCOS.LOSS_ALPHA
+        self.focal_loss_gamma = cfg.MODEL.FCOS.LOSS_GAMMA
+        self.center_sample = cfg.MODEL.FCOS.CENTER_SAMPLE
+        self.strides = cfg.MODEL.FCOS.FPN_STRIDES
+        self.radius = cfg.MODEL.FCOS.POS_RADIUS
+        self.pre_nms_thresh_train = cfg.MODEL.FCOS.INFERENCE_TH_TRAIN
+        self.pre_nms_thresh_test = cfg.MODEL.FCOS.INFERENCE_TH_TEST
+        self.pre_nms_topk_train = cfg.MODEL.FCOS.PRE_NMS_TOPK_TRAIN
+        self.pre_nms_topk_test = cfg.MODEL.FCOS.PRE_NMS_TOPK_TEST
+        self.nms_thresh = cfg.MODEL.FCOS.NMS_TH
+        self.post_nms_topk_train = cfg.MODEL.FCOS.POST_NMS_TOPK_TRAIN
+        self.post_nms_topk_test = cfg.MODEL.FCOS.POST_NMS_TOPK_TEST
+        self.thresh_with_ctr = cfg.MODEL.FCOS.THRESH_WITH_CTR
+        self.mask_on = cfg.MODEL.MASK_ON
+        self.iou_loss = IOULoss(cfg.MODEL.FCOS.LOC_LOSS_TYPE)
+        soi = []
+        prev_size = -1
+        for s in cfg.MODEL.FCOS.SIZES_OF_INTEREST:
+            soi.append([prev_size, s])
+            prev_size = s
+        soi.append([prev_size, INF])
+        self.sizes_of_interest = soi
+        self.fcos_head = FCOSHead(cfg, [input_shape[f] for f in self.in_features])
+
+    def forward(self, images, features, gt_instances):
+        """
+        Arguments:
+            images (list[Tensor] or ImageList): images to be processed
+            targets (list[BoxList]): ground-truth boxes present in the image (optional)
+
+        Returns:
+            result (list[BoxList] or dict[Tensor]): the output from the model.
+                During training, it returns a dict[Tensor] which contains the losses.
+                During testing, it returns list[BoxList] contains additional fields
+                like `scores`, `labels` and `mask` (for Mask R-CNN models).
+
+        """
+        features = [features[f] for f in self.in_features]
+        locations = self.compute_locations(features)
+        logits_pred, reg_pred, ctrness_pred, bbox_towers = self.fcos_head(features)
+        if self.training:
+            pre_nms_thresh = self.pre_nms_thresh_train
+            pre_nms_topk = self.pre_nms_topk_train
+            post_nms_topk = self.post_nms_topk_train
+        else:
+            pre_nms_thresh = self.pre_nms_thresh_test
+            pre_nms_topk = self.pre_nms_topk_test
+            post_nms_topk = self.post_nms_topk_test
+        outputs = FCOSOutputs(images, locations, logits_pred, reg_pred, ctrness_pred, self.focal_loss_alpha, self.focal_loss_gamma, self.iou_loss, self.center_sample, self.sizes_of_interest, self.strides, self.radius, self.fcos_head.num_classes, pre_nms_thresh, pre_nms_topk, self.nms_thresh, post_nms_topk, self.thresh_with_ctr, gt_instances)
+        if self.training:
+            losses, _ = outputs.losses()
+            if self.mask_on:
+                proposals = outputs.predict_proposals()
+                return proposals, losses
+            else:
+                return None, losses
+        else:
+            proposals = outputs.predict_proposals()
+            return proposals, {}
+
+    def compute_locations(self, features):
+        locations = []
+        for level, feature in enumerate(features):
+            h, w = feature.size()[-2:]
+            locations_per_level = self.compute_locations_per_level(h, w, self.fpn_strides[level], feature.device)
+            locations.append(locations_per_level)
+        return locations
+
+    def compute_locations_per_level(self, h, w, stride, device):
+        shifts_x = torch.arange(0, w * stride, step=stride, dtype=torch.float32, device=device)
+        shifts_y = torch.arange(0, h * stride, step=stride, dtype=torch.float32, device=device)
+        shift_y, shift_x = torch.meshgrid(shifts_y, shifts_x)
+        shift_x = shift_x.reshape(-1)
+        shift_y = shift_y.reshape(-1)
+        locations = torch.stack((shift_x, shift_y), dim=1) + stride // 2
+        return locations
+
+
+import torch
+from torch.nn import MSELoss, ReLU
+from types import SimpleNamespace
+
+
+TESTCASES = [
+    # (nn.Module, init_args, forward_args)
+    (Hsigmoid,
+     lambda: ([], {}),
+     lambda: ([torch.rand([4, 4, 4, 4])], {})),
+    (IOULoss,
+     lambda: ([], {}),
+     lambda: ([torch.rand([4, 4, 4, 4]), torch.rand([4, 4, 4, 4])], {})),
+    (Linear,
+     lambda: ([], {'in_features': 4, 'out_features': 4}),
+     lambda: ([torch.rand([4, 4, 4, 4])], {})),
+    (MaxPool2d,
+     lambda: ([], {'kernel_size': 4}),
+     lambda: ([torch.rand([4, 4, 4, 4])], {})),
+    (Scale,
+     lambda: ([], {}),
+     lambda: ([torch.rand([4, 4, 4, 4])], {})),
+    (eSEModule,
+     lambda: ([], {'channel': 4}),
+     lambda: ([torch.rand([4, 4, 4, 4])], {})),
+]
+
