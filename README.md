@@ -23,13 +23,11 @@ A file `errors.csv` is generated containing the top error messages and example
 
 ### Regenerate ParityBench
 
-*WARNING*: this will download 10+ gigabytes of code from crawling github and
-take days to complete.  It is likely not necessary for you to do this.
-#### Download available repos into `./paritybench_download` folder
+#### Download available repos. By default, downloads to `./paritybench_download` folder.
 ```
-python main.py --download [--limit max-repos]
+python main.py --download [--download-dir download-dir] [--limit max-repos]
 ```
-#### Regenerate PyTorch module testing cases in `./generated` folder
+#### Regenerate PyTorch module test cases. By default, loads from `./paritybench_download` and outputs to `./generated` folder.
 ```
-python main.py --generate-all [--limit max-repos] [--jobs num-worker-threads]
+python main.py --generate-all [--download-dir download-dir] [--tests-dir outputs-dir] [--limit max-repos] [--jobs num-worker-threads]
 ```
