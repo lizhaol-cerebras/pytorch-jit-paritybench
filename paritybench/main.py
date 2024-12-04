@@ -43,6 +43,11 @@ def get_args(raw_args=None):
         help="[SLOW:days] crawl and download top github projects",
     )
     group.add_argument(
+        "--download-urls",
+        type=str,
+        help="Path to a text file containing GitHub URLs to download (one URL per line)",
+    )
+    group.add_argument(
         "--generate-all",
         action="store_true",
         help="Turn crawled github projects into generated testcases",
@@ -130,8 +135,24 @@ def main(raw_args=None):
 
     os.environ["RLIMIT_AS_GB"] = str(args.memory_limit_gb)
 
-    if args.download:
-        return CrawlGitHub(args.download_dir, max_count=args.limit).download()
+    if args.download or args.download_urls:
+        if args.download_urls:
+            # Read URLs from the specified file
+            try:
+                with open(args.download_urls, "r") as f:
+                    urls = [line.strip() for line in f if line.strip()]
+                return CrawlGitHub(
+                    args.download_dir, max_count=args.limit, html_urls=urls
+                ).download()
+            except FileNotFoundError:
+                log.error(f"URL file not found: {args.download_urls}")
+                sys.exit(1)
+        else:
+            return CrawlGitHub(
+                args.download_dir,
+                max_count=args.limit,
+                query="pytorch+language:Python+stars:>100+size:<100000",
+            ).download()
 
     # generate mode doesn't work well with `spawn`
     if not args.generate_one and not args.generate_all:
