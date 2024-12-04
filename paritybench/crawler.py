@@ -31,7 +31,7 @@ class CrawlGitHub(object):
         for order in ("desc", "asc"):
             page = 1
             while True:
-                time.sleep(6)  # https://developer.github.com/v3/search/#rate-limit
+                time.sleep(6)  # https://docs.github.com/en/rest/search/search?apiVersion=2022-11-28#rate-limit
                 rs = requests.get(f"{base}&page={page}&order={order}&q={query}")
                 rs.raise_for_status()
                 result = rs.json()
