@@ -47,7 +47,7 @@ class ErrorAggregator(object):
         self.log = log or logging.getLogger(__name__)
 
     def record(self, e: Exception, module):
-        ex_msg = str(e).strip().split('\n')[0]
+        ex_msg = str(e).strip().split("\n")[0]
         error_msg = f"{e.__class__.__name__}: {ex_msg}"
         full_msg = f"{e.__class__.__name__}: {str(e)}"
         return self._add(error_msg, [(error_msg, f"{self.context}:{module}", full_msg)])
@@ -61,7 +61,9 @@ class ErrorAggregator(object):
         if "NameError" in error_msg:
             msg_bigrams = [error_msg]  # need exact match
         else:
-            msg_bigrams = [f"{a}_{b}" for a, b in zip(msg_words, msg_words[1:])] or msg_words
+            msg_bigrams = [
+                f"{a}_{b}" for a, b in zip(msg_words, msg_words[1:])
+            ] or msg_words
 
         shared_bigrams = Counter()
         for bigram in msg_bigrams:
@@ -83,17 +85,26 @@ class ErrorAggregator(object):
 
     @staticmethod
     def format_error_group(errors):
-        context, context_count = random.choice(list(Counter(context for msg, context, _ in errors).items()))
+        context, context_count = random.choice(
+            list(Counter(context for msg, context, _ in errors).items())
+        )
         return f"  - {len(errors)} errors like: {errors[0][0]} (example {context})"
 
     def __str__(self):
         errors = sorted(self.error_groups, key=len, reverse=True)
-        return '\n'.join(map(self.format_error_group, errors[:20]))
+        return "\n".join(map(self.format_error_group, errors[:20]))
 
     def __len__(self):
         return sum(map(len, self.error_groups))
 
-    csv_headers = ["phase", "count", "example_short", "example_long", "example_from1", "example_from2"]
+    csv_headers = [
+        "phase",
+        "count",
+        "example_short",
+        "example_long",
+        "example_from1",
+        "example_from2",
+    ]
 
     def write_csv(self, phase, out: csv.writer):
         for errors in sorted(self.error_groups, key=len, reverse=True)[:20]:
@@ -101,7 +112,9 @@ class ErrorAggregator(object):
             if "#" in context:
                 context1, _, context2 = context.partition(" # ")
             else:
-                context1 = context.replace("./paritybench_download/", "./generated/test_").replace(".zip:", ".py:")
+                context1 = context.replace(
+                    "./paritybench_download/", "./generated/test_"
+                ).replace(".zip:", ".py:")
                 context2 = context
 
             out.writerow([phase, len(errors), short, long, context1, context2])
@@ -115,7 +128,7 @@ class ErrorAggregatorDict(object):
     @classmethod
     def single(cls, name: str, e: Exception, context=None):
         errors = cls(context)
-        errors.record(name, e, 'global')
+        errors.record(name, e, "global")
         return errors
 
     def __init__(self, context=None):
@@ -129,7 +142,9 @@ class ErrorAggregatorDict(object):
 
     def __getitem__(self, item):
         if item not in self.aggregator:
-            self.aggregator[item] = ErrorAggregator(self.context, logging.getLogger(f"{item}.{self.name}"))
+            self.aggregator[item] = ErrorAggregator(
+                self.context, logging.getLogger(f"{item}.{self.name}")
+            )
         return self.aggregator[item]
 
     def update(self, other):
@@ -138,9 +153,11 @@ class ErrorAggregatorDict(object):
 
     def print_report(self):
         for name in sorted(list(self.aggregator.keys())):
-            self[name].log.info(f"\nTop errors in {name} ({len(self[name])} total):\n{self[name]}\n")
+            self[name].log.info(
+                f"\nTop errors in {name} ({len(self[name])} total):\n{self[name]}\n"
+            )
 
-        with open('errors.csv', "w") as fd:
+        with open("errors.csv", "w") as fd:
             out = csv.writer(fd)
             out.writerow(ErrorAggregator.csv_headers)
             for name in sorted(list(self.aggregator.keys())):

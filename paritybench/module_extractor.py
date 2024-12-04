@@ -29,7 +29,7 @@ from .utils import call_with_timeout
 log = logging.getLogger(__name__)
 
 NN_MODULE_RE = re.compile(r"(\btorch\b)|(\bnn[.]Module\b)", re.MULTILINE)
-PREFIX = f'''
+PREFIX = f"""
 from unittest.mock import mock_open, MagicMock
 from torch.autograd import Function
 from torch.nn import Module
@@ -42,19 +42,21 @@ from torch import Tensor
 __version__ = "1.0.0"
 xrange = range
 wraps = functools.wraps
-'''
-SUFFIX = '''
+"""
+SUFFIX = """
 import torch
 from torch.nn import MSELoss, ReLU
 from types import SimpleNamespace
 
-'''
+"""
 
 
 def to_source(node):
-    return astor.to_source(node,
-                           pretty_source=''.join,
-                           pretty_string=partial(astor.string_repr.pretty_string, max_line=8192))
+    return astor.to_source(
+        node,
+        pretty_source="".join,
+        pretty_string=partial(astor.string_repr.pretty_string, max_line=8192),
+    )
 
 
 class PyTorchModuleExtractor(object):
@@ -63,7 +65,14 @@ class PyTorchModuleExtractor(object):
     then test if they function correctly with the JIT.
     """
 
-    def __init__(self, tempdir: str, errors: ErrorAggregatorDict, stats: Stats, output_py: TextIO, args):
+    def __init__(
+        self,
+        tempdir: str,
+        errors: ErrorAggregatorDict,
+        stats: Stats,
+        output_py: TextIO,
+        args,
+    ):
         super(PyTorchModuleExtractor, self).__init__()
         self.errors = errors
         self.stats = stats
@@ -72,7 +81,7 @@ class PyTorchModuleExtractor(object):
 
         self.imports = dict()
         self.constants = []
-        self.nn_module_names = [] # list of nn modules in the input project
+        self.nn_module_names = []  # list of nn modules in the input project
 
         self.available_symbols = dict()
         self.global_config = None
@@ -82,15 +91,15 @@ class PyTorchModuleExtractor(object):
 
     def search_file(self, filename: str, open_fn=open):
         """ get module from filename .py file """
-        if not filename.endswith(".py") or '.#' in filename:
+        if not filename.endswith(".py") or ".#" in filename:
             return
 
-        with open_fn(filename, 'r') as fp:
+        with open_fn(filename, "r") as fp:
             source = fp.read()
             if isinstance(source, bytes):
-                source = source.decode('utf-8')
+                source = source.decode("utf-8")
 
-        has_match = bool(NN_MODULE_RE.search(source)) # there is torch in .py
+        has_match = bool(NN_MODULE_RE.search(source))  # there is torch in .py
 
         try:
             tree = self.ast_parse(source, filename)
@@ -102,16 +111,20 @@ class PyTorchModuleExtractor(object):
     @staticmethod
     def ast_parse(source, filename):
         try:
-            return ast.parse(source, filename) # get ast nodes from code
+            return ast.parse(source, filename)  # get ast nodes from code
         except SyntaxError:
             # perhaps python2?
             with tempfile.NamedTemporaryFile(mode="wb", suffix=".py") as tmp:
-                tmp.write(re.sub(r"\basync *=", "non_blocking=", source)
-                          .replace("\t", "    ")
-                          .encode('utf-8'))
+                tmp.write(
+                    re.sub(r"\basync *=", "non_blocking=", source)
+                    .replace("\t", "    ")
+                    .encode("utf-8")
+                )
                 tmp.flush()
                 with open("/dev/null", "w") as null:
-                    subprocess.check_call(["2to3", "-w", tmp.name], stderr=null, stdout=null)
+                    subprocess.check_call(
+                        ["2to3", "-w", tmp.name], stderr=null, stdout=null
+                    )
                 return ast.parse(open(tmp.name).read(), filename)
 
     def search_ast(self, tree: ast.AST, overwrite: bool):
@@ -129,11 +142,17 @@ class PyTorchModuleExtractor(object):
                         if module_name == "torch":
                             # Run torch imports so we can run issubclass(.., torch.nn.Module)
                             try:
-                                exec(compile(ast.Module([import_node], []), "<string>", "exec"),
-                                     scope.__dict__,
-                                     scope.__dict__)
+                                exec(
+                                    compile(
+                                        ast.Module([import_node], []),
+                                        "<string>",
+                                        "exec",
+                                    ),
+                                    scope.__dict__,
+                                    scope.__dict__,
+                                )
                             except Exception:
-                                log.exception('Bad torch import')
+                                log.exception("Bad torch import")
                                 continue
                         if module_name in IMPORT_WHITELIST:
                             self.imports[to_source(import_node)] = import_node
@@ -142,12 +161,12 @@ class PyTorchModuleExtractor(object):
                 self.add_available_symbol(node, overwrite)
 
     def is_torch_nn_module(self, scope: types.ModuleType, base: str):
-        if base in ('torch.nn.Module', 'nn.Module', 'Module'):
+        if base in ("torch.nn.Module", "nn.Module", "Module"):
             return True
-        if base.split('.')[-1] in self.nn_module_names:
+        if base.split(".")[-1] in self.nn_module_names:
             return True
         try:
-            for part in base.split('.'):
+            for part in base.split("."):
                 scope = getattr(scope, part, object)
             return issubclass(scope, torch.nn.Module)
         except Exception:
@@ -164,7 +183,7 @@ class PyTorchModuleExtractor(object):
                 self.search_file(name, archive.open)
 
     def add_available_symbol(self, node, overwrite=False):
-        node = ast.fix_missing_locations(ASTCleanup().visit(node)) # clean ast
+        node = ast.fix_missing_locations(ASTCleanup().visit(node))  # clean ast
         try:
             if overwrite:
                 self.available_symbols[node.name] = node
@@ -179,7 +198,9 @@ class PyTorchModuleExtractor(object):
                     self.available_symbols.setdefault(name, node)
 
     def construct_module(self):
-        self.output.run_statement(self.ast_parse(PREFIX, "<string>"), source_required=True)
+        self.output.run_statement(
+            self.ast_parse(PREFIX, "<string>"), source_required=True
+        )
         self.name_to_ast = dict()
 
         for statement in self.imports.values():
@@ -195,7 +216,7 @@ class PyTorchModuleExtractor(object):
         for name in self.nn_module_names:
             statement = self.available_symbols.get(name)
             if statement:
-                self.add_requirements(statement) # add what is needed for module
+                self.add_requirements(statement)  # add what is needed for module
                 try:
                     self.run_statement(statement)
                     self.available_symbols.pop(name)
@@ -216,9 +237,11 @@ class PyTorchModuleExtractor(object):
         """
         reads, writes = ExtractReadsWrites.run(statement)
         needs = {sym for sym in reads - writes if sym not in self.output}
-        log.debug(f"add_requirements: {getattr(statement, 'name', '')} "
-                  f"available {needs & set(self.available_symbols.keys())} "
-                  f"unavailable {needs - set(self.available_symbols.keys())}")
+        log.debug(
+            f"add_requirements: {getattr(statement, 'name', '')} "
+            f"available {needs & set(self.available_symbols.keys())} "
+            f"unavailable {needs - set(self.available_symbols.keys())}"
+        )
 
         need_config = False
         for name in sorted(needs):
@@ -239,9 +262,9 @@ class PyTorchModuleExtractor(object):
                 self.test_nn_module(name, value)
 
     def should_test_cls(self, cls):
-        if not isinstance(cls, type): # check if is class
+        if not isinstance(cls, type):  # check if is class
             return False
-        if not issubclass(cls, torch.nn.Module): # check if is torch module
+        if not issubclass(cls, torch.nn.Module):  # check if is torch module
             return False
         if issubclass(cls, DistributedDataParallel):
             return False
@@ -252,13 +275,16 @@ class PyTorchModuleExtractor(object):
             return
 
         self.stats["total"] += 1
-        checker = CheckCallableMembers.run(self.name_to_ast.get(name)) # get modules inside module
+        checker = CheckCallableMembers.run(
+            self.name_to_ast.get(name)
+        )  # get modules inside module
 
         try:
             stats, errors, testcases = call_with_timeout(
                 extract_nn_module,
                 args=(name, nn_cls, checker, self.errors.context),
-                timeout=300)
+                timeout=300,
+            )
             self.errors.update(errors)
             self.stats.update(stats)
             self.testcases.extend(testcases)
@@ -272,11 +298,11 @@ class PyTorchModuleExtractor(object):
         basename = re.sub(r"[.]zip$", "", os.path.basename(filename))
 
         if os.path.isdir(filename):
-            self.search_directory(filename) # find nn modules, imports, symbols
+            self.search_directory(filename)  # find nn modules, imports, symbols
         else:
             self.search_zipfile(filename)
 
-        self.construct_module() # run and write ast nodes
+        self.construct_module()  # run and write ast nodes
         self.test_modules()
         self.write_testcases(basename)
 
@@ -291,7 +317,9 @@ class PyTorchModuleExtractor(object):
         for name, init_args, forward_args, compiles in self.testcases:
             self.output.write(f"    ({name},\n")
             self.output.write(f"     lambda: ({init_args[0]}, {init_args[1]}),\n")
-            self.output.write(f"     lambda: ({forward_args[0]}, {forward_args[1]})),\n")
+            self.output.write(
+                f"     lambda: ({forward_args[0]}, {forward_args[1]})),\n"
+            )
         self.output.write("]\n\n")
 
 
@@ -310,16 +338,17 @@ def extract_nn_module_inner(name: str, nn_cls: type, checker, stats, errors, tes
         checker: modules inside nn_cls module
         mode: what to test module with: ts, onnx, etc
     """
-    init_signature = inspect.signature(nn_cls) # get args for init of module
+    init_signature = inspect.signature(nn_cls)  # get args for init of module
     try:
         init_deducer = DeduceParameters(
             nn_cls,
             *DeduceParameters.initial_args_init(init_signature),
-            checker=checker.check)
+            checker=checker.check,
+        )
         init_deducer.search()
         nn_module = init_deducer.last_result
     except Exception as e:
-        return errors.record('init', e, nn_cls)
+        return errors.record("init", e, nn_cls)
 
     try:
         nn_module.eval()
@@ -328,14 +357,16 @@ def extract_nn_module_inner(name: str, nn_cls: type, checker, stats, errors, tes
 
     stats["init_ok"] += 1
 
-    forward_signature = inspect.signature(nn_module.forward) # get args for forward of module
+    forward_signature = inspect.signature(
+        nn_module.forward
+    )  # get args for forward of module
     try:
         forward_deducer = DeduceParameters(
-            nn_module,
-            *DeduceParameters.initial_args_forward(forward_signature))
+            nn_module, *DeduceParameters.initial_args_forward(forward_signature)
+        )
         forward_deducer.search()
     except Exception as e:
-        return errors.record('deduce', e, nn_cls)
+        return errors.record("deduce", e, nn_cls)
 
     stats["deduced_args_ok"] += 1
 
@@ -343,23 +374,17 @@ def extract_nn_module_inner(name: str, nn_cls: type, checker, stats, errors, tes
         torch.jit.script(nn_module)
 
     except Exception as e:
-        testcases.append((
-            name,
-            init_deducer.testcase_args(),
-            forward_deducer.testcase_args(),
-            False
-        ))
+        testcases.append(
+            (name, init_deducer.testcase_args(), forward_deducer.testcase_args(), False)
+        )
 
-        return errors.record('compile', e, nn_cls)
+        return errors.record("compile", e, nn_cls)
 
     stats["jit_compiles"] += 1
 
-    testcases.append((
-        name,
-        init_deducer.testcase_args(),
-        forward_deducer.testcase_args(),
-        True
-    ))
+    testcases.append(
+        (name, init_deducer.testcase_args(), forward_deducer.testcase_args(), True)
+    )
 
 
 class IncrementalModule(object):
@@ -379,7 +404,10 @@ class IncrementalModule(object):
         :param name: symbol to check for
         :return: True if output module contains name (and it is not an alias)
         """
-        return getattr(self.output_module, name, self.output_module) is not self.output_module
+        return (
+            getattr(self.output_module, name, self.output_module)
+            is not self.output_module
+        )
 
     def items(self):
         return self.output_module.__dict__.items()
@@ -407,7 +435,7 @@ class IncrementalModule(object):
         else:
             # TorchScript requires source code to exist on disk
             assert self.tempdir
-            fn, filename = tempfile.mkstemp(suffix='.py', dir=self.tempdir, prefix="pb")
+            fn, filename = tempfile.mkstemp(suffix=".py", dir=self.tempdir, prefix="pb")
             with os.fdopen(fn, "w") as fd:
                 fd.write(source)
                 fd.flush()

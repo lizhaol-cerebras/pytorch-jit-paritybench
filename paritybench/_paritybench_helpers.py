@@ -9,8 +9,14 @@ import torch._inductor
 from torch.testing._internal.jit_utils import JitTestCase
 from torch._dynamo.testing import same
 
-from paritybench.utils import INDUCTOR_TOL, get_cosine_and_fp64_outputs, \
-    patch_torch_manual_seed, reset_rng_state, wrap_args, wrap_kwargs
+from paritybench.utils import (
+    INDUCTOR_TOL,
+    get_cosine_and_fp64_outputs,
+    patch_torch_manual_seed,
+    reset_rng_state,
+    wrap_args,
+    wrap_kwargs,
+)
 
 # Remove randomness
 torch._inductor.config.fallback_random = True
@@ -54,7 +60,7 @@ class _mock_config(dict):
 
 
 def _fails_compile():
-    if os.environ.get('TEST_ALL'):
+    if os.environ.get("TEST_ALL"):
         return lambda x: x
     return unittest.skip("jit compile fails")
 
@@ -81,25 +87,25 @@ class _paritybench_base(JitTestCase):
         result1 = script(*args, **kwargs)
         reset_rng_state()
         result2 = script(*args, **kwargs)
-        if os.environ.get('TEST_PY_ONLY'):
+        if os.environ.get("TEST_PY_ONLY"):
             return
 
-        if os.environ.get('TEST_WORKING_ONLY') and not compiles:
+        if os.environ.get("TEST_WORKING_ONLY") and not compiles:
             raise unittest.SkipTest("jit compile fails")
 
         reset_rng_state()
-        if not os.environ.get('TEST_TORCHSCRIPT'):  # test dynamo by default
+        if not os.environ.get("TEST_TORCHSCRIPT"):  # test dynamo by default
             torch._dynamo.reset()
             compiled_model = torch._dynamo.optimize("inductor")(script)
         else:
             compiled_model = torch.jit.script(script)
 
-        if os.environ.get('TEST_COMPILE_ONLY'):
+        if os.environ.get("TEST_COMPILE_ONLY"):
             return
 
         result3 = compiled_model(*args, **kwargs)
 
-        if os.environ.get('TEST_RUN_ONLY'):
+        if os.environ.get("TEST_RUN_ONLY"):
             return
 
         try:

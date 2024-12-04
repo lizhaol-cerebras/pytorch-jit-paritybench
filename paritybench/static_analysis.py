@@ -64,25 +64,25 @@ class ASTCleanup(ast.NodeTransformer):
         return self.generic_visit(node)
 
     def visit_Call(self, node: ast.Call):
-        if getattr(node.func, 'id', '') == 'print':
+        if getattr(node.func, "id", "") == "print":
             # Strip print() calls
             return ast.Expr(ast.Constant(value=None, kind=None))
-        if getattr(node.func, 'attr', '') in ('cuda', 'to'):
+        if getattr(node.func, "attr", "") in ("cuda", "to"):
             # foo.cuda() => foo
             return node.func.value
-        if getattr(node.func, 'id', '') == 'cuda_' and len(node.args) == 1:
+        if getattr(node.func, "id", "") == "cuda_" and len(node.args) == 1:
             return node.args[0]
         return self.generic_visit(node)
 
     def visit_Attribute(self, node: ast.Attribute):
         if isinstance(node.value, ast.Attribute):
             node2 = node.value
-            if getattr(node2.value, 'id', '') == "torch" and node2.attr == "cuda":
+            if getattr(node2.value, "id", "") == "torch" and node2.attr == "cuda":
                 if hasattr(torch, node.attr):
                     # torch.cuda.FloatTensor => torch.FloatTensor
-                    new_node = ast.Attribute(value=node2.value,
-                                             attr=node.attr,
-                                             ctx=node.ctx)
+                    new_node = ast.Attribute(
+                        value=node2.value, attr=node.attr, ctx=node.ctx
+                    )
                     ast.copy_location(new_node, node)
                     return new_node
         return self.generic_visit(node)
@@ -97,22 +97,20 @@ class ASTCleanup(ast.NodeTransformer):
                 bases=node.bases,
                 keywords=node.keywords,
                 body=node.body,
-                decorator_list=filter_decorators(node.decorator_list))
+                decorator_list=filter_decorators(node.decorator_list),
+            )
             ast.copy_location(new_node, old_node=node)
 
         return self.generic_visit(new_node)
 
     def visit_Assert(self, node: ast.Assert):
-        if 'is_cuda' in ast.dump(node):
+        if "is_cuda" in ast.dump(node):
             return None
         return self.generic_visit(node)
 
 
 def filter_decorators(decorator_list):
-    return [
-        node for node in decorator_list
-        if 'regist' not in ast.dump(node)
-    ]
+    return [node for node in decorator_list if "regist" not in ast.dump(node)]
 
 
 class ExtractReadsWrites(ast.NodeVisitor):
@@ -235,7 +233,7 @@ class CheckCallableMembers(ast.NodeVisitor):
     def visit_Call(self, node: ast.Call):
         if isinstance(node.func, ast.Attribute):
             attr = node.func
-            if getattr(attr.value, 'id', '') == 'self':
+            if getattr(attr.value, "id", "") == "self":
                 self.callable_members.add(attr.attr)
         return self.generic_visit(node)
 
@@ -256,9 +254,9 @@ def split_import(node):
             return  # not supported
         module_name = re.sub(r"[.].*$", "", node.module)
         for name in node.names:
-            tmp = ast.ImportFrom(re.sub(r"^torch.legacy\b", "torch", node.module),
-                                 [name],
-                                 level=0)
+            tmp = ast.ImportFrom(
+                re.sub(r"^torch.legacy\b", "torch", node.module), [name], level=0
+            )
             ast.copy_location(tmp, node)
             yield module_name, tmp
 
@@ -291,10 +289,24 @@ class FlattenStatement(ast.NodeTransformer):
             return self.prefix + [node] + self.suffix
 
     def to_tmp(self, node):
-        if isinstance(node, (
-                ast.Name, ast.Constant, ast.NamedExpr, ast.expr_context, ast.keyword, ast.arguments,
-                ast.withitem, ast.excepthandler,
-                ast.operator, ast.boolop, ast.unaryop, ast.cmpop, type(None))):
+        if isinstance(
+            node,
+            (
+                ast.Name,
+                ast.Constant,
+                ast.NamedExpr,
+                ast.expr_context,
+                ast.keyword,
+                ast.arguments,
+                ast.withitem,
+                ast.excepthandler,
+                ast.operator,
+                ast.boolop,
+                ast.unaryop,
+                ast.cmpop,
+                type(None),
+            ),
+        ):
             return node
 
         ctx = getattr(node, "ctx", ast.Load())
@@ -310,10 +322,7 @@ class FlattenStatement(ast.NodeTransformer):
         ident = self.unique_name()
         store = ast.Name(ident, ast.Store())
         load = ast.Name(ident, ast.Load())
-        assign = ast.Assign(
-            targets=[store],
-            value=node
-        )
+        assign = ast.Assign(targets=[store], value=node)
         ast.copy_location(assign, node)
         ast.copy_location(store, node)
         ast.copy_location(load, node)
@@ -324,10 +333,7 @@ class FlattenStatement(ast.NodeTransformer):
         ident = self.unique_name()
         store = ast.Name(ident, ast.Store())
         load = ast.Name(ident, ast.Load())
-        assign = ast.Assign(
-            targets=[node],
-            value=load
-        )
+        assign = ast.Assign(targets=[node], value=load)
         ast.copy_location(assign, node)
         ast.copy_location(store, node)
         ast.copy_location(load, node)
@@ -380,15 +386,11 @@ class FlattenStatement(ast.NodeTransformer):
         assign_if = ast.If(
             test=self.to_tmp_visit(node.test),
             body=FlattenStatement(self)(
-                ast.Assign(
-                    targets=[ast.Name(ident, ast.Store())],
-                    value=node.body)
+                ast.Assign(targets=[ast.Name(ident, ast.Store())], value=node.body)
             ),
             orelse=FlattenStatement(self)(
-                ast.Assign(
-                    targets=[ast.Name(ident, ast.Store())],
-                    value=node.orelse)
-            )
+                ast.Assign(targets=[ast.Name(ident, ast.Store())], value=node.orelse)
+            ),
         )
         ast.copy_location(assign_if, node)
         ast.fix_missing_locations(assign_if)
@@ -404,11 +406,7 @@ class FlattenStatement(ast.NodeTransformer):
         rv = ast.Return(node.body)
         ast.copy_location(rv, node)
 
-        fn = ast.FunctionDef(
-            name,
-            node.args,  # TODO(jansel): flatten these?
-            body=[rv]
-        )
+        fn = ast.FunctionDef(name, node.args, body=[rv])  # TODO(jansel): flatten these?
         ast.copy_location(fn, node)
         self.prefix.append(self.generic_visit(fn))
 
@@ -425,28 +423,29 @@ class FlattenStatement(ast.NodeTransformer):
         data = self.unique_name()
         add = f"{data}_{add_name}"
         statements = [
-            ast.Assign(
-                targets=[ast.Name(data, ast.Store())],
-                value=init
-            ),
+            ast.Assign(targets=[ast.Name(data, ast.Store())], value=init),
             ast.Assign(
                 targets=[ast.Name(add, ast.Store())],
                 value=ast.Attribute(
-                    value=ast.Name(data, ast.Load()),
-                    attr=add_name,
-                    ctx=ast.Load())
+                    value=ast.Name(data, ast.Load()), attr=add_name, ctx=ast.Load()
+                ),
             ),
             ast.For(
                 target=node.generators[0].target,  # TODO(jansel): flatten target
                 iter=self.to_tmp_visit(node.generators[0].iter),
-                body=FlattenStatement(self)(self._comprehension_if(
-                    node.generators[0].ifs,
-                    ast.Expr(value=ast.Call(
-                        func=ast.Name(add, ast.Load()),
-                        args=add_args,
-                        keywords=[],
-                    )))),
-                orelse=[]
+                body=FlattenStatement(self)(
+                    self._comprehension_if(
+                        node.generators[0].ifs,
+                        ast.Expr(
+                            value=ast.Call(
+                                func=ast.Name(add, ast.Load()),
+                                args=add_args,
+                                keywords=[],
+                            )
+                        ),
+                    )
+                ),
+                orelse=[],
             ),
         ]
         for stmt in statements:
@@ -465,12 +464,10 @@ class FlattenStatement(ast.NodeTransformer):
 
     def visit_ListComp(self, node):
         return self._comprehension(
-            node,
-            "append",
-            ast.List([], ctx=ast.Load()),
-            [node.elt])
+            node, "append", ast.List([], ctx=ast.Load()), [node.elt]
+        )
 
-    '''
+    """
     def visit_SetComp(self, node, output):  # (expr elt, comprehension* generators)
         # TODO(jansel): need to implement this
         return self.to_tmp(node, output)
@@ -482,7 +479,7 @@ class FlattenStatement(ast.NodeTransformer):
     def visit_GeneratorExp(self, node, output):  # (expr elt, comprehension* generators)
        # TODO(jansel): need to implement this
        return self.to_tmp(node, output)
-   '''
+   """
 
 
 class Flatten(ast.NodeTransformer):

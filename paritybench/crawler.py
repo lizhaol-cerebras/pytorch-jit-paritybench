@@ -17,7 +17,7 @@ class CrawlGitHub(object):
     def __init__(self, download_dir, max_count=None, query=""):
         super(CrawlGitHub, self).__init__()
         self.download_dir = download_dir
-        self.max_count = max_count # max number of projects to download
+        self.max_count = max_count  # max number of projects to download
         self.usr_query = query
 
     def github_search(self):
@@ -31,11 +31,12 @@ class CrawlGitHub(object):
         for order in ("desc", "asc"):
             page = 1
             while True:
-                time.sleep(6)  # https://docs.github.com/en/rest/search/search?apiVersion=2022-11-28#rate-limit
+                # https://docs.github.com/en/rest/search/search?apiVersion=2022-11-28#rate-limit
+                time.sleep(6)
                 rs = requests.get(f"{base}&page={page}&order={order}&q={query}")
                 rs.raise_for_status()
                 result = rs.json()
-                assert not result['incomplete_results']
+                assert not result["incomplete_results"]
                 for project in result["items"]:
                     name = project["full_name"]
                     if self.max_count and len(seen) >= self.max_count:
@@ -43,10 +44,16 @@ class CrawlGitHub(object):
                     if name not in seen:
                         seen.add(name)
                         yield project
-                total_count = result['total_count']
-                log.info(f"total_count={total_count} seen={len(seen)} page={page} {order}")
+                total_count = result["total_count"]
+                log.info(
+                    f"total_count={total_count} seen={len(seen)} page={page} {order}"
+                )
                 page += 1
-                if len(result["items"]) == 0 or len(seen) >= total_count or (self.max_count and len(seen) >= self.max_count):
+                if (
+                    len(result["items"]) == 0
+                    or len(seen) >= total_count
+                    or (self.max_count and len(seen) >= self.max_count)
+                ):
                     return
                 if page == 11:
                     break  # not allowed by API
@@ -68,7 +75,7 @@ class CrawlGitHub(object):
         return output_filename
 
     def download(self):
-        metadata_path = os.path.join(self.download_dir, 'metadata.json')
+        metadata_path = os.path.join(self.download_dir, "metadata.json")
         if os.path.exists(metadata_path):
             return
 

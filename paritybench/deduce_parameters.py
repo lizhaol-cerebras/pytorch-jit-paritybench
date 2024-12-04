@@ -19,7 +19,7 @@ log = logging.getLogger(__name__)
 
 
 class DeductionFailed(RuntimeError):
-    def __init__(self, attempt_log, name='', traceback='', signature='', index=-1):
+    def __init__(self, attempt_log, name="", traceback="", signature="", index=-1):
         attempt_lines = "\n".join(f" - {attempt}" for attempt in attempt_log)
         error_msg = f"{attempt_log[index][1]}\n{name}:\n{signature}\n{attempt_lines}\n----\n{traceback}\n----\n"
         super().__init__(error_msg)
@@ -30,25 +30,39 @@ class DeduceParameters(object):
     Try to figure out a valid input for an NN module by repeated
     guessing based on error messages.
     """
+
     default_size = 4
 
     @staticmethod
     def needed_args(signature: inspect.Signature):
         for name, param in signature.parameters.items():
-            if param.kind in (inspect.Parameter.VAR_KEYWORD, inspect.Parameter.VAR_POSITIONAL):
+            if param.kind in (
+                inspect.Parameter.VAR_KEYWORD,
+                inspect.Parameter.VAR_POSITIONAL,
+            ):
                 continue  # ignore args/kwargs
             if param.default is inspect.Parameter.empty:
                 yield param
 
     @classmethod
     def initial_args_init(cls, signature: inspect.Signature = None):
-        return [], {param.name: DeduceParameter.initial_arg_init(param, position)
-                    for position, param in enumerate(cls.needed_args(signature))}
+        return (
+            [],
+            {
+                param.name: DeduceParameter.initial_arg_init(param, position)
+                for position, param in enumerate(cls.needed_args(signature))
+            },
+        )
 
     @classmethod
     def initial_args_forward(cls, signature: inspect.Signature):
-        return [DeduceParameter.initial_arg_forward(param, position)
-                for position, param in enumerate(cls.needed_args(signature))], {}
+        return (
+            [
+                DeduceParameter.initial_arg_forward(param, position)
+                for position, param in enumerate(cls.needed_args(signature))
+            ],
+            {},
+        )
 
     def __init__(self, nn_module: Callable, args: list, kwargs: dict, checker=None):
         super(DeduceParameters, self).__init__()
@@ -68,9 +82,12 @@ class DeduceParameters(object):
         self.signature = f"args={names}, kwargs={list(kwargs.keys())}"
 
     def __str__(self):
-        return ", ".join(itertools.chain(
-            map(str, self.args),
-            [f"{name}={arg}" for name, arg in self.kwargs.items()]))
+        return ", ".join(
+            itertools.chain(
+                map(str, self.args),
+                [f"{name}={arg}" for name, arg in self.kwargs.items()],
+            )
+        )
 
     def testcase_args(self):
         args = repr(self.args)
@@ -102,7 +119,7 @@ class DeduceParameters(object):
             except IndexError:
                 pass
 
-            if error_msg.startswith('AssertionError:'):
+            if error_msg.startswith("AssertionError:"):
                 # Error msg often not useful for assert error
                 error_msg = f"{error_msg} {line}"
 
@@ -169,34 +186,49 @@ class DeduceParameters(object):
             for arg in self.all_args():
                 arg.alt_guess(gen)
 
-        raise DeductionFailed(self.attempt_log,
-                              str(type(self.nn_module)),
-                              traceback,
-                              self.signature,
-                              index=attempt_index)
+        raise DeductionFailed(
+            self.attempt_log,
+            str(type(self.nn_module)),
+            traceback,
+            self.signature,
+            index=attempt_index,
+        )
 
     def get_fixors(self):
         return [
-            (r"missing.*arguments?: (?P<name>['][a-zA-Z0-9_]+['])",
-             self.fix_missing_arg),
-            (r"unexpected keyword argument (?P<name>['][a-zA-Z0-9_]+['])",
-             self.fix_extra_arg),
-            (r"size mismatch, m1: (?P<a>\[.*\]), m2: (?P<b>\[.*\])",
-             self.fix_size_mismatch),
-            (r"shape (?P<a>\[[\d, ]+\]) doesn't match the broadcast shape (?P<b>\[[\d, ]+\])]",
-             self.fix_size_mismatch),
-            (r"assert +len\((?P<str_a>\w+)\) *== *len\((?P<str_b>\w+)\)",
-             self.fix_equal_names),
-            (r"assert +(?P<str_a>\w+) *== *(?P<str_b>\w+)",
-             self.fix_equal_names),
+            (
+                r"missing.*arguments?: (?P<name>['][a-zA-Z0-9_]+['])",
+                self.fix_missing_arg,
+            ),
+            (
+                r"unexpected keyword argument (?P<name>['][a-zA-Z0-9_]+['])",
+                self.fix_extra_arg,
+            ),
+            (
+                r"size mismatch, m1: (?P<a>\[.*\]), m2: (?P<b>\[.*\])",
+                self.fix_size_mismatch,
+            ),
+            (
+                r"shape (?P<a>\[[\d, ]+\]) doesn't match the broadcast shape (?P<b>\[[\d, ]+\])]",
+                self.fix_size_mismatch,
+            ),
+            (
+                r"assert +len\((?P<str_a>\w+)\) *== *len\((?P<str_b>\w+)\)",
+                self.fix_equal_names,
+            ),
+            (r"assert +(?P<str_a>\w+) *== *(?P<str_b>\w+)", self.fix_equal_names),
         ]
 
     def fix_size_mismatch(self, a, b):
         matches_a = [arg for arg in self.all_args() if arg.is_shape_match(a)]
         matches_b = [arg for arg in self.all_args() if arg.is_shape_match(b)]
         if not matches_a and not matches_b:
-            matches_a = [arg for arg in self.all_args() if arg.is_element_count_match(a)]
-            matches_b = [arg for arg in self.all_args() if arg.is_element_count_match(b)]
+            matches_a = [
+                arg for arg in self.all_args() if arg.is_element_count_match(a)
+            ]
+            matches_b = [
+                arg for arg in self.all_args() if arg.is_element_count_match(b)
+            ]
 
         if matches_a and matches_b:
             if max(x.created for x in matches_a) > max(x.created for x in matches_b):
@@ -236,7 +268,7 @@ class DeduceParameters(object):
             self.args.append(self.kwargs.pop(name))
             self.args.sort(key=lambda x: x.position)
         else:
-            self.kwargs[name] = DeduceParameter.initial_arg_init(name, float('inf'))
+            self.kwargs[name] = DeduceParameter.initial_arg_init(name, float("inf"))
         return True
 
     def fix_extra_arg(self, name):
@@ -252,8 +284,8 @@ class DeduceParameter(object):
 
     @classmethod
     def initial_arg_init(cls, name, position):
-        name = getattr(name, 'name', name)
-        if 'dataset' in name:
+        name = getattr(name, "name", name)
+        if "dataset" in name:
             # TODO: this likely wont work...
             return cls.initial_arg_forward(name, position)
 
@@ -290,7 +322,7 @@ class DeduceParameter(object):
 
     @classmethod
     def initial_arg_forward(cls, name, position=None, dims=4):
-        name = getattr(name, 'name', name)
+        name = getattr(name, "name", name)
         return cls(name, position, TensorGuess([TensorGuess.default_size] * dims))
 
     def __init__(self, name: str, position, initial_guess):
@@ -301,9 +333,9 @@ class DeduceParameter(object):
 
     def __str__(self):
         val = str(self._guesses[-1])
-        if val.startswith('<function _mock_layer'):
+        if val.startswith("<function _mock_layer"):
             # TODO: workaround, fix this better
-            return 'torch.nn.ReLU'
+            return "torch.nn.ReLU"
         return val
 
     __repr__ = __str__
@@ -322,7 +354,9 @@ class DeduceParameter(object):
         return len(self._guesses)
 
     def try_to_fix(self, error_message: str, line: str, pass_number: int) -> bool:
-        new_guess = self._guesses[-1].get_fix(error_message, line, pass_number, self.name)
+        new_guess = self._guesses[-1].get_fix(
+            error_message, line, pass_number, self.name
+        )
         if new_guess is not None:
             self.change_guess(new_guess)
             return True
@@ -353,8 +387,11 @@ class DeduceParameter(object):
         if isinstance(self._guesses[-1], TensorGuess) and gen < 2:
             # try starting with a smaller size
             new_size = [2, 3][gen]
-            self.change_guess(TensorGuess([TensorGuess.default_size] * new_size,
-                                          self._guesses[-1].dtype))
+            self.change_guess(
+                TensorGuess(
+                    [TensorGuess.default_size] * new_size, self._guesses[-1].dtype
+                )
+            )
 
 
 class Guess(object):
@@ -369,8 +406,8 @@ class Guess(object):
 
     def __str__(self):
         val = repr(self.value)
-        if '_mock_layer' in val:
-            return 'torch.nn.ReLU'
+        if "_mock_layer" in val:
+            return "torch.nn.ReLU"
         return val
 
     __repr__ = __str__
@@ -380,14 +417,16 @@ class Guess(object):
         for pattern, fixor in fixors:
             match = re.search(pattern, error_msg, flags=re.I)
             if match:
-                fix = fixor(**{k: Guess.literal(k, v) for k, v in match.groupdict().items()})
+                fix = fixor(
+                    **{k: Guess.literal(k, v) for k, v in match.groupdict().items()}
+                )
                 if fix is not None:
                     log.debug(f"FIX: {fixor.__name__} {error_msg} {fix}")
                     return fix
 
     @staticmethod
     def literal(name, value):
-        if name.startswith('str_'):
+        if name.startswith("str_"):
             return value
         # [1 x 1] => [1, 1]
         return ast.literal_eval(value.replace(" x ", ","))
@@ -409,7 +448,6 @@ class Guess(object):
 
 
 class LiteralGuess(Guess):
-
     def __str__(self):
         return repr(self.value)
 
@@ -423,6 +461,7 @@ class LiteralGuess(Guess):
         fixors = []
 
         if pass_number == 0 and isinstance(self.value, int):
+
             def fix_too_small():
                 if self.value < 18:
                     return 18
@@ -431,103 +470,168 @@ class LiteralGuess(Guess):
                 if self.value < 64:
                     return 64
 
-            fixors.extend([
-                (r"TypeError: cannot unpack non-iterable int object",
-                 lambda: [TensorGuess.default_size] * 2),
-                (r"TypeError: 'int' object is not subscriptable",
-                 lambda: [TensorGuess.default_size] * 2),
-                (r"TypeError: 'int' object is not iterable",
-                 lambda: [TensorGuess.default_size] * 2),
-                (r"TypeError: argument of type 'int' is not iterable",
-                 lambda: [TensorGuess.default_size] * 2),
-                (r"TypeError: object of type 'int' has no len()",
-                 lambda: [TensorGuess.default_size] * 2),
-                (r"assert isinstance.*list",
-                 lambda: [TensorGuess.default_size] * 2),
-                (r"AttributeError: 'int' object has no attribute '(size|shape|dtype|device|ndim)'",
-                 lambda: TensorGuess([TensorGuess.default_size] * 2)),
-                (r"must be Tensor, not int",
-                 lambda: TensorGuess([TensorGuess.default_size] * 2)),
-                (r"TypeError: int is not a Module subclass",
-                 lambda: _mock_layer()),
-                (r"AttributeError: 'int' object has no attribute 'expansion'",
-                 lambda: _mock_layer()),
-                (r"ModuleList.extend should be called with an iterable, but got int",
-                 lambda: [_mock_layer()]),
-                (r"ModuleDict.update should be called.*but got int",
-                 lambda: {'relu': torch.nn.ReLU()}),
-                (r"AttributeError: 'int' object has no attribute 'split'",
-                 lambda: "2,2"),
-                (r"IndexError: index 0 is out of bounds for dimension 0 with size 0",
-                 fix_too_small),
-                (r"ValueError: .* must be divisible by groups",
-                 fix_too_small),
-                (r"invalid depth",
-                 fix_too_small),
-                (r"KeyError: [1-9]",
-                 lambda: self.value // 2),
-                (r"multiple of (?P<m>\d{1,3})",
-                 lambda m: m),
-                (r"dropout probability has to be between 0 and 1, but got (?P<v>\d+)",
-                 lambda v: 0.5 if v == self.value and "drop" in name else None),
-                (r"should be a number in range \[0, 1\]",
-                 lambda: 0.5 if "drop" in name else None),
-                (r"member .* should be callable",
-                 lambda: _mock_layer()),
-                (r'''assert.*in\s+[(\[{]\s*(?P<v>\d+|'[^'\\]*'|"[^"\\]*")''',
-                 lambda v: v),
-                (r"AttributeError: 'int' object has no attribute '(upper|lower)'",
-                 lambda: 'gru' if 'rnn_type' in name else None),
-                (r"TypeError: 'int' object is not callable",
-                 lambda: _mock_layer if any(s in name.lower() for s in ["norm", "act", "cls", "block"]) else None),
-                (r"ZeroDivisionError: float division by zero",
-                 lambda: self.value * 2 if self.value < 256 else None),
-                (r"ZeroDivisionError: integer division or modulo by zero",
-                 lambda: self.value * 2 if self.value < 256 else None),
-                (r"Trying to create tensor with negative dimension",
-                 lambda: self.value * 2 if self.value < 256 else None),
-                (r"getattr.*attribute name must be string",
-                 lambda: 'relu' if 'act' in name else None),
-            ])
+            fixors.extend(
+                [
+                    (
+                        r"TypeError: cannot unpack non-iterable int object",
+                        lambda: [TensorGuess.default_size] * 2,
+                    ),
+                    (
+                        r"TypeError: 'int' object is not subscriptable",
+                        lambda: [TensorGuess.default_size] * 2,
+                    ),
+                    (
+                        r"TypeError: 'int' object is not iterable",
+                        lambda: [TensorGuess.default_size] * 2,
+                    ),
+                    (
+                        r"TypeError: argument of type 'int' is not iterable",
+                        lambda: [TensorGuess.default_size] * 2,
+                    ),
+                    (
+                        r"TypeError: object of type 'int' has no len()",
+                        lambda: [TensorGuess.default_size] * 2,
+                    ),
+                    (
+                        r"assert isinstance.*list",
+                        lambda: [TensorGuess.default_size] * 2,
+                    ),
+                    (
+                        r"AttributeError: 'int' object has no attribute '(size|shape|dtype|device|ndim)'",
+                        lambda: TensorGuess([TensorGuess.default_size] * 2),
+                    ),
+                    (
+                        r"must be Tensor, not int",
+                        lambda: TensorGuess([TensorGuess.default_size] * 2),
+                    ),
+                    (r"TypeError: int is not a Module subclass", lambda: _mock_layer()),
+                    (
+                        r"AttributeError: 'int' object has no attribute 'expansion'",
+                        lambda: _mock_layer(),
+                    ),
+                    (
+                        r"ModuleList.extend should be called with an iterable, but got int",
+                        lambda: [_mock_layer()],
+                    ),
+                    (
+                        r"ModuleDict.update should be called.*but got int",
+                        lambda: {"relu": torch.nn.ReLU()},
+                    ),
+                    (
+                        r"AttributeError: 'int' object has no attribute 'split'",
+                        lambda: "2,2",
+                    ),
+                    (
+                        r"IndexError: index 0 is out of bounds for dimension 0 with size 0",
+                        fix_too_small,
+                    ),
+                    (r"ValueError: .* must be divisible by groups", fix_too_small),
+                    (r"invalid depth", fix_too_small),
+                    (r"KeyError: [1-9]", lambda: self.value // 2),
+                    (r"multiple of (?P<m>\d{1,3})", lambda m: m),
+                    (
+                        r"dropout probability has to be between 0 and 1, but got (?P<v>\d+)",
+                        lambda v: 0.5 if v == self.value and "drop" in name else None,
+                    ),
+                    (
+                        r"should be a number in range \[0, 1\]",
+                        lambda: 0.5 if "drop" in name else None,
+                    ),
+                    (r"member .* should be callable", lambda: _mock_layer()),
+                    (
+                        r"""assert.*in\s+[(\[{]\s*(?P<v>\d+|'[^'\\]*'|"[^"\\]*")""",
+                        lambda v: v,
+                    ),
+                    (
+                        r"AttributeError: 'int' object has no attribute '(upper|lower)'",
+                        lambda: "gru" if "rnn_type" in name else None,
+                    ),
+                    (
+                        r"TypeError: 'int' object is not callable",
+                        lambda: _mock_layer
+                        if any(
+                            s in name.lower() for s in ["norm", "act", "cls", "block"]
+                        )
+                        else None,
+                    ),
+                    (
+                        r"ZeroDivisionError: float division by zero",
+                        lambda: self.value * 2 if self.value < 256 else None,
+                    ),
+                    (
+                        r"ZeroDivisionError: integer division or modulo by zero",
+                        lambda: self.value * 2 if self.value < 256 else None,
+                    ),
+                    (
+                        r"Trying to create tensor with negative dimension",
+                        lambda: self.value * 2 if self.value < 256 else None,
+                    ),
+                    (
+                        r"getattr.*attribute name must be string",
+                        lambda: "relu" if "act" in name else None,
+                    ),
+                ]
+            )
 
         if pass_number == 1 and isinstance(self.value, int):
-            fixors.extend([
-                (r"Embeddings parameter is expected to be 2-dimensional",
-                 lambda: TensorGuess([TensorGuess.default_size] * 2)),
-                (r"dropout probability has to be between 0 and 1, but got (?P<v>\d+)",
-                 lambda v: 0.5 if v == self.value else None),
-                (r"should be a number in range \[0, 1\]",
-                 lambda v: 0.5),
-                (r"(NotImplementedError|AssertionError):[^\d]*\b(?P<val>\d+)\b",
-                 lambda val: val),
-                (r"TypeError: 'int' object is not callable",
-                 lambda: _mock_layer),
-            ])
+            fixors.extend(
+                [
+                    (
+                        r"Embeddings parameter is expected to be 2-dimensional",
+                        lambda: TensorGuess([TensorGuess.default_size] * 2),
+                    ),
+                    (
+                        r"dropout probability has to be between 0 and 1, but got (?P<v>\d+)",
+                        lambda v: 0.5 if v == self.value else None,
+                    ),
+                    (r"should be a number in range \[0, 1\]", lambda v: 0.5),
+                    (
+                        r"(NotImplementedError|AssertionError):[^\d]*\b(?P<val>\d+)\b",
+                        lambda val: val,
+                    ),
+                    (r"TypeError: 'int' object is not callable", lambda: _mock_layer),
+                ]
+            )
 
         if pass_number == 2 and isinstance(self.value, int):
-            fixors.extend([
-                (r"Embeddings parameter is expected to be 2-dimensional",
-                 lambda: TensorGuess([TensorGuess.default_size] * 2)),
-                (r"dropout probability has to be between 0 and 1, but got (?P<v>\d+)",
-                 lambda v: 0.5 if v == self.value else None),
-                (r"should be a number in range \[0, 1\]",
-                 lambda v: 0.5),
-                (r"(NotImplementedError|AssertionError):.*bigger than.*[^\d]*\b(?P<val>\d+)\b",
-                 lambda val: val * 2),
-            ])
+            fixors.extend(
+                [
+                    (
+                        r"Embeddings parameter is expected to be 2-dimensional",
+                        lambda: TensorGuess([TensorGuess.default_size] * 2),
+                    ),
+                    (
+                        r"dropout probability has to be between 0 and 1, but got (?P<v>\d+)",
+                        lambda v: 0.5 if v == self.value else None,
+                    ),
+                    (r"should be a number in range \[0, 1\]", lambda v: 0.5),
+                    (
+                        r"(NotImplementedError|AssertionError):.*bigger than.*[^\d]*\b(?P<val>\d+)\b",
+                        lambda val: val * 2,
+                    ),
+                ]
+            )
 
         if pass_number == 0 and isinstance(self.value, float):
-            fixors.extend([
-                (r"received an invalid combination of arguments.*float",
-                 lambda: TensorGuess.default_size),
-                (r"tuple of ints, but found element of type float",
-                 lambda: TensorGuess.default_size),
-                (r"TypeError: 'float' object cannot be interpreted as an integer",
-                 lambda: int(self.value)),
-
-            ])
+            fixors.extend(
+                [
+                    (
+                        r"received an invalid combination of arguments.*float",
+                        lambda: TensorGuess.default_size,
+                    ),
+                    (
+                        r"tuple of ints, but found element of type float",
+                        lambda: TensorGuess.default_size,
+                    ),
+                    (
+                        r"TypeError: 'float' object cannot be interpreted as an integer",
+                        lambda: int(self.value),
+                    ),
+                ]
+            )
 
         if pass_number == 0 and isinstance(self.value, list):
+
             def fix_too_many(want):
                 if len(self.value) > want:
                     return [TensorGuess.default_size] * want
@@ -536,36 +640,58 @@ class LiteralGuess(Guess):
                 if len(self.value) == got:
                     return [TensorGuess.default_size] * want
 
-            fixors.extend([
-                (r"ValueError: too many values to unpack \(expected (?P<want>\d+)\)",
-                 fix_too_many),
-                (r"ValueError: not enough values to unpack \(expected (?P<want>\d+), got (?P<got>\d+)\)",
-                 fix_too_few),
-                (r"not supported between instances of '(list|int)' and '(list|int)'",
-                 lambda: TensorGuess.default_size),
-                (r"unsupported operand .* 'list'",
-                 lambda: TensorGuess.default_size),
-                (r"TypeError: 'list' object is not callable",
-                 lambda: _mock_layer),
-                (r"IndexError: list index out of range",
-                 lambda: self.value + [TensorGuess.default_size]),
-                (r"AttributeError: 'list' object has no attribute 'expansion'",
-                 lambda: _mock_layer()),
-                (r"TypeError: 'list' object cannot be interpreted as an integer",
-                 lambda: TensorGuess.default_size),
-                (r"assert len\(\w+\) == (?P<want>\d+)",
-                 lambda want: [TensorGuess.default_size] * want),
-                (r"expected .* list .* (?P<want>\d+)",
-                 lambda want: [TensorGuess.default_size] * want),
-            ])
+            fixors.extend(
+                [
+                    (
+                        r"ValueError: too many values to unpack \(expected (?P<want>\d+)\)",
+                        fix_too_many,
+                    ),
+                    (
+                        r"ValueError: not enough values to unpack \(expected (?P<want>\d+), got (?P<got>\d+)\)",
+                        fix_too_few,
+                    ),
+                    (
+                        r"not supported between instances of '(list|int)' and '(list|int)'",
+                        lambda: TensorGuess.default_size,
+                    ),
+                    (
+                        r"unsupported operand .* 'list'",
+                        lambda: TensorGuess.default_size,
+                    ),
+                    (r"TypeError: 'list' object is not callable", lambda: _mock_layer),
+                    (
+                        r"IndexError: list index out of range",
+                        lambda: self.value + [TensorGuess.default_size],
+                    ),
+                    (
+                        r"AttributeError: 'list' object has no attribute 'expansion'",
+                        lambda: _mock_layer(),
+                    ),
+                    (
+                        r"TypeError: 'list' object cannot be interpreted as an integer",
+                        lambda: TensorGuess.default_size,
+                    ),
+                    (
+                        r"assert len\(\w+\) == (?P<want>\d+)",
+                        lambda want: [TensorGuess.default_size] * want,
+                    ),
+                    (
+                        r"expected .* list .* (?P<want>\d+)",
+                        lambda want: [TensorGuess.default_size] * want,
+                    ),
+                ]
+            )
 
         if pass_number == 0 and isinstance(self.value, torch.nn.Module):
-            fixors.extend([
-                (r"object has no attribute 'split'",
-                 lambda: type(self.value).__name__),
-                (r"TypeError: must be real number, not DummyBlock",
-                 lambda: 1.0),
-            ])
+            fixors.extend(
+                [
+                    (
+                        r"object has no attribute 'split'",
+                        lambda: type(self.value).__name__,
+                    ),
+                    (r"TypeError: must be real number, not DummyBlock", lambda: 1.0),
+                ]
+            )
 
         if not fixors:
             return
@@ -634,44 +760,84 @@ class TensorGuess(Guess):
                     return LiteralGuess(_mock_layer())
 
         other_fixors = [
-            (r"expected Long",
-             lambda: self.__class__([self.default_size], torch.int64)),
-            (r"scalar type Long; but got torch.FloatTensor",
-             lambda: self.__class__([self.default_size], torch.int64)),
-            (r"Expected dtype int64 for index",
-             lambda: self.__class__([self.default_size], torch.int64)),
-            (r"tensors used as indices must be long",
-             lambda: self.__class__([self.default_size], torch.int64)),
-            (r"only integer scalar arrays can be converted to a scalar index",
-             lambda: self.__class__([self.default_size], torch.int64)),
-            (r"expected scalar type Long but found Float",
-             lambda: self.__class__([self.default_size], torch.int64)),
-            (r"TypeError: [']Tensor['] object is not callable",
-             tried_to_call),
-            (r"TypeError: only integer tensors of a single element can be converted to an index",
-             lambda: LiteralGuess(0)),
-            (r"'lengths' argument should be a 1D CPU int64 tensor",
-             lambda: (self.__class__([self.default_size], torch.int64) if "len" in name else None)),
-            (r"Boolean value of Tensor with more than one value is ambiguous",
-             lambda: LiteralGuess(0)),
-            (r"only supports 0-dimension value tensor",
-             lambda: LiteralGuess(0)),
-            (r"bool value of Tensor with more than one value is ambiguous",
-             lambda: LiteralGuess(0)),
-            (r"Length of all samples has to be greater than 0",
-             lambda: self.__class__([self.shape], self.dtype, fill_value=1)),
-            (r"invalid combination of arguments.*Tensor",
-             lambda: LiteralGuess(list(self.shape))),
-            (r"argument 'size' must be tuple of ints, but found element of type Tensor",
-             lambda: LiteralGuess(self.default_size)),
-            (r"ValueError: too many values to unpack \(expected (?P<num>\d+)",
-             lambda num: self.fix_tuple_guess(name, line, num)),
-            (r"ValueError: not enough values to unpack \(expected (?P<num>\d+)",
-             lambda num: self.fix_tuple_guess(name, line, num)),
-            (r"assert isinstance\((?P<str_name>\w+), .*tuple",
-             lambda str_name: TupleGuess([f"{name}[{i}]" for i in range(4)]) if str_name == name else None),
-            (r"assert isinstance\((?P<str_name>\w+), .*list",
-             lambda str_name: ListGuess([f"{name}[{i}]" for i in range(4)]) if str_name == name else None),
+            (
+                r"expected Long",
+                lambda: self.__class__([self.default_size], torch.int64),
+            ),
+            (
+                r"scalar type Long; but got torch.FloatTensor",
+                lambda: self.__class__([self.default_size], torch.int64),
+            ),
+            (
+                r"Expected dtype int64 for index",
+                lambda: self.__class__([self.default_size], torch.int64),
+            ),
+            (
+                r"tensors used as indices must be long",
+                lambda: self.__class__([self.default_size], torch.int64),
+            ),
+            (
+                r"only integer scalar arrays can be converted to a scalar index",
+                lambda: self.__class__([self.default_size], torch.int64),
+            ),
+            (
+                r"expected scalar type Long but found Float",
+                lambda: self.__class__([self.default_size], torch.int64),
+            ),
+            (r"TypeError: [']Tensor['] object is not callable", tried_to_call),
+            (
+                r"TypeError: only integer tensors of a single element can be converted to an index",
+                lambda: LiteralGuess(0),
+            ),
+            (
+                r"'lengths' argument should be a 1D CPU int64 tensor",
+                lambda: (
+                    self.__class__([self.default_size], torch.int64)
+                    if "len" in name
+                    else None
+                ),
+            ),
+            (
+                r"Boolean value of Tensor with more than one value is ambiguous",
+                lambda: LiteralGuess(0),
+            ),
+            (r"only supports 0-dimension value tensor", lambda: LiteralGuess(0)),
+            (
+                r"bool value of Tensor with more than one value is ambiguous",
+                lambda: LiteralGuess(0),
+            ),
+            (
+                r"Length of all samples has to be greater than 0",
+                lambda: self.__class__([self.shape], self.dtype, fill_value=1),
+            ),
+            (
+                r"invalid combination of arguments.*Tensor",
+                lambda: LiteralGuess(list(self.shape)),
+            ),
+            (
+                r"argument 'size' must be tuple of ints, but found element of type Tensor",
+                lambda: LiteralGuess(self.default_size),
+            ),
+            (
+                r"ValueError: too many values to unpack \(expected (?P<num>\d+)",
+                lambda num: self.fix_tuple_guess(name, line, num),
+            ),
+            (
+                r"ValueError: not enough values to unpack \(expected (?P<num>\d+)",
+                lambda num: self.fix_tuple_guess(name, line, num),
+            ),
+            (
+                r"assert isinstance\((?P<str_name>\w+), .*tuple",
+                lambda str_name: TupleGuess([f"{name}[{i}]" for i in range(4)])
+                if str_name == name
+                else None,
+            ),
+            (
+                r"assert isinstance\((?P<str_name>\w+), .*list",
+                lambda str_name: ListGuess([f"{name}[{i}]" for i in range(4)])
+                if str_name == name
+                else None,
+            ),
         ]
 
         return self.apply_fixors(other_fixors, error_message)
@@ -679,8 +845,9 @@ class TensorGuess(Guess):
     def fix_tuple_guess(self, name, line, num):
         if re.search(r"[.](shape|size|split)", line) or re.search(name + r"[.]", line):
             return
-        match = re.search(r"\s*,\s*".join([r"(\w+)"] * num) + r"\s*=\s*(?:list|tuple\()?" + name,
-                          line)
+        match = re.search(
+            r"\s*,\s*".join([r"(\w+)"] * num) + r"\s*=\s*(?:list|tuple\()?" + name, line
+        )
         if match:
             names = match.groups()
             assert len(names) == num
@@ -689,127 +856,230 @@ class TensorGuess(Guess):
     def shape_fixors(self, pass_number: int):
         if pass_number == 0:
             return [
-                (r"Given groups=(?P<groups>\d+).*(?P<weight>\[[\d, ]+\]), expected input(?P<got>\[[\d, ]+\])",
-                 self.fix_convolution_if_matching),
-                (r"Expected \d+-dimensional.*for.*(?P<weight>\[[\d, ]+\]).*got.*(?P<got>\[[\d, ]+\])",
-                 self.fix_convolution_if_matching),
-                (r"(?P<want>\d+) channels, but got (?P<got>\d+) channels",
-                 self.fix_num_channels),
-                (r"channels in input to be divisible by num_groups.*\[\d+, (?P<got>\d+),.* num_groups=(?P<want>\d+)",
-                 self.fix_num_channels),
-                (r"same number of dimensions: got (?P<want>\d+) and (?P<got>\d+)",
-                 self.fix_dimensions),
-                (r"Got (?P<got>\d+)D .*needs (?P<want>\d+)D",
-                 self.fix_dimensions),
-                (r"dimension mismatch for operand \d+: equation (?P<want>\d+) tensor (?P<got>\d+)",
-                 self.fix_dimensions),
-                (r"input must have (?P<want>\d+) dimensions, got (?P<got>\d+)",
-                 self.fix_dimensions),
-                (r"Expected (?P<want>\d+)D .* got (?P<got>\d+)D",
-                 self.fix_dimensions),
-                (r"expects .* (?P<want>\d+) dimensions, but self is (?P<got>\d+)D",
-                 self.fix_dimensions),
-                (r"Expected (?P<want>\d+)-dimensional tensor, but got (?P<got>\d+)-dimensional tensor",
-                 self.fix_dimensions),
-                (r"sizes provided \((?P<want>\d+)\) must be greater .* tensor \((?P<got>\d+)\)",
-                 self.fix_dimensions),
-                (r"The size.*[(](?P<want>\d+)[)] must match.*[(](?P<got>\d+)[)] at.*dimension (?P<dim>\d+)",
-                 self.fix_dimensions_at),
-                (r"must match except in dimension \d+. Got (?P<want>\d+) and (?P<got>\d+) in dimension (?P<dim>\d+)",
-                 self.fix_dimensions_at),
-                (r"input.size\(-1\) must be equal to input_size. Expected (?P<want>\d+), got (?P<got>\d+)",
-                 lambda want, got: self.fix_dimensions_at(want=want, got=got, dim=len(self.shape) - 1)),
-                (r"matrices expected, got (?P<got>\d+)D, (?P<want>\d+)D ",
-                 self.fix_dimensions),
-                (r"expected.* (?P<want>\d+)D input \(got (?P<got>\d+)D input\)",
-                 self.fix_dimensions),
-                (r"Expected.*size (?P<want>[\d, ()]+), got (?P<got>[\d, ()]+)",
-                 self.fix_shape),
-                (r"Number of dimensions of repeat dims can not be smaller than number of dimensions of tensor",
-                 lambda: self.shape[:-1]),
-                (r"Expected tensor to have size (?P<want>\d+) at dimension (?P<dim>\d+), but got size (?P<got>\d+)",
-                 self.fix_dimensions_at),
-                (r"RuntimeError: number of dims don't match in permute",
-                 self.fix_dimensions_unknown),
-                (r"ValueError: too many values to unpack \(expected (?P<want>\d+)\)",
-                 self.fix_dimensions),
-                (r"ValueError: not enough values to unpack \(expected (?P<want>\d+), got (?P<got>\d+)\)",
-                 self.fix_dimensions),
-                (r"expected to be in range of \[-\d+, (?P<got>\d+)\], but got (?P<want>\d+)",
-                 self.fix_dimension_out_of_range),
-                (r"sizes provided \((?P<want>\d+)\) must be greater or equal.* \((?P<got>\d+)\)",
-                 self.fix_dimensions),
-                (r"size mismatch, m1: (?P<a>\[.*\]), m2: (?P<b>\[.*\])",
-                 self.fix_size_mismatch),
-                (r"Embeddings parameter is expected to be 2-dimensional",
-                 lambda: [self.default_size] * 2 if len(self.shape) != 2 else None),
-                (r"IndexError: too many indices for tensor of dimension 0",
-                 lambda: self.shape + [self.default_size] if len(self.shape) < 4 else None),
-                (r"IndexError: dimension specified as 0 but tensor has no dimensions",
-                 lambda: self.shape + [self.default_size] if len(self.shape) < 4 else None),
-                (r"Only 3D, 4D and (?P<want>\d+)D input Tensors supported \(got (?P<got>\d+)D\)",
-                 self.fix_dimensions),
-                (r"AssertionError:.*(?P<got>\b\d+\b).*(?P<want>\b\d+\b).*(size\(\)|shape)\[(?P<dim>\d+)",
-                 self.fix_dimensions_at),
-                (r"assert.*\.dim\(\) *== *(?P<want>\d+)",
-                 self.fix_dimensions),
-                (r"Padding size should be less than the corresponding input dimension",
-                 self.fix_too_small),
-                (r"Kernel size can't be greater than actual input size",
-                 self.fix_too_small),
-                (r"Output size is too small",
-                 self.fix_too_small),
-                (r"smaller than kernel size",
-                 self.fix_too_small),
-                (r"shape '(?P<view>\[[\d, -]+\])' is invalid for input of size (?P<size>\d+)",
-                 self.fix_view),
-                (r"expected input with shape \[\*, (?P<want>\d+)\], but got input of size\[.* (?P<got>\d+)\]",
-                 lambda want, got: self.fix_too_small() if want > got else self.fix_too_big()),
-                (r"only one element tensors can be converted to Python scalars",
-                 lambda: self.shape[:-1] if 1 < len(self.shape) <= 3 else None),
-                (r"can't allocate memory",
-                 self.fix_too_big),
+                (
+                    r"Given groups=(?P<groups>\d+).*(?P<weight>\[[\d, ]+\]), expected input(?P<got>\[[\d, ]+\])",
+                    self.fix_convolution_if_matching,
+                ),
+                (
+                    r"Expected \d+-dimensional.*for.*(?P<weight>\[[\d, ]+\]).*got.*(?P<got>\[[\d, ]+\])",
+                    self.fix_convolution_if_matching,
+                ),
+                (
+                    r"(?P<want>\d+) channels, but got (?P<got>\d+) channels",
+                    self.fix_num_channels,
+                ),
+                (
+                    r"channels in input to be divisible by num_groups.*\[\d+, (?P<got>\d+),.* num_groups=(?P<want>\d+)",
+                    self.fix_num_channels,
+                ),
+                (
+                    r"same number of dimensions: got (?P<want>\d+) and (?P<got>\d+)",
+                    self.fix_dimensions,
+                ),
+                (r"Got (?P<got>\d+)D .*needs (?P<want>\d+)D", self.fix_dimensions),
+                (
+                    r"dimension mismatch for operand \d+: equation (?P<want>\d+) tensor (?P<got>\d+)",
+                    self.fix_dimensions,
+                ),
+                (
+                    r"input must have (?P<want>\d+) dimensions, got (?P<got>\d+)",
+                    self.fix_dimensions,
+                ),
+                (r"Expected (?P<want>\d+)D .* got (?P<got>\d+)D", self.fix_dimensions),
+                (
+                    r"expects .* (?P<want>\d+) dimensions, but self is (?P<got>\d+)D",
+                    self.fix_dimensions,
+                ),
+                (
+                    r"Expected (?P<want>\d+)-dimensional tensor, but got (?P<got>\d+)-dimensional tensor",
+                    self.fix_dimensions,
+                ),
+                (
+                    r"sizes provided \((?P<want>\d+)\) must be greater .* tensor \((?P<got>\d+)\)",
+                    self.fix_dimensions,
+                ),
+                (
+                    r"The size.*[(](?P<want>\d+)[)] must match.*[(](?P<got>\d+)[)] at.*dimension (?P<dim>\d+)",
+                    self.fix_dimensions_at,
+                ),
+                (
+                    r"must match except in dimension \d+. Got (?P<want>\d+) and (?P<got>\d+) in dimension (?P<dim>\d+)",
+                    self.fix_dimensions_at,
+                ),
+                (
+                    r"input.size\(-1\) must be equal to input_size. Expected (?P<want>\d+), got (?P<got>\d+)",
+                    lambda want, got: self.fix_dimensions_at(
+                        want=want, got=got, dim=len(self.shape) - 1
+                    ),
+                ),
+                (
+                    r"matrices expected, got (?P<got>\d+)D, (?P<want>\d+)D ",
+                    self.fix_dimensions,
+                ),
+                (
+                    r"expected.* (?P<want>\d+)D input \(got (?P<got>\d+)D input\)",
+                    self.fix_dimensions,
+                ),
+                (
+                    r"Expected.*size (?P<want>[\d, ()]+), got (?P<got>[\d, ()]+)",
+                    self.fix_shape,
+                ),
+                (
+                    r"Number of dimensions of repeat dims can not be smaller than number of dimensions of tensor",
+                    lambda: self.shape[:-1],
+                ),
+                (
+                    r"Expected tensor to have size (?P<want>\d+) at dimension (?P<dim>\d+), but got size (?P<got>\d+)",
+                    self.fix_dimensions_at,
+                ),
+                (
+                    r"RuntimeError: number of dims don't match in permute",
+                    self.fix_dimensions_unknown,
+                ),
+                (
+                    r"ValueError: too many values to unpack \(expected (?P<want>\d+)\)",
+                    self.fix_dimensions,
+                ),
+                (
+                    r"ValueError: not enough values to unpack \(expected (?P<want>\d+), got (?P<got>\d+)\)",
+                    self.fix_dimensions,
+                ),
+                (
+                    r"expected to be in range of \[-\d+, (?P<got>\d+)\], but got (?P<want>\d+)",
+                    self.fix_dimension_out_of_range,
+                ),
+                (
+                    r"sizes provided \((?P<want>\d+)\) must be greater or equal.* \((?P<got>\d+)\)",
+                    self.fix_dimensions,
+                ),
+                (
+                    r"size mismatch, m1: (?P<a>\[.*\]), m2: (?P<b>\[.*\])",
+                    self.fix_size_mismatch,
+                ),
+                (
+                    r"Embeddings parameter is expected to be 2-dimensional",
+                    lambda: [self.default_size] * 2 if len(self.shape) != 2 else None,
+                ),
+                (
+                    r"IndexError: too many indices for tensor of dimension 0",
+                    lambda: self.shape + [self.default_size]
+                    if len(self.shape) < 4
+                    else None,
+                ),
+                (
+                    r"IndexError: dimension specified as 0 but tensor has no dimensions",
+                    lambda: self.shape + [self.default_size]
+                    if len(self.shape) < 4
+                    else None,
+                ),
+                (
+                    r"Only 3D, 4D and (?P<want>\d+)D input Tensors supported \(got (?P<got>\d+)D\)",
+                    self.fix_dimensions,
+                ),
+                (
+                    r"AssertionError:.*(?P<got>\b\d+\b).*(?P<want>\b\d+\b).*(size\(\)|shape)\[(?P<dim>\d+)",
+                    self.fix_dimensions_at,
+                ),
+                (r"assert.*\.dim\(\) *== *(?P<want>\d+)", self.fix_dimensions),
+                (
+                    r"Padding size should be less than the corresponding input dimension",
+                    self.fix_too_small,
+                ),
+                (
+                    r"Kernel size can't be greater than actual input size",
+                    self.fix_too_small,
+                ),
+                (r"Output size is too small", self.fix_too_small),
+                (r"smaller than kernel size", self.fix_too_small),
+                (
+                    r"shape '(?P<view>\[[\d, -]+\])' is invalid for input of size (?P<size>\d+)",
+                    self.fix_view,
+                ),
+                (
+                    r"expected input with shape \[\*, (?P<want>\d+)\], but got input of size\[.* (?P<got>\d+)\]",
+                    lambda want, got: self.fix_too_small()
+                    if want > got
+                    else self.fix_too_big(),
+                ),
+                (
+                    r"only one element tensors can be converted to Python scalars",
+                    lambda: self.shape[:-1] if 1 < len(self.shape) <= 3 else None,
+                ),
+                (r"can't allocate memory", self.fix_too_big),
             ]
 
         if pass_number == 1:
             return [
-                (r"Given groups=(?P<groups>\d+).*(?P<weight>\[[\d, ]+\]), expected input\[[\d, ]+\]",
-                 self.fix_convolution),
-                (r"Expected \d+-dimensional.*for.*(?P<weight>\[[\d, ]+\]).*got.*\[[\d, ]+\]",
-                 self.fix_convolution),
-                (r"same number of dimensions: got (?P<got>\d+) and (?P<want>\d+)",
-                 self.fix_dimensions),
-                (r"sizes provided \((?P<want>\d+)\) must be greater .* tensor \((?P<got>\d+)\)",
-                 lambda want, got: self.fix_dimensions(want - 1, got - 1)),
-                (r"ValueError: not enough values to unpack \(expected (?P<want>\d+), got (?P<got>\d+)\)",
-                 lambda want, got: self.fix_dimensions(want + 1, got + 1)),
-                (r"Got \d+D .*needs (?P<want>\d+)D",
-                 self.fix_dimensions),
-                (r"The size.*[(](?P<got>\d+)[)] must match.*[(](?P<want>\d+)[)] at.*dimension (?P<dim>\d+)",
-                 self.fix_dimensions_at),
-                (r"must match except in dimension \d+. Got (?P<got>\d+) and (?P<want>\d+) in dimension (?P<dim>\d+)",
-                 self.fix_dimensions_at),
-                (r"expected (?P<want>\d+)D or \d+D input \(got (?P<got>\d+)D input\)",
-                 self.fix_dimensions),
-                (r"Expected tensor to have size (?P<got>\d+) at dimension (?P<dim>\d+), but got size (?P<want>\d+)",
-                 self.fix_dimensions_at),
-                (r"IndexError: Dimension out of range",
-                 lambda: self.shape + [self.default_size] if len(self.shape) < 4 else None),
-                (r"AssertionError:.*(?P<want>\b\d+\b).*(?P<got>\b\d+\b).*(size\(\)|shape)\[(?P<dim>\d+)",
-                 self.fix_dimensions_at),
-                (r"index (?P<index>\d+) is out of bounds for dimension (?P<dim>\d+) with size (?P<size>\d+)",
-                 self.fix_out_of_bounds),
-                (r"size mismatch, m1: (?P<a>\[.*\]), m2: (?P<b>\[.*\])",
-                 self.fix_size_mismatch2),
-                (r"shape '(?P<view>\[[\d, -]+\])' is invalid for input of size (?P<size>\d+)",
-                 self.fix_view2),
+                (
+                    r"Given groups=(?P<groups>\d+).*(?P<weight>\[[\d, ]+\]), expected input\[[\d, ]+\]",
+                    self.fix_convolution,
+                ),
+                (
+                    r"Expected \d+-dimensional.*for.*(?P<weight>\[[\d, ]+\]).*got.*\[[\d, ]+\]",
+                    self.fix_convolution,
+                ),
+                (
+                    r"same number of dimensions: got (?P<got>\d+) and (?P<want>\d+)",
+                    self.fix_dimensions,
+                ),
+                (
+                    r"sizes provided \((?P<want>\d+)\) must be greater .* tensor \((?P<got>\d+)\)",
+                    lambda want, got: self.fix_dimensions(want - 1, got - 1),
+                ),
+                (
+                    r"ValueError: not enough values to unpack \(expected (?P<want>\d+), got (?P<got>\d+)\)",
+                    lambda want, got: self.fix_dimensions(want + 1, got + 1),
+                ),
+                (r"Got \d+D .*needs (?P<want>\d+)D", self.fix_dimensions),
+                (
+                    r"The size.*[(](?P<got>\d+)[)] must match.*[(](?P<want>\d+)[)] at.*dimension (?P<dim>\d+)",
+                    self.fix_dimensions_at,
+                ),
+                (
+                    r"must match except in dimension \d+. Got (?P<got>\d+) and (?P<want>\d+) in dimension (?P<dim>\d+)",
+                    self.fix_dimensions_at,
+                ),
+                (
+                    r"expected (?P<want>\d+)D or \d+D input \(got (?P<got>\d+)D input\)",
+                    self.fix_dimensions,
+                ),
+                (
+                    r"Expected tensor to have size (?P<got>\d+) at dimension (?P<dim>\d+), but got size (?P<want>\d+)",
+                    self.fix_dimensions_at,
+                ),
+                (
+                    r"IndexError: Dimension out of range",
+                    lambda: self.shape + [self.default_size]
+                    if len(self.shape) < 4
+                    else None,
+                ),
+                (
+                    r"AssertionError:.*(?P<want>\b\d+\b).*(?P<got>\b\d+\b).*(size\(\)|shape)\[(?P<dim>\d+)",
+                    self.fix_dimensions_at,
+                ),
+                (
+                    r"index (?P<index>\d+) is out of bounds for dimension (?P<dim>\d+) with size (?P<size>\d+)",
+                    self.fix_out_of_bounds,
+                ),
+                (
+                    r"size mismatch, m1: (?P<a>\[.*\]), m2: (?P<b>\[.*\])",
+                    self.fix_size_mismatch2,
+                ),
+                (
+                    r"shape '(?P<view>\[[\d, -]+\])' is invalid for input of size (?P<size>\d+)",
+                    self.fix_view2,
+                ),
             ]
         if pass_number == 2:
             return [
-                (r"Expected \d+-dimensional.*for.*(?P<weight>\[[\d, ]+\]).*got.*(?P<got>\[[\d, ]+\])",
-                 self.fix_convolution_offset),
-                (r"The size.*[(](?P<got>\d+)[)] must match.*[(](?P<want>\d+)[)] at.*dimension (?P<dim>\d+)",
-                 self.fix_dimensions_at_pass2),
+                (
+                    r"Expected \d+-dimensional.*for.*(?P<weight>\[[\d, ]+\]).*got.*(?P<got>\[[\d, ]+\])",
+                    self.fix_convolution_offset,
+                ),
+                (
+                    r"The size.*[(](?P<got>\d+)[)] must match.*[(](?P<want>\d+)[)] at.*dimension (?P<dim>\d+)",
+                    self.fix_dimensions_at_pass2,
+                ),
             ]
 
     def fix_view(self, view, size):
@@ -837,7 +1107,9 @@ class TensorGuess(Guess):
                 v = tmp[-1] * 2
             tmp[-1] = v
             tmp[-2] = v
-            return TensorGuess(tmp, self.dtype, self.fill_value, hint=TooSmallHint(self.shape[-1]))
+            return TensorGuess(
+                tmp, self.dtype, self.fill_value, hint=TooSmallHint(self.shape[-1])
+            )
 
     def fix_too_big(self):
         if len(self.shape) >= 4:
@@ -848,7 +1120,9 @@ class TensorGuess(Guess):
                     v = (v + self.shape[-1]) // 2
                 tmp[-1] = v
                 tmp[-2] = v
-                return TensorGuess(tmp, self.dtype, self.fill_value, hint=TooBigHint(self.shape[-1]))
+                return TensorGuess(
+                    tmp, self.dtype, self.fill_value, hint=TooBigHint(self.shape[-1])
+                )
             if tmp[1] >= 4:
                 tmp[1] = tmp[1] // 2
                 return tmp
@@ -891,7 +1165,9 @@ class TensorGuess(Guess):
 
     def fix_convolution_offset(self, weight: List[int], got: List[int]):
         if len(got) == len(self.shape) - 1:
-            return [self.default_size, self.default_size, weight[1]] + [64 for _ in weight[2:]]
+            return [self.default_size, self.default_size, weight[1]] + [
+                64 for _ in weight[2:]
+            ]
 
     def fix_num_channels(self, want, got):
         guess = list(self.shape)
@@ -945,8 +1221,9 @@ class ConfigGuess(Guess):
         self._rollback = []
 
     def get_fix(self, error_message: str, line: str, pass_number: int, name: str):
-        guesses = sorted(self.value._guesses.values(),
-                         key=lambda x: x.created, reverse=True)
+        guesses = sorted(
+            self.value._guesses.values(), key=lambda x: x.created, reverse=True
+        )
         for guess in guesses:
             if guess.try_to_fix(error_message, line, pass_number):
                 self._rollback.append(guess)
@@ -1011,7 +1288,9 @@ class MockConfig(object):
 
     def __getitem__(self, item):
         if item not in self._guesses:
-            self._guesses[item] = DeduceParameter.initial_arg_init(name=item, position=None)
+            self._guesses[item] = DeduceParameter.initial_arg_init(
+                name=item, position=None
+            )
         return self._guesses[item].guess()
 
     __getattr__ = __getitem__

@@ -32,7 +32,9 @@ def call_with_timeout(fn, args, kwargs=None, timeout=10):
     kwargs = kwargs or {}
     parent_conn, child_conn = multiprocessing.Pipe()
     start = time.time()
-    proc = multiprocessing.Process(target=call_with_timeout_subproc, args=(fn, args, kwargs, child_conn))
+    proc = multiprocessing.Process(
+        target=call_with_timeout_subproc, args=(fn, args, kwargs, child_conn)
+    )
     proc.start()
     while proc.is_alive():
         if parent_conn.poll(1):
@@ -40,7 +42,9 @@ def call_with_timeout(fn, args, kwargs=None, timeout=10):
             proc.join()
             return result
         if time.time() - start > timeout:
-            os.kill(proc.pid, signal.SIGINT)  # maybe generate a stack trace for debugging
+            os.kill(
+                proc.pid, signal.SIGINT
+            )  # maybe generate a stack trace for debugging
             time.sleep(1)
             proc.terminate()
             proc.join(10)
@@ -61,7 +65,10 @@ def call_with_timeout_subproc(fn, args, kwargs, return_pipe):
     )
     if use_rlimit:
         _, hard = resource.getrlimit(resource.RLIMIT_AS)
-        resource.setrlimit(resource.RLIMIT_AS, (int(os.environ.get("RLIMIT_AS_GB", 10)) * 1024 ** 3, hard))
+        resource.setrlimit(
+            resource.RLIMIT_AS,
+            (int(os.environ.get("RLIMIT_AS_GB", 10)) * 1024 ** 3, hard),
+        )
     try:
         result = fn(*args, *kwargs)
         return_pipe.send(result)
@@ -77,14 +84,19 @@ def import_file(path):
     """
     module = types.ModuleType(re.findall(r"test_[^.]+", path)[0])
     sys.modules[module.__name__] = module
-    exec(compile(open(path).read(), filename=path, mode='exec'),
-         module.__dict__, module.__dict__)
+    exec(
+        compile(open(path).read(), filename=path, mode="exec"),
+        module.__dict__,
+        module.__dict__,
+    )
     if not hasattr(module, "TESTCASES"):
         module.TESTCASES = []
     return module
 
 
-def subproc_wrapper(path: str, fn: callable, timeout: int = 900, fresh_cache_dir: bool = False):
+def subproc_wrapper(
+    path: str, fn: callable, timeout: int = 900, fresh_cache_dir: bool = False
+):
     """
     A wrapper around call_with_timeout() adding a temp dir and error handling.
 
@@ -100,17 +112,19 @@ def subproc_wrapper(path: str, fn: callable, timeout: int = 900, fresh_cache_dir
         try:
             return call_with_timeout(fn, (tempdir, path), {}, timeout=timeout)
         except TimeoutError:
-            return ErrorAggregatorDict.single(
-                "meta",
-                TimeoutError("Timeout testing module"),
-                path
-            ), Stats({"timeout": 1})
+            return (
+                ErrorAggregatorDict.single(
+                    "meta", TimeoutError("Timeout testing module"), path
+                ),
+                Stats({"timeout": 1}),
+            )
         except OSError:
-            return ErrorAggregatorDict.single(
-                "meta",
-                OSError("Crash testing module"),
-                path
-            ), Stats({"crash": 1})
+            return (
+                ErrorAggregatorDict.single(
+                    "meta", OSError("Crash testing module"), path
+                ),
+                Stats({"crash": 1}),
+            )
 
 
 def tempdir_wrapper(path: str, fn: callable, fresh_cache_dir: bool = False):
@@ -124,7 +138,9 @@ def tempdir_wrapper(path: str, fn: callable, fresh_cache_dir: bool = False):
 
 def wrap_args(args, device="cuda"):
     device = torch.device(device)
-    return [x.to(device) if isinstance(x, torch.Tensor) else x for x in copy.deepcopy(args)]
+    return [
+        x.to(device) if isinstance(x, torch.Tensor) else x for x in copy.deepcopy(args)
+    ]
 
 
 def wrap_kwargs(kwargs, device="cuda"):
@@ -139,14 +155,14 @@ def wrap_kwargs(kwargs, device="cuda"):
 
 
 def get_skiplist(main_args):
-    if main_args.compile_mode == 'export':
+    if main_args.compile_mode == "export":
         return SKIP.get("export")
     else:
         return SKIP.get(main_args.backend)
 
 
 def get_tol(main_args):
-    if main_args.backend == 'inductor':
+    if main_args.backend == "inductor":
         return INDUCTOR_TOL
     else:
         return DYNAMO_TOL
@@ -202,9 +218,7 @@ def get_cosine_and_fp64_outputs(model, args, kwargs):
     reset_rng_state()
     try:
         model_fp64, args_fp64, kwargs_fp64 = cast_to_fp64(
-            copy.deepcopy(model),
-            clone_inputs(args),
-            clone_inputs(kwargs),
+            copy.deepcopy(model), clone_inputs(args), clone_inputs(kwargs),
         )
         fp64_outputs = model_fp64(*args_fp64, **kwargs_fp64)
     except Exception:
@@ -218,9 +232,7 @@ def get_cosine_and_fp64_outputs(model, args, kwargs):
 
 def export_aot_inductor(model, example_args, example_kwargs, device):
     with torch.no_grad():
-        so_path = torch._export.aot_compile(
-            model, tuple(example_args), example_kwargs
-        )
+        so_path = torch._export.aot_compile(model, tuple(example_args), example_kwargs)
 
     return torch._export.aot_load(so_path, device=device)
 
@@ -237,7 +249,7 @@ SKIP_DYNAMO_EAGER = [
     "./generated/test_pytorch_translate.py:OutputProjection",  # shape_as_tensor
     "./generated/test_ludwig_ai_ludwig.py:_VectorPreprocessing",
     "./generated/test_ludwig_ai_ludwig.py:_DatePreprocessing",  # torch.jit.isinstance
-    "./generated/test_adapter_hub_adapter_transformers.py:GPTNeoSelfAttention", # torch.where with dtype torch.uint8 is now deprecated.
+    "./generated/test_adapter_hub_adapter_transformers.py:GPTNeoSelfAttention",  # torch.where with dtype torch.uint8 is now deprecated.
     "./generated/test_ZhaoJ9014_face_evoLVe.py:AM_Softmax",
     "./generated/test_ZhaoJ9014_face_evoLVe.py:CircleLoss",
     "./generated/test_ZhaoJ9014_face_evoLVe.py:MagFace",
