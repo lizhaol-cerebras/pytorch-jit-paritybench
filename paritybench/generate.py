@@ -42,6 +42,7 @@ def generate_zipfile_subproc(tempdir: str, path: str, args):
     test_path = "{}/test_{}.py".format(
         args.tests_dir, re.sub(r"([.]zip|/)$", "", os.path.basename(path))
     )
+    os.makedirs(args.tests_dir, exist_ok=True)
     with open(test_path, "w") as output_py:
         extractor = PyTorchModuleExtractor(
             tempdir, errors, stats, output_py=output_py, args=args

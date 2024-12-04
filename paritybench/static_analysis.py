@@ -400,7 +400,7 @@ class FlattenStatement(ast.NodeTransformer):
         return load
 
     def visit_Lambda(self, node):
-        """ Converts Lambda to FunctionDef """
+        """Converts Lambda to FunctionDef"""
         # (arguments args, expr body)
         name = self.unique_name()
         rv = ast.Return(node.body)
@@ -505,7 +505,7 @@ class Flatten(ast.NodeTransformer):
         self.suffix = None
 
     def unique_name(self):
-        """ Create a name for a new local variable """
+        """Create a name for a new local variable"""
         v = self._cnt
         self._cnt += 1
         return f"_t_{v:02d}"
