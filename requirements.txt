@@ -12,3 +12,13 @@ matplotlib
 hypothesis
 expecttest
 requests
+transformers
+diffusers
+datasets
+tokenizers
+accelerate
+safetensors
+pillow
+opencv-python
+einops
+sentencepiece

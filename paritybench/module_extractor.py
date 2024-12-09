@@ -5,11 +5,12 @@ import logging
 import os
 import re
 import subprocess
+import sys
 import tempfile
 import types
 import zipfile
 from functools import partial
-from typing import TextIO, List
+from typing import List, Optional, TextIO
 
 import astor
 import torch
@@ -81,7 +82,8 @@ class PyTorchModuleExtractor(object):
 
         self.imports = dict()
         self.constants = []
-        self.nn_module_names = []  # list of nn modules in the input project
+        # list of class names to output to the generated file
+        self.output_class_names = []
 
         self.available_symbols = dict()
         self.global_config = None
@@ -90,7 +92,7 @@ class PyTorchModuleExtractor(object):
         self.args = args
 
     def search_file(self, filename: str, open_fn=open):
-        """ get module from filename .py file """
+        """get module from filename .py file"""
         if not filename.endswith(".py") or ".#" in filename:
             return
 
@@ -133,9 +135,16 @@ class PyTorchModuleExtractor(object):
         for node in ast.iter_child_nodes(tree):
             if isinstance(node, ast.ClassDef):
                 self.add_available_symbol(node, overwrite)
-                bases = [to_source(x).strip() for x in node.bases]
-                if overwrite and any(self.is_torch_nn_module(scope, x) for x in bases):
-                    self.nn_module_names.append(node.name)
+
+                if overwrite and self.should_output_class(scope, node):
+                    self.output_class_names.append(node.name)
+                    continue
+
+                bases = [to_source(base).strip() for base in node.bases]
+                if overwrite and any(
+                    self.should_output_class(scope, node, base=base) for base in bases
+                ):
+                    self.output_class_names.append(node.name)
             elif isinstance(node, (ast.Import, ast.ImportFrom)):
                 if overwrite:
                     for module_name, import_node in split_import(node):
@@ -160,17 +169,37 @@ class PyTorchModuleExtractor(object):
             elif isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef, ast.Assign)):
                 self.add_available_symbol(node, overwrite)
 
-    def is_torch_nn_module(self, scope: types.ModuleType, base: str):
+    def should_output_class(
+        self, scope: types.ModuleType, node: ast.ClassDef, base: Optional[str] = None
+    ):
+        """Check if a class should be kept in the output (nn.Modules and dataclasses)"""
+        # We want to keep dataclasses
+        for decorator in node.decorator_list:
+            # Check for @dataclass
+            if isinstance(decorator, ast.Name) and decorator.id == "dataclass":
+                return True
+            # Check for @dataclasses.dataclass
+            elif isinstance(decorator, ast.Attribute) and decorator.attr == "dataclass":
+                if (
+                    isinstance(decorator.value, ast.Name)
+                    and decorator.value.id == "dataclasses"
+                ):
+                    return True
+
+        if not base:
+            return False
+
+        # Checks for torch.nn.Module
         if base in ("torch.nn.Module", "nn.Module", "Module"):
             return True
-        if base.split(".")[-1] in self.nn_module_names:
+        if base.split(".")[-1] in self.output_class_names:
             return True
         try:
             for part in base.split("."):
                 scope = getattr(scope, part, object)
             return issubclass(scope, torch.nn.Module)
         except Exception:
-            log.exception("Error in is_torch_nn_module()")
+            log.exception("Error in should_keep_class()")
 
     def search_directory(self, filename: str):
         for root, _, files in os.walk(filename, topdown=False):
@@ -213,7 +242,7 @@ class PyTorchModuleExtractor(object):
                 self.output.run_statement(statement)
             except Exception as e:
                 self.errors.record("constant", e, getattr(statement, "name", ""))
-        for name in self.nn_module_names:
+        for name in self.output_class_names:
             statement = self.available_symbols.get(name)
             if statement:
                 self.add_requirements(statement)  # add what is needed for module
@@ -333,10 +362,10 @@ def extract_nn_module(name: str, nn_cls: type, checker, context):
 
 def extract_nn_module_inner(name: str, nn_cls: type, checker, stats, errors, testcases):
     """
-        name: name of the module
-        nn_cls: module class type
-        checker: modules inside nn_cls module
-        mode: what to test module with: ts, onnx, etc
+    name: name of the module
+    nn_cls: module class type
+    checker: modules inside nn_cls module
+    mode: what to test module with: ts, onnx, etc
     """
     init_signature = inspect.signature(nn_cls)  # get args for init of module
     try:
@@ -396,7 +425,9 @@ class IncrementalModule(object):
     def __init__(self, tempdir: str, output_py: TextIO):
         super().__init__()
         self.tempdir = tempdir
-        self.output_module = types.ModuleType(f"{__name__}.output")
+        module_name = f"{__name__}.output"
+        self.output_module = types.ModuleType(module_name)
+        sys.modules[module_name] = self.output_module
         self.output_py = output_py
 
     def __contains__(self, name):
@@ -408,6 +439,9 @@ class IncrementalModule(object):
             getattr(self.output_module, name, self.output_module)
             is not self.output_module
         )
+
+    def __del__(self):
+        sys.modules.pop(self.output_module.__name__, None)
 
     def items(self):
         return self.output_module.__dict__.items()
