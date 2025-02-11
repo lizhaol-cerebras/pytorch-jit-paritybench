@@ -1,12 +1,12 @@
 astor
 numpy
 pytest
-torch
 scipy
 scikit-learn
 tensorflow-cpu
+torch==2.4.0 # Keep aligned with monolith
+torchvision==0.19.0 # Keep aligned with monolith
 torchaudio
-torchvision
 pandas
 matplotlib
 hypothesis
