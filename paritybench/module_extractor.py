@@ -166,7 +166,16 @@ class PyTorchModuleExtractor(object):
                         if module_name in IMPORT_WHITELIST:
                             self.imports[to_source(import_node)] = import_node
 
-            elif isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef, ast.Assign, ast.AnnAssign, ast.AugAssign)):
+            elif isinstance(
+                node,
+                (
+                    ast.FunctionDef,
+                    ast.AsyncFunctionDef,
+                    ast.Assign,
+                    ast.AnnAssign,
+                    ast.AugAssign,
+                ),
+            ):
                 self.add_available_symbol(node, overwrite)
 
     def should_output_class(
