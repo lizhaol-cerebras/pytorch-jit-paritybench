@@ -341,8 +341,9 @@ class PyTorchModuleExtractor(object):
             self.search_zipfile(filename)
 
         self.construct_module()  # run and write ast nodes
-        self.test_modules()
-        self.write_testcases(basename)
+        if self.args.args_deducer == "rule-based":
+            self.test_modules()
+            self.write_testcases(basename)
 
         log.info(f"{basename}: {self.stats}")
 

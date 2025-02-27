@@ -122,6 +122,13 @@ def get_args(raw_args=None):
         action="store_true",
         help="use a fresh cache dir for each individual inductor test run and remove it after done",
     )
+    parser.add_argument(
+        "--args-deducer",
+        type=str,
+        default="rule-based",
+        choices=["rule-based", "llm"],
+        help="Choose the test case args deducer: rule-based or LLM",
+    )
     args = parser.parse_args(raw_args)
     return args
 

@@ -1,45 +1,58 @@
-from typing import TextIO, Union, List, Dict, Any, Tuple
-from transformers import AutoModelForCausalLM, AutoTokenizer
-import torch
-import json
+import logging
+import gc
+from typing import Any, Dict, List, TextIO, Tuple, Union
 
+import torch
+from transformers import AutoModelForCausalLM, AutoTokenizer
+
+log = logging.getLogger(__name__)
+
+SEP = "|"
 DEFAULT_PROMPT_TEMPLATE = """You are a PyTorch testing expert. I will provide you with Python code containing PyTorch nn.Module definitions. Your task is to analyze these modules and generate comprehensive test cases in a specific format.
 
 For each nn.Module class in the code, create a test case where each line contains:
 1. The module class name
-2. kwargs for module's constructor method
+2. kwargs for module's __init__ method
 3. kwargs for module's forward method
 
 The output must only in the following this exact format:
-Mlp
-{{"in_features": 64, "hidden_features": 128, "out_features": 64}}
-{{"x": [4, 64]}}
-RMSNorm
-{{"dim": 64, "elementwise_affine": True, "eps": 1e-6}}
-{{"x": [4, 64]}}
+RMSNorm{sep}{{"dim": 64, "elementwise_affine": True, "eps": 1e-6}}{sep}{{"x": torch.rand([4, 64])}}
 
 Rules for generating test cases:
-- Include all nn.Module definitions
+- Must use correct Python syntax and keywords
+- Include all PyTorch nn.Module sub-classes defined in the code
 - Deduce appropriate tensor shapes based on the module's architecture
 - Input tensor shapes must be compatible with the layers in the module
 - Use standard batch sizes (e.g., 4) and reasonable input dimensions
+- Each field is separted by "{sep}"
 - Include all arguments from __init__ method
 - Include all arguments from forward method
-- Include all PyTorch nn.Module classes
 - For loss functions, ensure input and target tensors have compatible shapes
 - Follow PyTorch's dimension conventions (batch_size, channels, height, width)
 - Use torch.rand() for creating input tensors
 - For device placement, use "cpu"
 - Keep tensor dimensions reasonable (e.g., 4, 8, 16, 32, 64)
-- All parenthesis/brackets/curly braces must be properly closed
-- Maintain proper indentation in the output
+- Brackets and quotes must be properly closed
 
 Here's the code to analyze:
 {code}
 
 Generate only the test cases for all nn.Module classes found in the code. Do not include any explanations or other text."""
 
+TESTCASE_TEMPLATE = """
 
+# Auto-generated test cases
+import torch.nn as nn
+
+TESTCASES = [
+    # (nn.Module, init_args, forward_args)
+{test_cases}
+]
+
+"""
+
+
+# Mlp{sep}{{"in_features": 64, "hidden_features": 128, "out_features": 64}}{sep}{{"x": [4, 64]}}
 class TestCaseParsingError(Exception):
     """Exception raised for errors during test case parsing."""
 
@@ -91,7 +104,7 @@ class PromptTemplate:
             List[Dict[str, str]]: List of message dictionaries
         """
         return self.base_messages + [
-            {"role": "user", "content": self.template.format(code=code)}
+            {"role": "user", "content": self.template.format(sep=SEP, code=code)}
         ]
 
     @classmethod
@@ -137,10 +150,12 @@ class PyTorchTestGenerator:
 
         # Set up generation config with defaults
         self.generation_config = {
-            "max_new_tokens": 8192,
-            "temperature": 0.01,
-            "top_p": 0.8,
-            "top_k": 30,
+            "max_new_tokens": 12288,
+            "temperature": 0.001,  # Very low temperature for near-deterministic output
+            "top_p": 0.95,  # Nucleus sampling threshold
+            "top_k": 40,  # Limit vocabulary choices
+            # "repetition_penalty": 1.1,  # Prevent redundant test cases
+            # "length_penalty": 1.0,  # Balance between length and quality
             **(generation_config or {}),
         }
 
@@ -151,11 +166,11 @@ class PyTorchTestGenerator:
                 self.model_name,
                 torch_dtype="auto",
                 device_map="auto",
-                max_memory={"cpu": "16GiB"},  # Limits CPU memory
-                low_cpu_mem_usage=True,  # Reduces CPU memory during loading
-                # offload_folder="offload_folder",  # Optional: directory for offloading
+                trust_remote_code=True,
             )
-            self.tokenizer = AutoTokenizer.from_pretrained(self.model_name)
+            self.tokenizer = AutoTokenizer.from_pretrained(
+                self.model_name, trust_remote_code=True
+            )
 
             # Store the device for reuse
             self.device = next(self.model.parameters()).device
@@ -202,33 +217,18 @@ class PyTorchTestGenerator:
         lines = [line.strip() for line in output.strip().split("\n") if line.strip()]
 
         try:
-            # Process lines in groups of 3
-            for i in range(0, len(lines), 3):
-                if i + 2 >= len(lines):
-                    raise TestCaseParsingError(f"Incomplete test case at line {i}")
+            for i, line in enumerate(lines):
+                parts = line.split(SEP)
+                if len(parts) != 3:
+                    log.warning(f"Incomplete test case at line {i}: {line}")
+                    continue
 
                 # Extract components
-                class_name = lines[i]
-                init_args = lines[i + 1]
-                forward_args = lines[i + 2]
+                class_name, init_args, forward_args = parts
+                test_cases.append(
+                    (class_name.strip(), init_args.strip(), forward_args.strip())
+                )
 
-                # init_args = json.loads(lines[i + 1])
-                # forward_args = json.loads(lines[i + 2])
-                # # Validate components
-                # if not isinstance(init_args, dict):
-                #     raise TestCaseParsingError(
-                #         f"Invalid init args format for {class_name}"
-                #     )
-                # if not isinstance(forward_args, dict):
-                #     raise TestCaseParsingError(
-                #         f"Invalid forward args format for {class_name}"
-                #     )
-                # test_cases.append((class_name, repr(init_args), repr(forward_args)))
-
-                test_cases.append((class_name, init_args, forward_args))
-
-        except json.JSONDecodeError as e:
-            raise TestCaseParsingError(f"Invalid JSON format: {str(e)}")
         except Exception as e:
             raise TestCaseParsingError(f"Error parsing output: {str(e)}")
 
@@ -263,17 +263,13 @@ class PyTorchTestGenerator:
         )
 
         # Prepare inputs and move to device
-        inputs = self.tokenizer(
-            [text], return_tensors="pt", padding=True, truncation=True
-        ).to(self.device)
+        inputs = self.tokenizer([text], return_tensors="pt").to(self.model.device)
 
         # Generate output with optimized settings
         generated_ids = self.model.generate(
             **inputs,
             **self.generation_config,
-            pad_token_id=self.tokenizer.pad_token_id,
-            eos_token_id=self.tokenizer.eos_token_id,
-            use_cache=False,  # Enable KV-cache for faster generation
+            use_cache=True,  # Enable KV-cache for faster generation
         )
 
         # Process output efficiently
@@ -286,6 +282,89 @@ class PyTorchTestGenerator:
 
         # Parse and return formatted test cases
         return self.parse_output(generated_text.strip())
+
+    def write_testcases_to_file(self, filepath: str, test_cases: List[tuple]):
+        """
+        Append test cases to the end of the source file.
+
+        Args:
+            filepath: Path to the source file
+            test_cases: List of (class_name, init_args, forward_args) tuples
+        """
+        if not test_cases:
+            return
+
+        # Convert test cases to formatted strings
+        formatted_cases = []
+        for name, init_args, forward_args in test_cases:
+            case_str = f"    ({name},\n"
+            case_str += f"     lambda: ([], {init_args}),\n"
+            case_str += f"     lambda: ([], {forward_args})),"
+            formatted_cases.append(case_str)
+
+        # Join all test cases with newlines
+        all_cases = "\n".join(formatted_cases)
+
+        # Create the complete test case section
+        test_section = TESTCASE_TEMPLATE.format(test_cases=all_cases)
+
+        # Append to file
+        with open(filepath, "a", encoding="utf-8") as f:
+            f.write(test_section)
+
+    @classmethod
+    def process_source_files(
+        cls,
+        src_paths: List[str],
+        model_name: str = "Qwen/Qwen2.5-Coder-7B-Instruct",
+        batch_size: int = 1,
+        cleanup_cuda: bool = True,
+    ):
+        """
+        Process multiple source files and generate test cases with proper resource cleanup.
+
+        Args:
+            src_paths: List of file paths to process
+            model_name: Name of the model to use
+            batch_size: Number of files to process before cleanup
+            cleanup_cuda: Whether to perform CUDA cleanup after each batch
+        """
+        log = logging.getLogger(__name__)
+
+        # Convert all paths to Path objects for consistency
+        paths = src_paths
+
+        for i in range(0, len(paths), batch_size):
+            # Create generator instance for this batch
+            generator = cls(model_name=model_name)
+            batch_paths = paths[i : i + batch_size]
+
+            try:
+                # Process each file in the batch
+                for src_path in batch_paths:
+                    log.info(f"Generating test cases for {src_path}...")
+
+                    try:
+                        with open(src_path, "r", encoding="utf-8") as src_file:
+                            src = src_file.read()
+                            test_cases = generator.generate_testcases(src)
+                        generator.write_testcases_to_file(src_path, test_cases)
+                        log.info(
+                            f"Successfully wrote {len(test_cases)} test cases to {src_path}"
+                        )
+
+                    except Exception as e:
+                        log.warning(f"Error processing {src_path}: {str(e)}")
+                        continue
+
+            finally:
+                # Cleanup after batch processing
+                del generator
+                gc.collect()
+
+                if cleanup_cuda and torch.cuda.is_available():
+                    torch.cuda.empty_cache()
+                    torch.cuda.ipc_collect()
 
 
 # Example usage:
@@ -312,8 +391,8 @@ if __name__ == "__main__":
         print("\nGenerated test cases:")
         for class_name, init_args, forward_args in test_cases:
             print(f"\nClass: {class_name}")
-            print(f"Init args: {json.dumps(init_args, indent=2)}")
-            print(f"Forward args: {json.dumps(forward_args, indent=2)}")
+            print(f"Init args: {init_args}")
+            print(f"Forward args: {forward_args}")
 
     except TestCaseParsingError as e:
         print(f"Error parsing test cases: {e}")
