@@ -8,8 +8,9 @@ from functools import partial
 from multiprocessing.pool import ThreadPool
 from unittest.mock import patch
 
+from paritybench.generate_testcases import PyTorchTestGenerator
 from paritybench.module_extractor import PyTorchModuleExtractor
-from paritybench.reporting import Stats, ErrorAggregatorDict
+from paritybench.reporting import ErrorAggregatorDict, Stats
 from paritybench.utils import subproc_wrapper
 
 log = logging.getLogger(__name__)
@@ -39,9 +40,7 @@ def generate_zipfile_subproc(tempdir: str, path: str, args):
     """
     errors = ErrorAggregatorDict(path)
     stats = Stats()
-    test_path = "{}/test_{}.py".format(
-        args.tests_dir, re.sub(r"([.]zip|/)$", "", os.path.basename(path))
-    )
+    test_path = make_test_src_path(path, args.tests_dir)
     os.makedirs(args.tests_dir, exist_ok=True)
     with open(test_path, "w") as output_py:
         extractor = PyTorchModuleExtractor(
@@ -49,6 +48,13 @@ def generate_zipfile_subproc(tempdir: str, path: str, args):
         )
         extractor.main(path)
     return errors, stats
+
+
+def make_test_src_path(path, tests_dir):
+    test_path = "{}/test_{}.py".format(
+        tests_dir, re.sub(r"([.]zip|/)$", "", os.path.basename(path))
+    )
+    return test_path
 
 
 def generate_all(args, download_dir, limit=None, jobs=4):
@@ -74,3 +80,11 @@ def generate_all(args, download_dir, limit=None, jobs=4):
     pool.close()
     errors.print_report()
     log.info(f"TOTAL: {stats}, took {time.time() - start:.1f} seconds")
+
+    if args.args_deducer == "llm":
+        src_paths = [
+            make_test_src_path(zipfile, args.tests_dir) for zipfile in zipfiles
+        ]
+        PyTorchTestGenerator.process_source_files(
+            src_paths, model_name="Qwen/Qwen2.5-Coder-7B-Instruct"
+        )

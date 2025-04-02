@@ -33,5 +33,5 @@ python main.py --download-urls path-to-urls-file [--download-dir download-dir] [
 ```
 #### Regenerate PyTorch module test cases. By default, loads from `./paritybench_download` and outputs to `./generated` folder.
 ```
-python main.py --generate-all [--download-dir download-dir] [--tests-dir outputs-dir] [--limit max-repos] [--jobs num-worker-threads]
+python main.py --generate-all [--download-dir download-dir] [--tests-dir outputs-dir] [--limit max-repos] [--jobs num-worker-threads] [--args-deducer testcase-args-deducer]
 ```

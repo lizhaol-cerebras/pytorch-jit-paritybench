@@ -166,7 +166,16 @@ class PyTorchModuleExtractor(object):
                         if module_name in IMPORT_WHITELIST:
                             self.imports[to_source(import_node)] = import_node
 
-            elif isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef, ast.Assign)):
+            elif isinstance(
+                node,
+                (
+                    ast.FunctionDef,
+                    ast.AsyncFunctionDef,
+                    ast.Assign,
+                    ast.AnnAssign,
+                    ast.AugAssign,
+                ),
+            ):
                 self.add_available_symbol(node, overwrite)
 
     def should_output_class(
@@ -332,8 +341,9 @@ class PyTorchModuleExtractor(object):
             self.search_zipfile(filename)
 
         self.construct_module()  # run and write ast nodes
-        self.test_modules()
-        self.write_testcases(basename)
+        if self.args.args_deducer == "rule-based":
+            self.test_modules()
+            self.write_testcases(basename)
 
         log.info(f"{basename}: {self.stats}")
 
